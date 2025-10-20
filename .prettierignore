@@ -1,0 +1,12 @@
+node_modules
+.next
+out
+dist
+build
+coverage
+.env*
+*.log
+.DS_Store
+amplify/backend
+amplify/team-provider-info.json
+amplify/#current-cloud-backend

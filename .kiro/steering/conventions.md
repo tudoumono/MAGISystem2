@@ -8,6 +8,46 @@
 - **Utilities**: camelCase (`formatTraceStep.ts`)
 - **Constants**: SCREAMING_SNAKE_CASE (`AGENT_TYPES.ts`)
 
+## AI可読性ガイドライン
+
+### コメント標準
+```typescript
+/**
+ * [Component/Function Name] - [簡潔な説明]
+ * 
+ * 目的: [なぜこのコンポーネント/関数が必要か]
+ * 設計理由: [なぜこの実装方法を選んだか]
+ * 
+ * @param {Type} param - [パラメータの説明と使用理由]
+ * @returns {Type} [戻り値の説明と意味]
+ * 
+ * 使用例:
+ * ```typescript
+ * // 実際の使用例
+ * ```
+ * 
+ * 関連: [関連ファイルや学習リソース]
+ */
+```
+
+### ファイルヘッダー標準
+```typescript
+/**
+ * [ファイル名] - [システムでの役割]
+ * 
+ * このファイルは[具体的な責務]を担当します。
+ * [技術選択の理由や重要な設計判断]
+ * 
+ * 主要機能:
+ * - [機能1]: [説明]
+ * - [機能2]: [説明]
+ * 
+ * 学習ポイント:
+ * - [重要な概念1]
+ * - [重要な概念2]
+ */
+```
+
 ### 変数・関数
 - **Variables**: camelCase (`traceId`, `agentResponse`)
 - **Functions**: camelCase (`executeAgent`, `formatScore`)
