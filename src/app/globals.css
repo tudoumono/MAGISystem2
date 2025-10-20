@@ -1,0 +1,321 @@
+/**
+ * Global Styles for MAGI Decision System
+ * 
+ * このファイルはアプリケーション全体で使用されるグローバルスタイルを定義します。
+ * Tailwind CSSのベーススタイルとカスタムCSS変数を含みます。
+ * 
+ * 学習ポイント:
+ * - Tailwind CSSのディレクティブ
+ * - CSS変数によるテーマ管理
+ * - ダークモード対応
+ * - カスタムスクロールバー
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * CSS変数の定義
+ * 
+ * 学習ポイント:
+ * - :root セレクターでグローバル変数を定義
+ * - HSL色空間の使用（色の調整が容易）
+ * - ライトモードとダークモードの切り替え対応
+ */
+@layer base {
+  :root {
+    /* ライトモードの色定義 */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 262.1 83.3% 57.8%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 262.1 83.3% 57.8%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* ダークモードの色定義 */
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 262.1 83.3% 57.8%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 262.1 83.3% 57.8%;
+  }
+}
+
+/**
+ * ベーススタイルの設定
+ * 
+ * 学習ポイント:
+ * - * セレクターでボックスサイジングを統一
+ * - html, body要素の基本設定
+ * - スクロール動作の最適化
+ */
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/**
+ * カスタムコンポーネントスタイル
+ * 
+ * 学習ポイント:
+ * - @layer components でコンポーネント固有のスタイルを定義
+ * - 再利用可能なスタイルパターンの作成
+ */
+@layer components {
+  /* カスタムスクロールバー */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground)) hsl(var(--muted));
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-muted rounded-full;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground rounded-full;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-foreground/60;
+  }
+
+  /* MAGI システム固有のスタイル */
+  .magi-panel {
+    @apply bg-card border border-border rounded-lg shadow-sm;
+  }
+  
+  .magi-panel-header {
+    @apply px-6 py-4 border-b border-border;
+  }
+  
+  .magi-panel-content {
+    @apply px-6 py-4;
+  }
+  
+  /* エージェント固有の色分け */
+  .agent-caspar {
+    @apply border-l-4 border-l-magi-caspar-500;
+  }
+  
+  .agent-balthasar {
+    @apply border-l-4 border-l-magi-balthasar-500;
+  }
+  
+  .agent-melchior {
+    @apply border-l-4 border-l-magi-melchior-500;
+  }
+  
+  .agent-solomon {
+    @apply border-l-4 border-l-magi-solomon-500;
+  }
+  
+  /* 判定結果のスタイル */
+  .decision-approved {
+    @apply bg-green-50 border-green-200 text-green-800;
+  }
+  
+  .decision-rejected {
+    @apply bg-red-50 border-red-200 text-red-800;
+  }
+  
+  .decision-pending {
+    @apply bg-yellow-50 border-yellow-200 text-yellow-800;
+  }
+}
+
+/**
+ * ユーティリティクラス
+ * 
+ * 学習ポイント:
+ * - @layer utilities で独自のユーティリティクラスを定義
+ * - アニメーションやトランジションの統一
+ */
+@layer utilities {
+  /* テキスト選択の無効化 */
+  .select-none {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  
+  /* フォーカス表示の統一 */
+  .focus-visible-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  }
+  
+  /* グラデーション背景 */
+  .gradient-magi {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--magi-caspar-500)) 0%,
+      hsl(var(--magi-balthasar-500)) 50%,
+      hsl(var(--magi-melchior-500)) 100%
+    );
+  }
+  
+  /* アニメーション */
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .animate-thinking {
+    animation: thinking 2s ease-in-out infinite;
+  }
+}
+
+/**
+ * キーフレームアニメーション
+ * 
+ * 学習ポイント:
+ * - @keyframes でカスタムアニメーションを定義
+ * - エージェント実行中の視覚的フィードバック
+ */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes thinking {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/**
+ * プリント用スタイル
+ * 
+ * 学習ポイント:
+ * - @media print でプリント時の最適化
+ * - 不要な要素の非表示
+ * - 色の調整
+ */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-break-before {
+    page-break-before: always;
+  }
+  
+  .print-break-after {
+    page-break-after: always;
+  }
+  
+  /* プリント時は背景色を削除 */
+  .magi-panel {
+    @apply bg-white border border-gray-300;
+  }
+}
+
+/**
+ * 高コントラストモード対応
+ * 
+ * 学習ポイント:
+ * - アクセシビリティ向上のための設定
+ * - 視覚的な区別を強化
+ */
+@media (prefers-contrast: high) {
+  .magi-panel {
+    @apply border-2;
+  }
+  
+  .decision-approved {
+    @apply bg-green-100 border-green-400;
+  }
+  
+  .decision-rejected {
+    @apply bg-red-100 border-red-400;
+  }
+}
+
+/**
+ * 動きを抑制する設定
+ * 
+ * 学習ポイント:
+ * - prefers-reduced-motion でアニメーションを制御
+ * - アクセシビリティ配慮
+ */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-slide-up,
+  .animate-thinking {
+    animation: none;
+  }
+  
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
