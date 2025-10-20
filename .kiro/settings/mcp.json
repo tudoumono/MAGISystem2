@@ -1,0 +1,101 @@
+{
+    "mcpServers": {
+        // "aws-knowledge": {
+        //     "command": "uvx",
+        //     "args": [
+        //         "awslabs.aws-documentation-mcp-server@latest"
+        //     ],
+        //     "env": {
+        //         "FASTMCP_LOG_LEVEL": "ERROR"
+        //     },
+        //     "disabled": false,
+        //     "autoApprove": [
+        //         "search_documentation",
+        //         "read_documentation",
+        //         "recommend",
+        //         "get_regional_availability",
+        //         "list_regions"
+        //     ],
+        //     "description": "AWS公式ドキュメント検索・参照（学習用）"
+        // },
+        "github": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-github"
+            ],
+            "env": {
+                "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+            },
+            "disabled": false,
+            "autoApprove": [
+                "search_repositories",
+                "get_file_contents",
+                "list_files",
+                "get_repository_info"
+            ],
+            "description": "GitHub統合（コード参照・学習用）"
+        },
+        "filesystem": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-filesystem",
+                "."
+            ],
+            "disabled": false,
+            "autoApprove": [
+                "read_file",
+                "list_directory",
+                "search_files"
+            ],
+            "description": "ローカルファイルシステム（学習プロジェクト用）"
+        },
+        "web-search": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-brave-search"
+            ],
+            "env": {
+                "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+            },
+            "disabled": false,
+            "autoApprove": [
+                "search",
+                "get_page_content"
+            ],
+            "description": "Web検索（技術情報・学習リソース検索用）"
+        }
+        // "postgres": {
+        //   "command": "npx",
+        //   "args": ["-y", "@modelcontextprotocol/server-postgres"],
+        //   "env": {
+        //     "POSTGRES_CONNECTION_STRING": "postgresql://localhost:5432/magi_dev"
+        //   },
+        //   "disabled": true,
+        //   "autoApprove": [],
+        //   "description": "PostgreSQL統合（開発DB用、オプション）"
+        // }
+    },
+    "learning_configuration": {
+        "auto_approve_safe_operations": true,
+        "log_mcp_interactions": true,
+        "explain_mcp_responses": true,
+        "suggest_related_tools": true
+    },
+    "development_settings": {
+        "enable_debug_logging": true,
+        "cache_responses": true,
+        "timeout_seconds": 30,
+        "max_retries": 3
+    },
+    "cost_optimization": {
+        "rate_limit_requests": true,
+        "cache_duration_minutes": 60,
+        "disable_expensive_operations": [
+            "large_file_operations",
+            "bulk_api_calls"
+        ]
+    }
+}
