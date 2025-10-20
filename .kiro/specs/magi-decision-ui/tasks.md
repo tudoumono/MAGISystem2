@@ -19,26 +19,29 @@
 
 ## Phase 1: 基盤とモックデータ実装
 
-- [ ] 1. プロジェクト構造とコアインターフェースのセットアップ **[🤖 Kiro]**
+- [x] 1. プロジェクト構造とコアインターフェースのセットアップ **[🤖 Kiro]**
   - Next.js 15 + TypeScript + Tailwind CSSプロジェクトを作成（学習用詳細コメント付き）
   - Amplify Gen2設定（認証、データ、関数）をセットアップ（各設定の説明コメント付き）
   - エージェント、会話、トレース用のコアTypeScriptインターフェースを定義（型設計の理由を説明）
   - ESLint、Prettier、開発ツールを設定（設定理由と最適化ポイントを記載）
   - 学習用README.mdを作成（技術スタックの選択理由と学習ポイントを記載）
   - **モックデータライブラリの基盤を構築（様々なシナリオ対応）**
+  - **📚 学習資料: 基礎技術の学習ドキュメント作成完了**
   - _要件: 1.1, 1.2, 1.3_
 
 - [ ] 2. データモデルとAmplify Data設定の作成
-  - [ ] 2.1 Amplify Dataスキーマの定義 **[🤖 Kiro]**
+  - [x] 2.1 Amplify Dataスキーマの定義 **[🤖 Kiro]**
     - User、Conversation、Message、TraceStep、AgentPresetモデルを作成
     - オーナーベースアクセスで認可ルールを設定
     - リアルタイム更新用GraphQLサブスクリプションをセットアップ
+    - **🤖 AI可読性**: 各モデルの設計理由と関係性を詳細コメント化
     - _要件: 2.1, 2.2, 2.3_
 
   - [ ] 2.2 TypeScript型とAPIクライアントの生成 **[🤖 Kiro + 👤 Human]**
     - **[🤖 Kiro]** Amplify codegenを実行してスキーマから型を生成
     - **[🤖 Kiro]** データ操作用カスタムフック（useConversations、useMessages）を作成
     - **[🤖 Kiro]** より良いUXのための楽観的更新を実装
+    - **[🤖 Kiro]** **🤖 AI可読性**: 各フックの使用目的と実装パターンを詳細解説
     - **[👤 Human]** `amplify push` でAWSリソースを実際にデプロイ
     - _要件: 2.1, 2.2, 2.3_
 
@@ -78,6 +81,20 @@
     - 適切なクリーンアップ付きサインアウト機能を追加
     - _要件: 1.2, 1.3, 1.4_
 
+---
+
+## 📚 Phase 1-2 完了時の学習資料更新 **[🤖 Kiro]**
+- [ ] **学習ドキュメント更新**: Phase 1-2完了時
+  - `docs/learning/phases/phase1-2/frontend-first.md` 新規作成
+  - `docs/learning/phases/phase1-2/ui-components.md` 新規作成  
+  - `docs/learning/phases/phase1-2/mock-integration.md` 新規作成
+  - 基礎技術ドキュメントにPhase 1-2実装例を追記
+  - 相互参照リンクと学習順序の更新
+  - 実装例とサンプルコードの追加
+  - _学習戦略: フロントエンドファースト開発の完全ドキュメント化_
+
+---
+
 ## Phase 2: フロントエンド基盤（認証とデザインシステム）
 
 - [ ] 5. 認証UIとデザインシステムの構築
@@ -85,13 +102,30 @@
     - SignInForm、SignUpForm、ForgotPasswordFormコンポーネントを作成
     - SSRトークン処理付きAuthProviderコンテキストを実装
     - 保護されたルートラッパーと認証ガードを構築
+    - **🤖 AI可読性**: 各コンポーネントの責務と認証フローを詳細解説
     - _要件: 1.1, 1.2, 1.3_
 
   - [ ] 5.2 基本UIコンポーネントライブラリの作成 **[🤖 Kiro]**
     - Button、Input、Card、Modal等の基本コンポーネントを作成
     - Tailwind CSSベースのデザインシステムを構築
     - ダークモード対応とテーマシステムを実装
+    - **🤖 AI可読性**: デザインシステムの設計原則と各コンポーネントの使用指針を明記
     - _要件: 6.1, 6.2, 6.5_
+
+---
+
+## 📚 Phase 3 完了時の学習資料更新 **[🤖 Kiro]**
+- [ ] **学習ドキュメント更新**: Phase 3完了時
+  - `docs/learning/phases/phase3/README.md` 新規作成
+  - `docs/learning/phases/phase3/data-integration.md` 新規作成
+  - `docs/learning/phases/phase3/auth-implementation.md` 新規作成
+  - `docs/learning/phases/phase3/realtime-features.md` 新規作成
+  - AWS Amplify Gen2ドキュメントに実際の統合例を追記
+  - Next.js App Routerドキュメントに認証統合パターンを追記
+  - モックから実データへの移行パターンをドキュメント化
+  - _学習戦略: 部分統合パターンの詳細解説_
+
+---
 
 ## Phase 3: コア機能実装（エージェント連携）
 
@@ -186,6 +220,21 @@
     - 会話リスト用仮想スクロールを実装
     - 画像最適化とアセット圧縮を追加
     - _要件: 5.1, 5.4_
+
+---
+
+## 📚 Phase 4-6 完了時の学習資料更新 **[🤖 Kiro]**
+- [ ] **学習ドキュメント最終更新**: Phase 4-6完了時
+  - `docs/learning/phases/phase4-6/README.md` 新規作成
+  - `docs/learning/phases/phase4-6/ai-integration.md` 新規作成
+  - `docs/learning/phases/phase4-6/observability.md` 新規作成
+  - `docs/learning/phases/phase4-6/production-ready.md` 新規作成
+  - 全基礎技術ドキュメントに本格運用の考慮事項を追記
+  - 完全統合パターンとベストプラクティスをドキュメント化
+  - 学習ガイドの完成版リリース準備
+  - _学習戦略: 本格的AIシステム構築の完全ガイド_
+
+---
 
 ## Phase 6: アクセシビリティとテスト
 

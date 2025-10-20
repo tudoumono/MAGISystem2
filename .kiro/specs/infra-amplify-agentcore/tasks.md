@@ -8,6 +8,7 @@
   - **[🤖 Kiro]** 開発・ステージング・本番環境の分離設定を実装
   - **[👤 Human]** Git統合とブランチベースデプロイメントを設定
   - **[🤖 Kiro]** 学習用ドキュメントとAmplify Gen2の特徴説明を作成
+  - **🤖 AI可読性**: インフラ設定の設計判断と構成理由を詳細解説
   - _要件: 6.1, 6.2_
 
 - [ ] 2. Amplify Auth設定の実装
@@ -16,6 +17,7 @@
     - **[🤖 Kiro]** MFA（SMS、TOTP）オプションを実装
     - **[🤖 Kiro]** ソーシャルプロバイダー（Google、Apple）統合を設定
     - **[🤖 Kiro]** カスタムユーザー属性（role、preferences）を定義
+    - **[🤖 Kiro]** **🤖 AI可読性**: 認証設定の選択理由とセキュリティ考慮事項を明記
     - **[👤 Human]** `amplify push` でCognitoリソースをデプロイ
     - _要件: 2.1, 2.2, 5.2_
 
@@ -54,6 +56,19 @@
     - 接続管理とスケーラビリティ対策を追加
     - サブスクリプションフィルタリングと権限制御を実装
     - _要件: 2.3, 4.4_
+
+---
+
+## 📚 Phase 1 完了時の学習資料更新 **[🤖 Kiro]**
+- [ ] **学習ドキュメント更新**: Phase 1完了時
+  - `docs/learning/phases/infra-phase1/README.md` 新規作成
+  - `docs/learning/phases/infra-phase1/amplify-gen2-setup.md` 新規作成
+  - `docs/learning/phases/infra-phase1/auth-data-integration.md` 新規作成
+  - AWS Amplify Gen2ドキュメントにインフラ実装例を追記
+  - インフラ設定の設計判断と運用考慮事項をドキュメント化
+  - _学習戦略: インフラ構築パターンの完全ガイド_
+
+---
 
 ## Phase 2: AgentCore統合とデプロイメント
 
