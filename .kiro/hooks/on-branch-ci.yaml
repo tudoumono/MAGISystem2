@@ -1,0 +1,149 @@
+name: "Branch CI Pipeline"
+description: "PR/mainブランチで型チェック、テスト、ビルドを実行（学習用）"
+
+# トリガー設定
+triggers:
+  - type: "git_push"
+    branches: ["main", "develop"]
+  - type: "pull_request"
+    actions: ["opened", "synchronize", "reopened"]
+  - type: "git_commit"
+    patterns:
+      - "src/**"
+      - "agents/**"
+      - "amplify/**"
+
+# 実行条件
+conditions:
+  - type: "branch_protection"
+    require_status_checks: true
+  - type: "file_changes"
+    include_patterns:
+      - "**/*.ts"
+      - "**/*.tsx"
+      - "**/*.js"
+      - "**/*.jsx"
+      - "**/*.py"
+      - "**/package.json"
+      - "**/requirements.txt"
+
+# 実行ステップ（並列実行）
+parallel_steps:
+  - name: "Frontend CI"
+    steps:
+      - name: "Install Dependencies"
+        commands:
+          - "npm ci"
+        description: "Node.js依存関係をインストール"
+
+      - name: "Type Check"
+        commands:
+          - "npm run type-check"
+        description: "TypeScript型チェック"
+
+      - name: "Lint Check"
+        commands:
+          - "npm run lint"
+        description: "ESLint + Prettierチェック"
+
+      - name: "Unit Tests"
+        commands:
+          - "npm run test:unit -- --coverage"
+        description: "Jest単体テスト実行"
+
+      - name: "Build Check"
+        commands:
+          - "npm run build"
+        description: "Next.jsビルドチェック"
+
+  - name: "Backend CI"
+    steps:
+      - name: "Python Setup"
+        commands:
+          - "python -m pip install --upgrade pip"
+          - "pip install -r agents/requirements.txt"
+        description: "Python環境セットアップ"
+
+      - name: "Python Lint"
+        commands:
+          - "black --check agents/"
+          - "isort --check-only agents/"
+          - "flake8 agents/"
+        description: "Pythonコード品質チェック"
+
+      - name: "Python Tests"
+        commands:
+          - "pytest agents/tests/ --cov=agents/"
+        description: "Python単体テスト実行"
+
+  - name: "Infrastructure CI"
+    condition: "files_changed.includes('amplify/')"
+    steps:
+      - name: "Amplify Validation"
+        commands:
+          - "npx amplify configure"
+          - "npx amplify status"
+        description: "Amplify設定検証"
+
+      - name: "Schema Validation"
+        commands:
+          - "npx amplify codegen"
+          - "npm run validate-schema"
+        description: "GraphQLスキーマ検証"
+
+# 学習用機能
+learning_features:
+  show_progress: true
+  explain_failures: true
+  suggest_fixes: true
+  generate_reports: true
+
+# 品質ゲート
+quality_gates:
+  - name: "Code Coverage"
+    threshold: 80
+    metric: "line_coverage"
+    required: false  # 学習用なので必須ではない
+
+  - name: "Type Safety"
+    threshold: 100
+    metric: "type_errors"
+    required: true
+
+  - name: "Lint Score"
+    threshold: 95
+    metric: "lint_score"
+    required: false
+
+# 成果物
+artifacts:
+  - path: "coverage/"
+    name: "test-coverage"
+    retention: 7  # 7日間保持
+
+  - path: "dist/"
+    name: "build-output"
+    retention: 3
+
+  - path: "reports/"
+    name: "quality-reports"
+    retention: 14
+
+# 通知設定
+notifications:
+  on_success:
+    message: "✅ CI成功: 全チェック通過"
+    include_metrics: true
+  
+  on_failure:
+    message: "❌ CI失敗: {failed_steps}"
+    include_logs: true
+    suggest_actions: true
+
+# 学習レポート生成
+post_actions:
+  - name: "Generate Learning Report"
+    commands:
+      - "node scripts/generate-ci-report.js"
+    description: "CI実行結果の学習レポートを生成"
+    output: "docs/learning/ci-report-{timestamp}.md"

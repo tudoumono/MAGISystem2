@@ -1,0 +1,82 @@
+name: "Sync Tasks on Spec Approval"
+description: "Spec承認時にtasksとデータ契約を同期（学習用）"
+
+# トリガー設定
+triggers:
+  - type: "spec_approved"
+    spec_types: ["requirements", "design", "tasks"]
+  - type: "file_save"
+    patterns:
+      - ".kiro/specs/**/requirements.md"
+      - ".kiro/specs/**/design.md"
+      - ".kiro/specs/**/tasks.md"
+
+# 実行条件
+conditions:
+  - type: "spec_status"
+    status: "approved"
+  - type: "file_contains"
+    patterns:
+      - "# Requirements Document"
+      - "# Design Document" 
+      - "# Implementation Plan"
+
+# 実行ステップ
+steps:
+  - name: "Extract API Contracts"
+    commands:
+      - "node scripts/extract-api-contracts.js {spec_path}"
+    description: "Specからインターフェース定義を抽出"
+    outputs:
+      - "src/types/generated/"
+      - "agents/shared/types.py"
+
+  - name: "Update Type Definitions"
+    commands:
+      - "npx amplify codegen"
+      - "npm run type-check"
+    description: "Amplify型定義を更新し、型チェックを実行"
+
+  - name: "Sync Agent Configurations"
+    condition: "spec_name.includes('agent')"
+    commands:
+      - "python scripts/sync-agent-configs.py {spec_path}"
+    description: "エージェント設定をSpecと同期"
+
+  - name: "Generate Implementation Stubs"
+    commands:
+      - "node scripts/generate-stubs.js {spec_path}"
+    description: "実装スケルトンコードを生成"
+    outputs:
+      - "src/components/generated/"
+      - "src/lib/generated/"
+
+  - name: "Update Documentation"
+    commands:
+      - "node scripts/update-docs.js {spec_path}"
+    description: "技術ドキュメントを自動更新"
+    outputs:
+      - "docs/api/"
+      - "docs/architecture/"
+
+# 学習用機能
+learning_features:
+  show_diff: true
+  explain_changes: true
+  generate_comments: true
+  create_learning_notes: true
+
+# 出力設定
+outputs:
+  - path: "docs/learning/spec-sync-{timestamp}.md"
+    content: "Spec同期の学習ログ"
+    template: "spec-sync-log"
+
+# 通知設定
+notifications:
+  on_success:
+    message: "📋 Spec同期完了: {spec_name}"
+    details: "型定義、設定、ドキュメントを更新しました"
+  on_error:
+    message: "⚠️ Spec同期エラー: {error_message}"
+    action: "手動確認が必要です"
