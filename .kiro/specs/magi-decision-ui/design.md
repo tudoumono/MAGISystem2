@@ -4,6 +4,36 @@
 
 エヴァンゲリオンのMAGIシステムにインスパイアされた多エージェント意思決定システムのWebユーザーインターフェースを設計します。システムは3賢者（CASPAR、BALTHASAR、MELCHIOR）とSOLOMON Judgeによる多視点分析を提供し、リアルタイムな推論過程の可視化と柔軟なエージェント設定機能を備えます。
 
+## Development Approach
+
+### フロントエンドファースト開発戦略
+
+学習効果と開発効率を最大化するため、**フロントエンドファースト**のアプローチを採用します。
+
+#### 段階的開発フロー
+
+**Phase 1-2: モックデータ開発** 🎭
+- エージェント応答は事前定義されたモックデータを使用
+- UIロジック、デザインシステム、ユーザー体験に集中
+- 様々なシナリオ（成功、エラー、ローディング、エッジケース）を網羅的にテスト
+- 視覚的フィードバックによる学習効果の最大化
+
+**Phase 3: 部分統合** 🔗
+- Amplify Data（認証・会話履歴・プリセット管理）は実データ
+- エージェント実行部分はまだモックデータを使用
+- データ永続化とリアルタイム機能の動作確認
+
+**Phase 4-6: 完全統合** 🤖
+- 全てのコンポーネントが実データで動作
+- Strands Agents + Bedrock AgentCore統合
+- 本格的なMAGI意思決定システムとして完成
+
+#### 学習メリット
+- **視覚的フィードバック**: 進捗が目に見えてモチベーション維持
+- **段階的複雑性**: 簡単なものから複雑なものへ自然に学習
+- **早期検証**: UIコンセプトとユーザー体験を早期に確認
+- **デバッグ容易性**: フロントエンドの方がエラーが分かりやすい
+
 ## Architecture
 
 ### システム全体アーキテクチャ
@@ -199,6 +229,108 @@ interface AgentScore {
   score: number;        // 0-100点のスコア
   reasoning: string;    // スコアの根拠
 }
+
+interface TraceStep {
+  id: string;
+  traceId: string;
+  stepNumber: number;
+  agentId: string;
+  action: string;
+  toolsUsed: string[];
+  citations: string[];
+  duration: number;
+  errorCount: number;
+  timestamp: Date;
+}
+```
+
+### Mock Data Strategy
+
+#### Phase 1-2: モックデータ実装
+```typescript
+// src/lib/mock/magi-responses.ts
+export const mockMAGIDecision = (question: string): Promise<AskResponse> => {
+  return new Promise((resolve) => {
+    // リアルな応答時間をシミュレート
+    setTimeout(() => {
+      resolve({
+        conversationId: generateId(),
+        messageId: generateId(),
+        agentResponses: [
+          {
+            agentId: 'caspar',
+            decision: 'REJECTED',
+            content: '慎重な検討が必要です。過去の事例を分析すると、このような急進的な変更は予期しない問題を引き起こす可能性があります。',
+            reasoning: 'リスク分析の結果、成功確率が低く、失敗時の影響が大きいと判断',
+            confidence: 0.85,
+            executionTime: 1200
+          },
+          {
+            agentId: 'balthasar',
+            decision: 'APPROVED',
+            content: '革新的で素晴らしいアイデアです！新しい可能性を切り開く挑戦として、積極的に取り組むべきです。',
+            reasoning: '創造性と革新性の観点から、大きな価値創造の可能性を評価',
+            confidence: 0.92,
+            executionTime: 980
+          },
+          {
+            agentId: 'melchior',
+            decision: 'APPROVED',
+            content: 'データを総合的に分析した結果、適切な準備と段階的実装により成功可能と判断します。',
+            reasoning: '科学的分析により、リスクを管理しながら実行可能と結論',
+            confidence: 0.78,
+            executionTime: 1450
+          }
+        ],
+        judgeResponse: {
+          finalDecision: 'APPROVED',
+          votingResult: { approved: 2, rejected: 1, abstained: 0 },
+          scores: [
+            { agentId: 'caspar', score: 75, reasoning: '慎重で現実的な分析' },
+            { agentId: 'balthasar', score: 88, reasoning: '創造的で前向きな提案' },
+            { agentId: 'melchior', score: 82, reasoning: 'バランスの取れた科学的判断' }
+          ],
+          summary: '3賢者の判断を総合すると、適切な準備により実行可能',
+          finalRecommendation: '段階的実装によるリスク管理を推奨',
+          reasoning: '多数決により可決。ただし、CASPARの懸念を考慮した慎重な実行が必要',
+          confidence: 0.85
+        },
+        traceId: generateTraceId(),
+        executionTime: 1450
+      });
+    }, 1500); // 1.5秒の応答時間をシミュレート
+  });
+};
+
+// 様々なシナリオのモックデータ
+export const mockScenarios = {
+  unanimous_approval: () => mockMAGIDecision('全員一致で可決されるケース'),
+  unanimous_rejection: () => mockMAGIDecision('全員一致で否決されるケース'),
+  split_decision: () => mockMAGIDecision('意見が分かれるケース'),
+  error_scenario: () => Promise.reject(new Error('エージェント実行エラー')),
+  timeout_scenario: () => new Promise(() => {}) // タイムアウトシミュレート
+};
+```
+
+#### Phase 3: 部分統合パターン
+```typescript
+// src/lib/api/hybrid-execution.ts
+export const executeMAGIDecision = async (
+  question: string,
+  config?: AgentConfig[]
+): Promise<AskResponse> => {
+  // Phase 3: 認証・データは実データ、エージェントはモック
+  const user = await getCurrentUser(); // 実データ
+  const conversation = await createConversation(user.id); // 実データ
+  
+  // エージェント実行はまだモック
+  const magiResult = await mockMAGIDecision(question);
+  
+  // メッセージ保存は実データ
+  await saveMessage(conversation.id, question, magiResult);
+  
+  return magiResult;
+};
 ```
 
 #### 2. Configuration Management
