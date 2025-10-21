@@ -38,6 +38,11 @@
     - _要件: 2.1, 2.2, 2.3_
 
   - [ ] 2.2 TypeScript型とAPIクライアントの生成 **[🤖 Kiro + 👤 Human]**
+
+
+
+
+
     - **[🤖 Kiro]** Amplify codegenを実行してスキーマから型を生成
     - **[🤖 Kiro]** データ操作用カスタムフック（useConversations、useMessages）を作成
     - **[🤖 Kiro]** より良いUXのための楽観的更新を実装

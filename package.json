@@ -7,7 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "setup-env": "node scripts/setup-env.js",
+    "validate-env": "node scripts/setup-env.js validate",
+    "amplify:push": "npx ampx push",
+    "amplify:status": "npx ampx status",
+    "amplify:logs": "npx ampx logs"
   },
   "dependencies": {
     "@aws-amplify/backend": "^1.6.0",

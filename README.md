@@ -110,50 +110,53 @@ magi-decision-ui/
 
 ## 🚀 セットアップ・実行方法
 
-### 前提条件
+### ⚡ クイックスタート
 
-- Node.js 20.x 以上
-- npm または yarn
-- AWS CLI (Amplify使用時)
-- Git
+**5分でセットアップ完了！** → [**QUICKSTART.md**](QUICKSTART.md)
 
-### 1. プロジェクトのクローン
+### 📋 詳細な手順書
 
-```bash
-git clone <repository-url>
-cd magi-decision-ui
-```
+完全なセットアップ手順 → [**ユーザーアクション手順書**](docs/deployment/user-action-guide.md)
 
-### 2. 依存関係のインストール
+### 基本セットアップ
+
+#### 前提条件
+
+- Node.js 18+ 
+- AWS アカウント
+- AWS CLI
+
+#### 1. 依存関係のインストール
 
 ```bash
 npm install
-# または
-yarn install
 ```
 
-### 3. 開発サーバーの起動
+#### 2. AWS認証とデプロイ
+
+```bash
+# AWS認証設定
+aws configure
+
+# Amplifyリソースデプロイ
+npx ampx configure profile
+npx ampx push
+```
+
+#### 3. 環境変数の自動設定
+
+```bash
+# 環境変数を自動設定
+npm run setup-env
+```
+
+#### 4. アプリケーション起動
 
 ```bash
 npm run dev
-# または
-yarn dev
 ```
 
 ブラウザで [http://localhost:3000](http://localhost:3000) を開いてアプリケーションを確認できます。
-
-### 4. Amplifyバックエンドのセットアップ (Phase 3以降)
-
-```bash
-# Amplify CLIのインストール
-npm install -g @aws-amplify/cli
-
-# Amplifyプロジェクトの初期化
-amplify init
-
-# バックエンドリソースのデプロイ
-amplify push
-```
 
 ## 🧪 開発・テスト
 
