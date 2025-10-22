@@ -17,6 +17,20 @@
 
 ---
 
+## 📋 AWS MCP参照タスク（継続的実施）
+
+- [ ] **AWS MCP継続参照**: 各フェーズでの最新情報確認 **[🤖 Kiro]**
+  - **Phase 1-2**: Amplify Gen2、Cognito、DynamoDB、AppSyncの最新機能と制限事項
+  - **Phase 3**: Bedrock、AgentCore、Lambda統合の最新ベストプラクティス
+  - **Phase 4-6**: CloudWatch、X-Ray、Route53の最新監視・運用機能
+  - **権限管理**: 各フェーズで必要な最小権限の最新推奨事項
+  - **セキュリティ**: 最新のセキュリティベストプラクティスとコンプライアンス要件
+  - **コスト最適化**: 各サービスの最新料金体系と最適化手法
+  - **手順書更新**: 新機能や変更に基づく手順書の継続的更新
+  - _学習戦略: 常に最新のAWS情報に基づく実装と学習_
+
+---
+
 ## Phase 1: 基盤とモックデータ実装
 
 - [x] 1. プロジェクト構造とコアインターフェースのセットアップ **[🤖 Kiro]**
@@ -58,6 +72,8 @@
     - _要件: 3.1, 3.2_
 
   - [ ] 3.2 Amazon Bedrock AgentCore統合 **[👤 Human + 🤖 Kiro]**
+    - **[🤖 Kiro]** **AWS MCP参照**: 最新のBedrock AgentCore権限とセットアップ手順を確認
+    - **[👤 Human]** IAMユーザーに `AmazonBedrockFullAccess` と `BedrockAgentCoreFullAccess` 権限を追加
     - **[👤 Human]** AWS ConsoleでBedrock モデルアクセス権限を有効化
     - **[👤 Human]** AgentCore Runtimeでの実行環境を構築（利用可能な場合）
     - **[🤖 Kiro]** OpenTelemetryトレーシングを有効化
@@ -230,6 +246,7 @@
 
 ## 📚 Phase 4-6 完了時の学習資料更新 **[🤖 Kiro]**
 - [ ] **学習ドキュメント最終更新**: Phase 4-6完了時
+  - **AWS MCP参照**: 最新のAWS機能とベストプラクティスを反映
   - `docs/learning/phases/phase4-6/README.md` 新規作成
   - `docs/learning/phases/phase4-6/ai-integration.md` 新規作成
   - `docs/learning/phases/phase4-6/observability.md` 新規作成
@@ -238,6 +255,49 @@
   - 完全統合パターンとベストプラクティスをドキュメント化
   - 学習ガイドの完成版リリース準備
   - _学習戦略: 本格的AIシステム構築の完全ガイド_
+
+## 📚 継続的ドキュメント更新タスク
+
+- [ ] **手順書の継続的更新** **[🤖 Kiro]**
+  - **AWS MCP定期参照**: 月次でAWS新機能・変更点をチェック
+  - **権限要件の更新**: 新サービス・機能に応じた権限の見直し
+    - Phase 1-2: `PowerUserAccess` + `AmplifyBackendDeployFullAccess`
+    - Phase 3: `AmazonBedrockFullAccess` + `BedrockAgentCoreFullAccess` + `AWSLambdaFullAccess` 追加
+    - Phase 4: `CloudWatchFullAccess` + `AmazonRoute53FullAccess`（オプション）追加
+  - **セキュリティ要件の更新**: 最新のセキュリティベストプラクティス反映
+  - **コスト最適化の更新**: 料金変更・新サービスに応じた最適化手法
+  - **トラブルシューティングの拡充**: 実際の問題事例と解決方法の追加
+  - **学習リソースの更新**: 新しい公式ドキュメント・チュートリアルの追加
+  - _継続的改善: 常に最新で正確な手順書の維持_
+
+### 🔍 AWS MCP参照ガイドライン
+
+**手順書作成・更新時の必須チェック項目:**
+
+1. **権限要件の確認**
+   - `mcp_aws_knowledge_mcp_server_aws___search_documentation` で最新のIAMポリシーを検索
+   - `mcp_aws_knowledge_mcp_server_aws___read_documentation` で公式ドキュメントの詳細を確認
+   - 各サービスの最小権限要件と推奨設定を調査
+
+2. **サービス制限・制約の確認**
+   - 各AWSサービスのクォータ・制限事項を確認
+   - リージョン別の機能可用性をチェック
+   - 新機能のプレビュー・GA状況を確認
+
+3. **セキュリティベストプラクティスの確認**
+   - 最新のセキュリティ推奨事項を調査
+   - コンプライアンス要件の変更をチェック
+   - 暗号化・認証方式の最新動向を確認
+
+4. **コスト最適化の確認**
+   - 料金体系の変更・新プランを調査
+   - 無料利用枠の条件変更をチェック
+   - コスト削減の新手法を確認
+
+5. **手順書の品質保証**
+   - 実際のAWS環境での手順検証
+   - エラーケース・トラブルシューティングの充実
+   - 初心者向けの説明とコメントの追加
 
 ---
 
@@ -401,6 +461,7 @@
     - _要件: 3.1, 3.2, 3.3_
 
   - [ ] 8.2 カスタムAmplifyハンドラーの構築
+    - **AWS MCP参照**: 最新のBedrock API仕様とベストプラクティスを確認
     - Bedrock統合用カスタムビジネスロジックハンドラーを作成（Bedrock APIの使用方法を詳細説明）
     - エージェントオーケストレーションと応答集約を実装（Strands Agentsとの連携方法を解説）
     - トレースID生成と相関を追加（OpenTelemetryとの統合パターンを説明）
@@ -426,10 +487,12 @@
     - 画像最適化とアセット圧縮を追加
     - _要件: 5.1, 5.4_
 
-  - [ ] 9.3 パフォーマンス監視の追加
-    - Core Web Vitalsトラッキングを実装
-    - カスタムパフォーマンスメトリクスとログを追加
-    - パフォーマンスダッシュボードとアラートを作成
+  - [ ] 9.3 パフォーマンス監視の追加 **[👤 Human + 🤖 Kiro]**
+    - **[🤖 Kiro]** **AWS MCP参照**: 最新のCloudWatch機能とベストプラクティスを確認
+    - **[👤 Human]** IAMユーザーに `CloudWatchFullAccess` 権限を追加（Phase 4で必要）
+    - **[🤖 Kiro]** Core Web Vitalsトラッキングを実装
+    - **[🤖 Kiro]** カスタムパフォーマンスメトリクスとログを追加
+    - **[👤 Human]** CloudWatchでパフォーマンスダッシュボードとアラートを作成
     - _要件: 5.1, 5.2_
 
 - [ ] 10. アクセシビリティと国際化の追加

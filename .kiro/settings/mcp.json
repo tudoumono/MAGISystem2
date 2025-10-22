@@ -45,7 +45,8 @@
       "disabled": false,
       "autoApprove": [
         "search",
-        "get_page_content"
+        "get_page_content",
+        "brave_web_search"
       ]
     }
   }
