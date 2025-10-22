@@ -750,7 +750,33 @@ Edge API routes are not supported
 - Edge API Routes を通常のAPI Routes に変更
 - `export const runtime = 'edge'` を削除
 
-**4. ビルド出力サイズ超過**
+**4. モジュールが見つからないエラー**
+```bash
+Cannot find module '/codebuild/output/src.../amplify/auth/resource'
+```
+
+**解決方法:**
+- **ファイル存在確認**: `amplify/auth/resource.ts` が存在するか確認
+- **TypeScript型エラー修正**: 以下の修正を適用:
+```typescript
+// ❌ 間違い
+userAttributes: {
+  given_name: { required: false, mutable: true }
+}
+multifactor: { mode: 'optional' }
+accountRecovery: 'email'
+
+// ✅ 正しい
+userAttributes: {
+  givenName: { required: false, mutable: true }
+}
+multifactor: { mode: 'OPTIONAL' }
+accountRecovery: 'EMAIL_ONLY'
+```
+- **Gitコミット確認**: 必要なファイルがコミットされているか確認
+- **キャッシュクリア**: Amplify Console → Build settings → Clear cache
+
+**5. ビルド出力サイズ超過**
 ```bash
 Build output exceeds maximum allowed size (220MB)
 ```
@@ -799,6 +825,12 @@ frontend:
    - Build
    - Deploy
    - Verify
+
+**よくあるエラーパターン:**
+- `Cannot find module` → ファイル欠落またはTypeScript型エラー
+- `JavaScript heap out of memory` → メモリ不足
+- `NODE.JS VERSION NOT SUPPORTED` → Node.jsバージョン問題
+- `Build output exceeds maximum` → ビルドサイズ超過
 
 **CLI での確認:**
 ```bash
