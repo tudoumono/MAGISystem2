@@ -9,6 +9,8 @@ Task 2.2 完了後、実際のAWSリソースをデプロイし、アプリケ�
 - 初心者は画面操作、上級者はコマンドラインを選択可能
 - 両方の方法の関係性と背景を理解できる構成
 
+**✨ 重要:** このガイドは **画面操作のみでも完全に実施可能** です。AWS CLI のインストールや複雑なコマンド操作なしで、ブラウザだけで全ての設定を完了できます。
+
 ## 🔄 操作方法の選び方
 
 | 項目 | コマンドライン | 画面操作 |
@@ -19,6 +21,25 @@ Task 2.2 完了後、実際のAWSリソースをデプロイし、アプリケ�
 | **視覚的理解** | ❌ 抽象的 | ✅ 直感的 |
 | **エラー対応** | 🔧 ログ解析必要 | 👀 画面で確認しやすい |
 | **推奨レベル** | 中級者以上 | 初心者〜中級者 |
+
+## 🚨 重要: CDKブートストラップについて
+
+### CDKブートストラップとは
+AWS CDKを使用する前に、AWS環境を準備する**一回限りの**プロセスです。以下のリソースを作成します：
+- IAMロール（deploy-role、file-publishing-role等）
+- S3バケット（CDKアセット保管用）
+- ECRリポジトリ（Dockerイメージ用）
+- KMSキー、SSMパラメータ
+
+### 🔐 必要な権限レベル
+- **ブートストラップ実行**: `AdministratorAccess` または同等の強い権限
+- **通常のデプロイ**: `PowerUserAccess` + `AmplifyBackendDeployFullAccess`
+
+### 📋 推奨実行フロー
+1. **管理者がブートストラップを実行** （一回のみ）
+2. **開発者が通常権限でデプロイ** （継続的）
+
+---
 
 ## 🚀 Step 1: AWS認証情報の設定
 
@@ -33,6 +54,10 @@ Task 2.2 完了後、実際のAWSリソースをデプロイし、アプリケ�
 4. ~~長期アクセスキー~~ - **非推奨・セキュリティリスク**
 
 ### 1.1 AWS CLI v2 のインストール
+
+> **💡 重要な選択肢**  
+> **画面操作のみで進める場合、このステップは不要です。**  
+> Step 1.2 の「画面操作版」のみを使用すれば、AWS CLI なしで全ての設定が可能です。
 
 <details>
 <summary>💻 <strong>コマンドライン版</strong> - 高速インストール</summary>
@@ -92,15 +117,21 @@ aws --version
 1. [AWS Console](https://console.aws.amazon.com/) にルートユーザーでログイン
 2. 「IAM Identity Center」を検索してアクセス
 3. 「Enable」をクリックしてサービスを有効化
-4. **Users** → 「Add user」で開発用ユーザーを作成:
-   - Username: `magi-developer`
-   - Email: あなたのメールアドレス
-   - First name / Last name: 適切に入力
-5. **Permission sets** → 「Create permission set」:
-   - Type: `Predefined permission set`
-   - Policy: `PowerUserAccess` (開発用) または `AdministratorAccess` (フル権限)
-   - Name: `MAGIDeveloperAccess`
-6. **AWS accounts** → アカウントを選択 → ユーザーと権限セットを割り当て
+4. **Users（ユーザー）** → 「Add user（ユーザーを追加）」で開発用ユーザーを作成:
+   - Username（ユーザー名）: `magi-developer`
+   - Email（メールアドレス）: あなたのメールアドレス
+   - First name / Last name（姓名）: 適切に入力
+5. **Permission sets（アクセス許可セット）** → 「Create permission set（アクセス許可セットを作成）」:
+   - Type（タイプ）: `Predefined permission set（事前定義されたアクセス許可セット）`
+   - Policy（ポリシー）: `PowerUserAccess` (必須 - IAM管理以外の全操作)
+   - **追加で必要**: `AmplifyBackendDeployFullAccess` (必須 - Amplifyデプロイ専用)
+   
+   **複数ポリシーの追加方法:**
+   - 「Create permission set」で最初に `PowerUserAccess` を選択
+   - 作成後、Permission set を編集して `AmplifyBackendDeployFullAccess` を追加
+   - ⚠️ **AdministratorAccess は避ける** (セキュリティリスク)
+   - Name（名前）: `MAGIDeveloperAccess`
+6. **AWS accounts（AWSアカウント）** → アカウントを選択 → ユーザーと権限セットを割り当て
 
 #### **Step 1.2.2: CLI での SSO 設定**
 
@@ -144,25 +175,90 @@ aws sts get-caller-identity --profile magi-dev
 
 **画面操作での設定:**
 1. [IAM Console](https://console.aws.amazon.com/iam/) にアクセス
-2. **Users** → 「Create user」:
-   - User name: `magi-temp-developer`
-   - ✅ 「Provide user access to the AWS Management Console」をチェック
-   - Console password: 「Custom password」で強力なパスワードを設定
-   - ❌ 「Users must create a new password at next sign-in」のチェックを外す
+2. **Users（ユーザー）** → 「Create user（ユーザーを作成）」:
+   - User name（ユーザー名）: `magi-temp-developer`
+   - ✅ 「Provide user access to the AWS Management Console（AWS Management Consoleへのユーザーアクセスを提供する）」をチェック
+   - Console password（コンソールパスワード）: 「Custom password（カスタムパスワード）」で強力なパスワードを設定
+   - ❌ 「Users must create a new password at next sign-in（次回サインイン時にユーザーは新しいパスワードを作成する必要があります）」のチェックを外す
 
-3. **Permissions** → 「Attach policies directly」:
-   - ✅ `PowerUserAccess` (推奨) または `AdministratorAccess`
+3. **Permissions（アクセス許可）** → 「Attach policies directly（ポリシーを直接アタッチ）」:
+   - ✅ `PowerUserAccess` (必須 - 基本開発権限)
+   - ✅ `AmplifyBackendDeployFullAccess` (必須 - Amplifyデプロイ専用)
+   - ⚠️ **AdministratorAccess は避ける** (セキュリティリスク)
 
-4. **Review and create** → 「Create user」
+4. **Review and create（確認して作成）** → 「Create user（ユーザーを作成）」
+
+#### **Step 1.2.2.1: 追加権限の設定（重要）**
+
+**🚨 重要**: Amplify Gen2の初期化には `AmplifyBackendDeployFullAccess` では不十分です。
+
+**なぜ AmplifyBackendDeployFullAccess では不十分？**
+- `npx ampx sandbox deploy` は内部でCDKを使用
+- CDKが自動的にbootstrapを実行しようとする
+- このポリシーは**既にbootstrap済み**の環境で既存CDKロールを使う権限のみ
+- `sts:AssumeRole` - 既存CDKロールの引き受けのみ可能
+- `iam:CreateRole` - IAMロール作成権限が**含まれていない**
+- **Amplify初期化時にCDKブートストラップが自動実行される**
+
+**Amplify初期化時に自動作成されるリソース:**
+- **CDKToolkitスタック** - CloudFormationスタック
+- **IAMロール** - deploy-role、file-publishing-role、image-publishing-role等
+- **S3バケット** - CDKアセット保管用
+- **ECRリポジトリ** - Dockerイメージ用  
+- **KMSキー** - 暗号化用
+- **SSMパラメータ** - バージョン情報用
+- **Amplifyアプリリソース** - Cognito、AppSync、DynamoDB等
+
+**解決策（推奨順）:**
+
+**🥇 方法1: 管理者権限でAmplify初期化（最も推奨）**
+1. 管理者権限を持つユーザーで `npx ampx sandbox deploy` を実行
+2. 初期化完了後は `magi-developer` が `AmplifyBackendDeployFullAccess` でデプロイ可能
+3. **理由**: Amplify初期化時にCDKブートストラップが自動実行されるため
+
+**🥈 方法2: 管理者に依頼（組織ポリシー準拠）**
+1. 管理者にAmplify初期化（`npx ampx sandbox deploy`）を依頼
+2. 初期化完了後、開発者は通常権限でデプロイ可能
+3. **メリット**: 開発者にCreateRole権限を付与する必要なし
+
+**🥉 方法3: 一時的にAmplify初期化権限を付与**
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:GetRole", 
+        "iam:PutRolePolicy",
+        "iam:AttachRolePolicy",
+        "iam:PassRole",
+        "iam:TagRole",
+        "s3:CreateBucket",
+        "ecr:CreateRepository",
+        "kms:CreateKey",
+        "ssm:PutParameter",
+        "cloudformation:*"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+**最終的な権限構成（bootstrap後）:**
+- ✅ `PowerUserAccess` - 基本開発権限（IAM管理以外の全操作）
+- ✅ `AmplifyBackendDeployFullAccess` - Amplifyデプロイ専用（既存CDKロール使用）
 
 #### **Step 1.2.2: 短期アクセスキーの作成**
 
 1. 作成したユーザー `magi-temp-developer` をクリック
-2. **Security credentials** タブ → 「Create access key」
-3. **Use case** → 「Command Line Interface (CLI)」を選択
-4. ⚠️ 「I understand the above recommendation...」をチェック
-5. **Description tag** → 「MAGI Development - 30 days only」
-6. 「Create access key」をクリック
+2. **Security credentials（セキュリティ認証情報）** タブ → 「Create access key（アクセスキーを作成）」
+3. **Use case（ユースケース）** → 「Command Line Interface (CLI)」を選択
+4. ⚠️ 「I understand the above recommendation...（上記の推奨事項を理解しています...）」をチェック
+5. **Description tag（説明タグ）** → 「MAGI Development - 30 days only」
+6. 「Create access key（アクセスキーを作成）」をクリック
 7. **重要:** Access key と Secret key をすぐにコピーして安全に保存
 
 #### **Step 1.2.3: CLI 設定**
@@ -248,40 +344,34 @@ set AWS_PROFILE=magi-dev     # Windows
 1. **AWS Console での確認:**
    - [AWS Console](https://console.aws.amazon.com/) にアクセス
    - 右上のユーザー名をクリック
-   - 「Security credentials」を選択
+   - 「Security credentials（セキュリティ認証情報）」を選択
    - ページが正常に表示されれば認証成功
 
 2. **設定内容の確認:**
-   - ✅ 右上に **アカウントID** が表示されている
+   - ✅ 右上に **Account ID（アカウントID）** が表示されている
    - ✅ 右上のリージョン表示が「**Asia Pacific (Tokyo) ap-northeast-1**」になっている
-   - ✅ エラーメッセージや「Access Denied」が表示されない
+   - ✅ エラーメッセージや「Access Denied（アクセス拒否）」が表示されない
    - ✅ ユーザー名が `magi-developer` または `magi-temp-developer` になっている
 
 3. **セキュリティ確認:**
-   - **Access keys** セクションで不要なアクセスキーがないことを確認
-   - **MFA devices** で多要素認証が設定されていることを確認（推奨）
+   - **Access keys（アクセスキー）** セクションで不要なアクセスキーがないことを確認
+   - **MFA devices（MFAデバイス）** で多要素認証が設定されていることを確認（推奨）
 
 3. **追加確認（オプション）:**
    - 左上の「Services」をクリック
    - 「IAM」を検索して選択
    - IAM ダッシュボードが表示されれば権限も正常
 
-4. **ローカルファイルの確認:**
-   - 作成した `credentials` ファイルをテキストエディタで開く
-   - アクセスキーが正しく記載されていることを確認
-   - 作成した `config` ファイルをテキストエディタで開く
-   - リージョンが `ap-northeast-1` に設定されていることを確認
-
 **✅ 成功の確認ポイント:**
 - AWS Console にログインできる
 - アカウント情報が正しく表示される
 - 各種AWSサービスにアクセスできる
-- ローカルファイルが正しく作成されている
+- 選択した認証方法が正常に動作している
 
 **❌ 問題がある場合:**
-- 「Invalid credentials」エラー → アクセスキーを再確認
+- 「Invalid credentials」エラー → 認証設定を再確認
 - 「Access Denied」エラー → IAM権限を確認
-- ファイルが見つからない → ファイルパスと名前を確認
+- SSO ログインエラー → SSO設定を確認
 
 **メリット:** 
 - 視覚的に確認でき、問題箇所を特定しやすい
@@ -293,46 +383,312 @@ set AWS_PROFILE=magi-dev     # Windows
 
 ### 1.4 セキュリティベストプラクティス
 
-**✅ 必須セキュリティ設定:**
+## 🎯 実行すべきアクション
 
-1. **MFA (多要素認証) の有効化:**
-   - IAM Console → Users → Security credentials → MFA device
-   - 仮想MFAデバイス（Google Authenticator等）を推奨
+### ✅ 必須設定（すぐに実行）
 
-2. **最小権限の原則:**
-   - 必要最小限の権限のみを付与
-   - 定期的な権限の見直し
+1. **権限設定の確認**
+   - 前のステップで `PowerUserAccess` + `AmplifyBackendDeployFullAccess` を選択した場合 → そのまま進む
+   - より安全にしたい場合 → 下記のカスタムポリシーに変更
 
-3. **アクセスキーの管理:**
-   - 定期的なローテーション（30日以内推奨）
-   - 使用しないキーの即座な削除
-   - `.gitignore` での認証情報の除外
+2. **MFA（多要素認証）の有効化**
+   - IAM Console → Users（ユーザー） → あなたのユーザー → Security credentials（セキュリティ認証情報）
+   - 「Assign MFA device（MFAデバイスを割り当て）」をクリック
+   - 「Virtual MFA device（仮想MFAデバイス）」を選択
+   - Google Authenticator アプリでQRコードをスキャン
 
-4. **監査とモニタリング:**
-   - CloudTrail でのAPI呼び出し記録
-   - 異常なアクセスパターンの監視
+3. **`.gitignore` ファイルの設定**
+   - プロジェクトルートに `.gitignore` ファイルを作成
+   - 以下の内容を追加:
+   ```gitignore
+   # AWS認証情報（重要！）
+   .aws/
+   .env.local
+   .env.*.local
+   amplify_outputs.json
+   
+   # 一時ファイル
+   *.pem
+   *.key
+   ```
 
-**🔒 `.gitignore` 設定例:**
-```gitignore
-# AWS認証情報
-.aws/
-.env.local
-.env.*.local
-aws-exports.js
-amplify_outputs.json
+### 🔒 推奨権限設定
 
-# 一時ファイル
-*.pem
-*.key
-credentials
+**🥇 最も安全（推奨）: MAGIプロジェクト専用ポリシー**
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "MAGIAmplifyDevelopment",
+      "Effect": "Allow",
+      "Action": [
+        "amplify:*",
+        "cognito-idp:*",
+        "appsync:*",
+        "dynamodb:*",
+        "lambda:*",
+        "logs:*",
+        "cloudformation:*",
+        "s3:*",
+        "iam:GetRole",
+        "iam:PassRole",
+        "sts:AssumeRole"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "MAGIBedrockAgents",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:*",
+        "bedrock-agentcore:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "MAGIMonitoring",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:*",
+        "xray:*",
+        "application-signals:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "MAGIDomainManagement",
+      "Effect": "Allow",
+      "Action": [
+        "route53:*"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
 ```
 
-**📅 セキュリティチェックリスト:**
+**🥈 簡単設定: PowerUserAccess + AmplifyBackendDeployFullAccess（前のステップで選択済み）**
+- PowerUserAccess: IAM管理以外の全操作が可能
+- AmplifyBackendDeployFullAccess: Amplifyデプロイ専用（既存CDKロール使用）
+- **注意**: CDKブートストラップは管理者権限で別途実行が必要
+
+**❌ 絶対に避ける: AdministratorAccess**
+- 全権限でセキュリティリスク大
+
+### 📅 完了チェックリスト
+
+**今すぐ確認:**
 - [ ] MFA が有効化されている
-- [ ] 不要なアクセスキーが削除されている
-- [ ] `.gitignore` が適切に設定されている
-- [ ] アクセスキーの有効期限が設定されている（30日以内）
-- [ ] CloudTrail が有効化されている
+- [ ] `.gitignore` ファイルが作成されている
+- [ ] 権限が `PowerUserAccess` + `AmplifyBackendDeployFullAccess` または カスタムポリシー
+- [ ] `AdministratorAccess` を使用していない
+
+**30日後に確認:**
+- [ ] アクセスキーをローテーション（短期アクセスキー使用の場合）
+- [ ] 不要なリソースを削除
+- [ ] CloudTrail ログを確認
+
+### 📅 今後のフェーズで追加予定の権限
+
+**Phase 3: エージェント統合時に追加:**
+- [ ] `AmazonBedrockFullAccess` - AI/MLモデルアクセス用
+- [ ] `BedrockAgentCoreFullAccess` - エージェント実行基盤用
+- [ ] `AWSLambdaFullAccess` - エージェント関数のデプロイ・管理用
+
+**Phase 4: 本番環境構築時に追加:**
+- [ ] `CloudWatchFullAccess` - ログ・監視・アラート設定用
+- [ ] `AmazonRoute53FullAccess` - カスタムドメイン設定用（オプション）
+
+**権限追加の手順:**
+1. IAM Console → Users → `magi-developer` → Permissions
+2. 「Add permissions」→「Attach policies directly」
+3. 必要なポリシーを検索・選択
+4. 「Add permissions」で追加
+
+**各権限の詳細:**
+
+**🤖 AmazonBedrockFullAccess**
+- Amazon Bedrockの全機能へのアクセス
+- Claude、GPT等のLLMモデル呼び出し
+- モデル推論とファインチューニング
+- エージェント作成と管理
+
+**🔧 BedrockAgentCoreFullAccess**  
+- Amazon Bedrock AgentCoreの全機能
+- エージェント実行環境の管理
+- A2A（Agent-to-Agent）プロトコル
+- 分散トレーシングとObservability
+
+**⚡ AWSLambdaFullAccess**
+- Lambda関数の作成・更新・削除
+- 関数のデプロイとバージョン管理
+- トリガーとイベントソースの設定
+- VPC設定とネットワーク管理
+
+**📊 CloudWatchFullAccess**
+- ログ・メトリクス・アラームの管理
+- ダッシュボード作成と監視設定
+- X-Ray分散トレーシング
+- Application Insights
+
+**🌐 AmazonRoute53FullAccess**
+- DNS管理とドメイン設定
+- ヘルスチェックと監視
+- トラフィックルーティング
+- カスタムドメイン設定
+
+### 🔒 セキュリティ考慮事項
+
+**各権限の安全性評価:**
+
+| 権限 | 安全性レベル | 理由 | 注意点 |
+|------|-------------|------|--------|
+| `PowerUserAccess` | ✅ 安全 | IAM管理を除く全操作（AWS公式推奨） | IAMユーザー作成不可 |
+| `AmplifyBackendDeployFullAccess` | ✅ 安全 | Amplify専用（AWS公式・用途限定） | CDK操作のみ |
+| `AmazonBedrockFullAccess` | ✅ 安全 | AI/ML専用（用途限定） | モデル呼び出し料金に注意 |
+| `BedrockAgentCoreFullAccess` | ✅ 安全 | エージェント実行専用 | 実行時間制限推奨 |
+| `AWSLambdaFullAccess` | ⚠️ 注意 | サーバーレス専用だが影響範囲広い | 関数数・実行時間制限推奨 |
+| `CloudWatchFullAccess` | ⚠️ 注意 | 監視専用だが設定変更可能 | アラーム設定の誤操作注意 |
+| `AmazonRoute53FullAccess` | ⚠️ 注意 | DNS管理（影響範囲限定だが重要） | 本番ドメイン操作注意 |
+
+**AdministratorAccess を避ける理由:**
+- 🚨 全AWSサービスへの無制限アクセス
+- 🚨 請求・アカウント設定の変更可能
+- 🚨 セキュリティ設定の変更可能
+- 🚨 他のユーザー・ロールの管理可能
+- 🚨 リソース削除による重大な影響
+
+**推奨セキュリティ設定:**
+1. **MFA（多要素認証）の有効化** - 必須
+2. **アクセスキーの定期ローテーション** - 30日以内
+3. **CloudTrail監査ログの有効化** - 全操作記録
+4. **請求アラートの設定** - 予期しない課金の検知
+5. **リソースタグの統一** - `Project:MAGI`, `Environment:Dev`
+
+---
+
+## 🔧 Step 1.5: Amplify初期化の実行
+
+> **⚠️ 重要**  
+> このステップは**管理者権限**が必要です。開発者権限（PowerUserAccess + AmplifyBackendDeployFullAccess）では実行できません。  
+> `npx ampx sandbox deploy` 実行時にCDKブートストラップが自動実行されるためです。
+
+### 1.5.1 Amplify初期化の実行方法
+
+<details>
+<summary>🏆 <strong>推奨方法: 管理者による実行</strong></summary>
+
+**管理者が実行する場合:**
+1. 管理者権限を持つユーザーでAWSにログイン
+2. プロジェクトディレクトリで以下のコマンドを実行:
+```bash
+# Amplify CLI のインストール（未インストールの場合）
+npm install -g @aws-amplify/cli-internal
+
+# Amplify初期化（CDKブートストラップも自動実行）
+npx ampx sandbox deploy
+
+# または段階的に実行
+cdk bootstrap aws://[ACCOUNT-ID]/ap-northeast-1  # 手動bootstrap
+npx ampx sandbox deploy                           # Amplify初期化
+```
+
+**実行後の確認:**
+- CloudFormationコンソールで `CDKToolkit` スタックが作成されていることを確認
+- CloudFormationコンソールで `amplify-*` スタックが作成されていることを確認
+- S3コンソールで CDKアセットバケットが作成されていることを確認
+
+</details>
+
+<details>
+<summary>🔧 <strong>開発者が実行する場合: 一時的権限付与</strong></summary>
+
+**組織ポリシーで管理者実行ができない場合:**
+
+1. **一時的にCDKブートストラップ権限を付与:**
+   - IAM Console → Users → `magi-developer` → Permissions
+   - 「Add permissions」→「Attach policies directly」
+   - 以下のカスタムポリシーを作成・アタッチ:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CDKBootstrapPermissions",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:GetRole",
+        "iam:PutRolePolicy", 
+        "iam:AttachRolePolicy",
+        "iam:PassRole",
+        "iam:TagRole",
+        "iam:DetachRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:DeleteRole",
+        "s3:*",
+        "ecr:*",
+        "kms:*",
+        "ssm:*",
+        "cloudformation:*"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+2. **Amplify初期化を実行:**
+```bash
+npx ampx sandbox deploy
+```
+
+3. **⚠️ 重要: 初期化完了後、上記の強い権限を削除**
+   - セキュリティのため、ブートストラップ専用権限は即座に削除
+   - 通常の開発権限（PowerUserAccess + AmplifyBackendDeployFullAccess）のみ残す
+
+</details>
+
+<details>
+<summary>❌ <strong>トラブルシューティング</strong></summary>
+
+**よくあるエラーと解決方法:**
+
+1. **`iam:CreateRole` エラー**
+   ```
+   User is not authorized to perform: iam:CreateRole
+   ```
+   - **原因**: IAMロール作成権限が不足
+   - **解決**: 管理者権限でブートストラップを実行
+
+2. **`s3:CreateBucket` エラー**
+   ```
+   Access Denied when calling CreateBucket
+   ```
+   - **原因**: S3バケット作成権限が不足
+   - **解決**: 上記のCDKブートストラップ権限を付与
+
+3. **既にブートストラップ済みの場合**
+   ```
+   CDKToolkit stack already exists
+   ```
+   - **対処**: 正常な状態です。このステップをスキップして次に進む
+
+</details>
+
+### 1.5.2 Amplify初期化完了の確認
+
+**確認項目:**
+- [ ] CloudFormationで `CDKToolkit` スタックが `CREATE_COMPLETE` 状態
+- [ ] CloudFormationで `amplify-*` スタックが `CREATE_COMPLETE` 状態
+- [ ] S3で CDKアセットバケットが作成済み
+- [ ] IAMで CDK実行ロールが作成済み
+- [ ] Cognitoユーザープールが作成済み
+- [ ] AppSync GraphQL APIが作成済み
+- [ ] DynamoDBテーブルが作成済み
+- [ ] 一時的な強い権限を削除済み（開発者が実行した場合）
 
 ---
 
@@ -358,19 +714,19 @@ npx ampx configure profile
 <summary>🖱️ <strong>画面操作版</strong> - Amplify Console経由</summary>
 
 1. [AWS Amplify Console](https://console.aws.amazon.com/amplify/) にアクセス
-2. 「Create new app」をクリック
-3. 「Build an app」を選択
-4. **Git provider の選択:**
+2. 「Create new app（新しいアプリを作成）」をクリック
+3. 「Build an app（アプリを構築）」を選択
+4. **Git provider（Gitプロバイダー）の選択:**
    - GitHub を選択
-   - 「Connect branch」をクリック
+   - 「Connect branch（ブランチを接続）」をクリック
    - GitHubアカウントでログイン
-   - リポジトリ `MAGISystem2` を選択
-   - ブランチ `main` を選択
+   - Repository（リポジトリ） `MAGISystem2` を選択
+   - Branch（ブランチ） `main` を選択
 
-5. **App settings:**
-   - App name: `magi-decision-system`
-   - Environment name: `dev`
-   - 「Next」をクリック
+5. **App settings（アプリ設定）:**
+   - App name（アプリ名）: `magi-decision-system`
+   - Environment name（環境名）: `dev`
+   - 「Next（次へ）」をクリック
 
 **メリット:** Git連携が自動設定され、CI/CDパイプラインも同時に構築される
 </details>
@@ -407,58 +763,58 @@ npx ampx logs --follow
 #### **Option A: Amplify Console での自動デプロイ**
 1. 前のステップでGit連携を設定した場合、自動的にデプロイが開始
 2. Amplify Console で進行状況を確認:
-   - 「Provision」: AWSリソースの作成
-   - 「Build」: アプリケーションのビルド
-   - 「Deploy」: デプロイメント
-   - 「Verify」: 動作確認
+   - 「Provision（プロビジョン）」: AWSリソースの作成
+   - 「Build（ビルド）」: アプリケーションのビルド
+   - 「Deploy（デプロイ）」: デプロイメント
+   - 「Verify（検証）」: 動作確認
 
 #### **Option B: 手動でのリソース作成**
 
 **🔐 Step 2.2.1: Cognito User Pool の作成**
 1. [Amazon Cognito Console](https://console.aws.amazon.com/cognito/) にアクセス
-2. 「Create user pool」をクリック
-3. **Configure sign-in experience:**
-   - Provider types: `Cognito user pool`
-   - Cognito user pool sign-in options: `Email`
-   - 「Next」をクリック
+2. 「Create user pool（ユーザープールを作成）」をクリック
+3. **Configure sign-in experience（サインイン エクスペリエンスの設定）:**
+   - Provider types（プロバイダータイプ）: `Cognito user pool`
+   - Cognito user pool sign-in options（Cognito ユーザープール サインインオプション）: `Email`
+   - 「Next（次へ）」をクリック
 
-4. **Configure security requirements:**
-   - Password policy: `Cognito defaults` または カスタム設定
-   - Multi-factor authentication: `Optional` (推奨)
-   - 「Next」をクリック
+4. **Configure security requirements（セキュリティ要件の設定）:**
+   - Password policy（パスワードポリシー）: `Cognito defaults` または カスタム設定
+   - Multi-factor authentication（多要素認証）: `Optional（オプション）` (推奨)
+   - 「Next（次へ）」をクリック
 
-5. **Configure sign-up experience:**
-   - Self-service sign-up: `Enable`
-   - Required attributes: `email`
-   - 「Next」をクリック
+5. **Configure sign-up experience（サインアップ エクスペリエンスの設定）:**
+   - Self-service sign-up（セルフサービス サインアップ）: `Enable（有効）`
+   - Required attributes（必須属性）: `email`
+   - 「Next（次へ）」をクリック
 
-6. **Configure message delivery:**
-   - Email provider: `Send email with Cognito`
-   - 「Next」をクリック
+6. **Configure message delivery（メッセージ配信の設定）:**
+   - Email provider（メールプロバイダー）: `Send email with Cognito`
+   - 「Next（次へ）」をクリック
 
-7. **Integrate your app:**
-   - User pool name: `magi-user-pool`
-   - App client name: `magi-web-client`
-   - 「Next」をクリック
+7. **Integrate your app（アプリの統合）:**
+   - User pool name（ユーザープール名）: `magi-user-pool`
+   - App client name（アプリクライアント名）: `magi-web-client`
+   - 「Next（次へ）」をクリック
 
-8. 設定を確認して「Create user pool」をクリック
+8. 設定を確認して「Create user pool（ユーザープールを作成）」をクリック
 
 **📊 Step 2.2.2: AppSync GraphQL API の作成**
 1. [AWS AppSync Console](https://console.aws.amazon.com/appsync/) にアクセス
-2. 「Create API」をクリック
-3. 「Build from scratch」を選択
-4. **API details:**
-   - API name: `magi-graphql-api`
-   - 「Create」をクリック
+2. 「Create API（APIを作成）」をクリック
+3. 「Build from scratch（ゼロから構築）」を選択
+4. **API details（API詳細）:**
+   - API name（API名）: `magi-graphql-api`
+   - 「Create（作成）」をクリック
 
-5. **Schema の設定:**
-   - 左メニューから「Schema」を選択
+5. **Schema（スキーマ）の設定:**
+   - 左メニューから「Schema（スキーマ）」を選択
    - `amplify/data/resource.ts` の内容をGraphQLスキーマに変換して貼り付け
-   - 「Save Schema」をクリック
+   - 「Save Schema（スキーマを保存）」をクリック
 
-6. **Data sources の設定:**
-   - 「Data Sources」を選択
-   - 「Create data source」をクリック
+6. **Data sources（データソース）の設定:**
+   - 「Data Sources（データソース）」を選択
+   - 「Create data source（データソースを作成）」をクリック
    - DynamoDBテーブルを作成・接続
 
 **メリット:** 各リソースの設定を詳細に確認・カスタマイズできる
