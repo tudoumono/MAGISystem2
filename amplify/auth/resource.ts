@@ -37,24 +37,24 @@ export const auth = defineAuth({
    * 
    * 設計理由:
    * - email: 必須属性として設定（ログインに使用）
-   * - given_name: ユーザーの名前（UI表示用）
-   * - family_name: ユーザーの姓（UI表示用）
-   * - preferred_username: 表示名（オプション）
+   * - givenName: ユーザーの名前（UI表示用）
+   * - familyName: ユーザーの姓（UI表示用）
+   * - preferredUsername: 表示名（オプション）
    */
   userAttributes: {
     email: {
       required: true,
       mutable: true,
     },
-    given_name: {
+    givenName: {
       required: false,
       mutable: true,
     },
-    family_name: {
+    familyName: {
       required: false,
       mutable: true,
     },
-    preferred_username: {
+    preferredUsername: {
       required: false,
       mutable: true,
     },
@@ -64,16 +64,16 @@ export const auth = defineAuth({
    * 多要素認証（MFA）の設定
    * 
    * 学習ポイント:
-   * - mode: 'optional' - ユーザーが選択可能
+   * - mode: 'OPTIONAL' - ユーザーが選択可能
    * - sms: SMS認証を有効化
    * - totp: TOTP（Time-based One-Time Password）を有効化
    * 
    * セキュリティ考慮:
-   * - 企業環境では 'required' に変更することを推奨
+   * - 企業環境では 'REQUIRED' に変更することを推奨
    * - TOTPアプリ（Google Authenticator等）の使用を推奨
    */
   multifactor: {
-    mode: 'optional',
+    mode: 'OPTIONAL',
     sms: true,
     totp: true,
   },
@@ -82,10 +82,10 @@ export const auth = defineAuth({
    * アカウント回復設定
    * 
    * 学習ポイント:
-   * - email: メールでのパスワードリセットを有効化
+   * - EMAIL_ONLY: メールでのパスワードリセットを有効化
    * - ユーザビリティとセキュリティのバランスを考慮
    */
-  accountRecovery: 'email',
+  accountRecovery: 'EMAIL_ONLY',
 
   /**
    * パスワードポリシー
@@ -112,7 +112,7 @@ export const auth = defineAuth({
    * - verificationEmailBody: 検証メールの本文
    */
   verificationEmailSubject: 'MAGI Decision System - メールアドレスの確認',
-  verificationEmailBody: (createConfirmAccountLink) =>
+  verificationEmailBody: (createConfirmAccountLink: () => string) =>
     `MAGI Decision Systemへようこそ！以下のリンクをクリックしてアカウントを確認してください: ${createConfirmAccountLink()}`,
 
   /**
