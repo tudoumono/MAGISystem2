@@ -756,8 +756,46 @@ Cannot find module '/codebuild/output/src.../amplify/auth/resource'
 ```
 
 **解決方法:**
-- **ファイル存在確認**: `amplify/auth/resource.ts` が存在するか確認
-- **TypeScript型エラー修正**: 以下の修正を適用:
+
+**A. amplify.ymlファイルの作成（最重要）**
+```yaml
+version: 1
+backend:
+  phases:
+    build:
+      commands:
+        - npm ci
+        - npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+    build:
+      commands:
+        - npm run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
+      - .next/cache/**/*
+```
+
+**B. ファイル存在確認**
+```bash
+# ローカルで確認
+git ls-files amplify/
+# 以下が表示されるべき:
+# amplify/auth/resource.ts
+# amplify/backend.ts
+# amplify/data/resource.ts
+# amplify/functions/agent-gateway/resource.ts
+```
+
+**C. TypeScript型エラー修正**
 ```typescript
 // ❌ 間違い
 userAttributes: {
@@ -773,8 +811,13 @@ userAttributes: {
 multifactor: { mode: 'OPTIONAL' }
 accountRecovery: 'EMAIL_ONLY'
 ```
-- **Gitコミット確認**: 必要なファイルがコミットされているか確認
-- **キャッシュクリア**: Amplify Console → Build settings → Clear cache
+
+**D. Gitコミット・プッシュ**
+```bash
+git add amplify.yml amplify/
+git commit -m "Add amplify.yml and fix auth resource types"
+git push
+```
 
 **5. ビルド出力サイズ超過**
 ```bash
@@ -853,15 +896,24 @@ aws amplify get-job --app-id [APP-ID] --branch-name main --job-id [JOB-ID]
 > Step 1.5でAmplify初期化が完了していることを確認してください。
 
 <details>
-<summary>💻 <strong>コマンドライン版</strong> - 継続開発</summary>
+<summary>💻 <strong>コマンドライン版</strong> - Amplify Gen2セットアップ</summary>
 
+**必要ファイルの確認:**
 ```bash
-# 既に初期化済みの場合（Step 1.5完了後）
+# 必須ファイルが存在するか確認
+ls amplify.yml                    # ビルド設定ファイル
+ls amplify/backend.ts            # バックエンド定義
+ls amplify/auth/resource.ts      # 認証設定
+ls amplify/data/resource.ts      # データ設定
+```
+
+**Amplify Gen2デプロイ:**
+```bash
+# サンドボックス環境でのデプロイ
 npx ampx sandbox deploy
 
-# 初回の場合（管理者権限で実行済みの場合）
-npx ampx configure profile
-# プロファイル名を入力（例: magi-dev）
+# 本番環境でのデプロイ（Git連携後）
+npx ampx pipeline-deploy --branch main --app-id [APP-ID]
 ```
 
 **ビルドエラーが発生した場合:**
@@ -872,9 +924,12 @@ npx ampx sandbox deploy
 
 # 詳細ログで確認
 npx ampx sandbox deploy --verbose
+
+# TypeScriptエラーチェック
+npm run type-check
 ```
 
-**背景:** `amplify/team-provider-info.json` ファイルが作成され、プロジェクト設定が保存される
+**背景:** Amplify Gen2では`amplify.yml`とTypeScriptベースの設定ファイルが必要
 </details>
 
 <details>
