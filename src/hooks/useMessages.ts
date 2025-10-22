@@ -38,10 +38,15 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { generateClient } from 'aws-amplify/data';
-import { 
-  type Message, 
-  type CreateMessageInput, 
+import {
+  amplifyClient,
+  withErrorHandling,
+  getCurrentAuthUser,
+  subscribeToUpdates
+} from '../lib/amplify/client';
+import {
+  type Message,
+  type CreateMessageInput,
   type UpdateMessageInput,
   type AgentResponse,
   type JudgeResponse,
@@ -51,11 +56,6 @@ import {
 } from '../types/amplify';
 
 /**
- * Amplify Data クライアントの初期化
- */
-const client = generateClient();
-
-/**
  * エージェント実行状態の型定義
  * 
  * 設計理由:
@@ -63,7 +63,7 @@ const client = generateClient();
  * - UI表示の状態制御
  * - エラー状態の詳細な分類
  */
-type AgentExecutionStatus = 
+type AgentExecutionStatus =
   | 'idle'           // 待機中
   | 'analyzing'      // 質問分析中
   | 'executing'      // 3賢者実行中
@@ -95,22 +95,22 @@ interface UseMessagesReturn {
   loading: boolean;
   error: string | null;
   hasNextPage: boolean;
-  
+
   // エージェント実行状態
   agentResponding: boolean;
   agentStatus: AgentExecutionStatus;
   agentProgress: AgentProgress;
   currentTraceId: string | null;
-  
+
   // メッセージ操作
   sendMessage: (content: string, agentPresetId?: string) => Promise<Message | null>;
   loadMoreMessages: () => Promise<void>;
   refreshMessages: () => Promise<void>;
-  
+
   // リアルタイム制御
   subscribeToUpdates: boolean;
   setSubscribeToUpdates: (subscribe: boolean) => void;
-  
+
   // トレース情報
   traceSteps: TraceStep[];
   getTraceStepsForMessage: (messageId: string) => TraceStep[];
@@ -150,7 +150,7 @@ export function useMessages(
   const [error, setError] = useState<string | null>(null);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [nextToken, setNextToken] = useState<string | null>(null);
-  const [subscribeToUpdates, setSubscribeToUpdates] = useState(enableRealtime);
+  const [isSubscribedToUpdates, setSubscribeToUpdates] = useState(enableRealtime);
 
   // エージェント実行状態管理
   const [agentResponding, setAgentResponding] = useState(false);
@@ -177,6 +177,7 @@ export function useMessages(
    * - 会話IDによるフィルタリング
    * - 時系列順でのソート
    * - ページネーション対応
+   * - 実際のAmplify API呼び出しパターン
    */
   const fetchMessages = useCallback(async (
     token?: string | null
@@ -185,18 +186,22 @@ export function useMessages(
 
     try {
       setError(null);
-      
-      // 実際のAmplify実装では以下のようなクエリを使用
-      // const response = await client.models.Message.list({
-      //   filter: { conversationId: { eq: conversationId } },
-      //   limit,
-      //   nextToken: token || undefined,
-      //   sortDirection: 'ASC' // 古いメッセージから順番に
-      // });
 
-      const response = await mockListMessages(conversationId, {
-        limit,
-        ...(token && { nextToken: token })
+      // 実際のAmplify Data API呼び出し
+      const response = await withErrorHandling(async () => {
+        // 実際のAmplify実装（Phase 3で有効化）
+        // return await amplifyClient.models.Message.list({
+        //   filter: { conversationId: { eq: conversationId } },
+        //   limit,
+        //   nextToken: token || undefined,
+        //   sortDirection: 'ASC' // 古いメッセージから順番に
+        // });
+
+        // Phase 1-2: モック実装を使用
+        return await mockListMessages(conversationId, {
+          limit,
+          ...(token && { nextToken: token })
+        });
       });
 
       return response;
@@ -221,13 +226,13 @@ export function useMessages(
     const loadInitialMessages = async () => {
       setLoading(true);
       const result = await fetchMessages();
-      
+
       if (result) {
         setMessages(result.items.filter(Boolean) as Message[]);
         setNextToken(result.nextToken || null);
         setHasNextPage(!!result.nextToken);
       }
-      
+
       setLoading(false);
     };
 
@@ -243,7 +248,7 @@ export function useMessages(
    * - 複数サブスクリプションの管理
    */
   useEffect(() => {
-    if (!subscribeToUpdates || !conversationId) return;
+    if (!isSubscribedToUpdates || !conversationId) return;
 
     // メッセージ更新の購読
     // 実際のAmplify実装では以下のようなサブスクリプションを使用
@@ -278,7 +283,7 @@ export function useMessages(
         traceSubscriptionRef.current = null;
       }
     };
-  }, [subscribeToUpdates, conversationId]);
+  }, [isSubscribedToUpdates, conversationId]);
 
   /**
    * メッセージ送信とエージェント実行
@@ -299,7 +304,7 @@ export function useMessages(
       setError(null);
       setAgentResponding(true);
       setAgentStatus('analyzing');
-      
+
       // エージェント進行状況をリセット
       setAgentProgress({
         caspar: 'pending',
@@ -307,6 +312,12 @@ export function useMessages(
         melchior: 'pending',
         solomon: 'pending'
       });
+
+      // 現在のユーザー情報を取得
+      const currentUser = await getCurrentAuthUser();
+      if (!currentUser) {
+        throw new Error('認証が必要です');
+      }
 
       // ユーザーメッセージの作成
       const userMessageInput: CreateMessageInput = {
@@ -322,15 +333,20 @@ export function useMessages(
           id: `temp-user-${Date.now()}`,
           ...userMessageInput,
           createdAt: new Date().toISOString(),
-          owner: await getCurrentUserId(),
+          owner: currentUser.userId,
         };
-        
+
         setMessages(prev => [...prev, optimisticUserMessage!]);
       }
 
       // ユーザーメッセージの保存
-      // const savedUserMessage = await client.models.Message.create(userMessageInput);
-      const savedUserMessage = await mockCreateMessage(userMessageInput);
+      const savedUserMessage = await withErrorHandling(async () => {
+        // 実際のAmplify実装（Phase 3で有効化）
+        // return await amplifyClient.models.Message.create(userMessageInput);
+
+        // Phase 1-2: モック実装を使用
+        return await mockCreateMessage(userMessageInput);
+      });
 
       if (!savedUserMessage) {
         throw new Error('メッセージの保存に失敗しました');
@@ -338,8 +354,8 @@ export function useMessages(
 
       // 楽観的更新の置き換え
       if (enableOptimisticUpdates && optimisticUserMessage) {
-        setMessages(prev => 
-          prev.map(msg => 
+        setMessages(prev =>
+          prev.map(msg =>
             msg.id === optimisticUserMessage!.id ? savedUserMessage : msg
           )
         );
@@ -362,9 +378,9 @@ export function useMessages(
           content: 'エージェントが分析中です...',
           traceId,
           createdAt: new Date().toISOString(),
-          owner: await getCurrentUserId(),
+          owner: currentUser.userId,
         };
-        
+
         setMessages(prev => [...prev, optimisticAssistantMessage!]);
       }
 
@@ -372,15 +388,7 @@ export function useMessages(
       const agentResult = await executeMAGIAgents(content, {
         traceId,
         agentPresetId: agentPresetId || undefined,
-        onProgress: (progress) => {
-          setAgentProgress(progress);
-          
-          // 各エージェントの完了時にステータス更新
-          const completedAgents = Object.values(progress).filter(status => status === 'completed').length;
-          if (completedAgents === 3) {
-            setAgentStatus('judging'); // 3賢者完了、SOLOMON評価開始
-          }
-        },
+        onProgress: setAgentProgress,
         onTraceStep: (step) => {
           setTraceSteps(prev => [...prev, step]);
         }
@@ -399,21 +407,26 @@ export function useMessages(
         traceId,
       };
 
-      // const savedAssistantMessage = await client.models.Message.create(assistantMessageInput);
-      const savedAssistantMessage = await mockCreateMessage(assistantMessageInput);
+      const savedAssistantMessage = await withErrorHandling(async () => {
+        // 実際のAmplify実装（Phase 3で有効化）
+        // return await amplifyClient.models.Message.create(assistantMessageInput);
+
+        // Phase 1-2: モック実装を使用
+        return await mockCreateMessage(assistantMessageInput);
+      });
 
       if (savedAssistantMessage) {
         // 楽観的更新の置き換え
         if (enableOptimisticUpdates && optimisticAssistantMessage) {
-          setMessages(prev => 
-            prev.map(msg => 
+          setMessages(prev =>
+            prev.map(msg =>
               msg.id === optimisticAssistantMessage!.id ? savedAssistantMessage : msg
             )
           );
         } else {
           setMessages(prev => [...prev, savedAssistantMessage]);
         }
-        
+
         return savedAssistantMessage;
       }
 
@@ -421,14 +434,14 @@ export function useMessages(
     } catch (err) {
       // エラー時のロールバック
       if (enableOptimisticUpdates) {
-        setMessages(prev => 
+        setMessages(prev =>
           prev.filter(msg => !msg.id.startsWith('temp-'))
         );
       }
-      
+
       setAgentResponding(false);
       setAgentStatus('error');
-      
+
       const errorMessage = err instanceof Error ? err.message : 'メッセージの送信に失敗しました';
       setError(errorMessage);
       console.error('Failed to send message:', err);
@@ -444,10 +457,10 @@ export function useMessages(
 
     setLoading(true);
     const result = await fetchMessages(nextToken);
-    
+
     if (result) {
       const newMessages = result.items.filter(Boolean) as Message[];
-      
+
       // 重複を防いで既存データに追加（古いメッセージを先頭に追加）
       setMessages(prev => {
         const existingIds = new Set(prev.map(msg => msg.id));
@@ -456,11 +469,11 @@ export function useMessages(
         );
         return [...uniqueNewMessages, ...prev];
       });
-      
+
       setNextToken(result.nextToken || null);
       setHasNextPage(!!result.nextToken);
     }
-    
+
     setLoading(false);
   }, [hasNextPage, loading, conversationId, nextToken, fetchMessages]);
 
@@ -473,16 +486,16 @@ export function useMessages(
     setError(null);
     setNextToken(null);
     setHasNextPage(false);
-    
+
     setLoading(true);
     const result = await fetchMessages();
-    
+
     if (result) {
       setMessages(result.items.filter(Boolean) as Message[]);
       setNextToken(result.nextToken || null);
       setHasNextPage(!!result.nextToken);
     }
-    
+
     setLoading(false);
   }, [conversationId, fetchMessages]);
 
@@ -492,7 +505,7 @@ export function useMessages(
   const getTraceStepsForMessage = useCallback((messageId: string): TraceStep[] => {
     const message = messages.find(msg => msg.id === messageId);
     if (!message?.traceId) return [];
-    
+
     return traceSteps.filter(step => step.traceId === message.traceId);
   }, [messages, traceSteps]);
 
@@ -502,22 +515,22 @@ export function useMessages(
     loading,
     error,
     hasNextPage,
-    
+
     // エージェント実行状態
     agentResponding,
     agentStatus,
     agentProgress,
     currentTraceId,
-    
+
     // メッセージ操作
     sendMessage,
     loadMoreMessages,
     refreshMessages,
-    
+
     // リアルタイム制御
-    subscribeToUpdates,
+    subscribeToUpdates: isSubscribedToUpdates,
     setSubscribeToUpdates,
-    
+
     // トレース情報
     traceSteps,
     getTraceStepsForMessage,
@@ -530,8 +543,13 @@ export function useMessages(
  * 注意: 本番環境では実際のAmplify Data APIとエージェント実行APIに置き換える
  */
 
-// 現在のユーザーIDを取得
+// 現在のユーザーIDを取得（モック実装）
 async function getCurrentUserId(): Promise<string> {
+  // 実際の実装では認証コンテキストから取得
+  // const currentUser = await getCurrentAuthUser();
+  // return currentUser?.userId || '';
+
+  // Phase 1-2: モック実装
   return 'mock-user-id';
 }
 
@@ -546,7 +564,7 @@ async function mockListMessages(
   params: { limit: number; nextToken?: string | null }
 ): Promise<ModelMessageConnection> {
   await new Promise(resolve => setTimeout(resolve, 300));
-  
+
   const mockMessages: Message[] = [
     {
       id: 'msg-1',
@@ -597,7 +615,7 @@ async function mockListMessages(
 // メッセージ作成のモック実装
 async function mockCreateMessage(input: CreateMessageInput): Promise<Message> {
   await new Promise(resolve => setTimeout(resolve, 200));
-  
+
   return {
     id: `msg-${Date.now()}`,
     ...input,
@@ -612,7 +630,7 @@ async function executeMAGIAgents(
   options: {
     traceId: string;
     agentPresetId?: string | undefined;
-    onProgress: (progress: AgentProgress) => void;
+    onProgress: (updateFn: (prev: AgentProgress) => AgentProgress) => void;
     onTraceStep: (step: TraceStep) => void;
   }
 ): Promise<{
@@ -620,7 +638,7 @@ async function executeMAGIAgents(
   agentResponses: AgentResponse[];
   judgeResponse: JudgeResponse;
 }> {
-  const { traceId, onProgress, onTraceStep } = options;
+  const { traceId, onTraceStep } = options;
 
   // 段階的な実行をシミュレート
   const agents: Array<keyof AgentProgress> = ['caspar', 'balthasar', 'melchior'];
@@ -629,20 +647,23 @@ async function executeMAGIAgents(
   // 各エージェントの実行
   for (let i = 0; i < agents.length; i++) {
     const agentId = agents[i];
-    
+
     // エージェント開始
     const updateProgress = (status: 'running' | 'completed') => {
-      if (agentId === 'caspar') {
-        onProgress((prev: AgentProgress) => ({ ...prev, caspar: status }));
-      } else if (agentId === 'balthasar') {
-        onProgress((prev: AgentProgress) => ({ ...prev, balthasar: status }));
-      } else if (agentId === 'melchior') {
-        onProgress((prev: AgentProgress) => ({ ...prev, melchior: status }));
-      }
+      options.onProgress(prev => {
+        if (agentId === 'caspar') {
+          return { ...prev, caspar: status };
+        } else if (agentId === 'balthasar') {
+          return { ...prev, balthasar: status };
+        } else if (agentId === 'melchior') {
+          return { ...prev, melchior: status };
+        }
+        return prev;
+      });
     };
-    
+
     updateProgress('running');
-    
+
     // トレースステップの記録
     onTraceStep({
       id: `step-${Date.now()}-${i}`,
@@ -673,14 +694,14 @@ async function executeMAGIAgents(
     };
 
     agentResponses.push(response);
-    
+
     // エージェント完了
     updateProgress('completed');
   }
 
   // SOLOMON Judge の実行
-  onProgress((prev: AgentProgress) => ({ ...prev, solomon: 'running' }));
-  
+  options.onProgress(prev => ({ ...prev, solomon: 'running' }));
+
   await new Promise(resolve => setTimeout(resolve, 800));
 
   const judgeResponse: JudgeResponse = {
@@ -701,7 +722,7 @@ async function executeMAGIAgents(
     confidence: 0.85
   };
 
-  onProgress((prev: AgentProgress) => ({ ...prev, solomon: 'completed' }));
+  options.onProgress(prev => ({ ...prev, solomon: 'completed' }));
 
   return {
     summary: judgeResponse.summary,
@@ -715,9 +736,9 @@ function mockSubscribeToMessages(
   conversationId: string,
   callback: (messages: Message[]) => void
 ) {
-  return { unsubscribe: () => {} };
+  return { unsubscribe: () => { } };
 }
 
 function mockSubscribeToTraceSteps(callback: (steps: TraceStep[]) => void) {
-  return { unsubscribe: () => {} };
+  return { unsubscribe: () => { } };
 }
