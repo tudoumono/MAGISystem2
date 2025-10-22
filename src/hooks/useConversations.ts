@@ -10,6 +10,8 @@
  * - リアルタイム更新（GraphQL Subscriptions）
  * - 楽観的更新によるUX向上
  * - エラーハンドリングと再試行機構
+ * - デバウンス検索機能
+ * - 自動リフレッシュ機能
  * 
  * 学習ポイント:
  * - React Hooks パターンの実装
@@ -17,6 +19,7 @@
  * - 楽観的更新の実装パターン
  * - リアルタイム通信の統合
  * - エラーハンドリングのベストプラクティス
+ * - パフォーマンス最適化（デバウンス、メモ化）
  * 
  * 使用例:
  * ```typescript
@@ -28,22 +31,40 @@
  *   updateConversation,
  *   deleteConversation,
  *   searchConversations
- * } = useConversations();
+ * } = useConversations({
+ *   limit: 20,
+ *   enableRealtime: true,
+ *   enableOptimisticUpdates: true
+ * });
  * 
  * // 新しい会話を作成
  * const handleCreateConversation = async () => {
- *   await createConversation({
+ *   const result = await createConversation({
  *     title: "新しい会話",
  *     agentPresetId: "preset-default"
  *   });
+ *   
+ *   if (result) {
+ *     console.log('会話が作成されました:', result.id);
+ *   }
+ * };
+ * 
+ * // 検索機能の使用
+ * const handleSearch = (query: string) => {
+ *   searchConversations(query); // デバウンス処理済み
  * };
  * ```
  * 
- * 関連: src/types/amplify.ts, amplify/data/resource.ts
+ * 関連: src/types/amplify.ts, amplify/data/resource.ts, src/lib/amplify/client.ts
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { generateClient } from 'aws-amplify/data';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { 
+  amplifyClient, 
+  withErrorHandling, 
+  getCurrentAuthUser,
+  subscribeToUpdates 
+} from '../lib/amplify/client';
 import { 
   type Conversation, 
   type CreateConversationInput, 
@@ -51,16 +72,6 @@ import {
   type ModelConversationFilterInput,
   type ModelConversationConnection
 } from '../types/amplify';
-
-/**
- * Amplify Data クライアントの初期化
- * 
- * 学習ポイント:
- * - generateClient(): Amplify v6 の新しいクライアント生成方式
- * - 型安全性を保ちながらGraphQL操作を実行
- * - 認証情報の自動管理
- */
-const client = generateClient();
 
 /**
  * フック戻り値の型定義
@@ -128,10 +139,16 @@ export function useConversations(options: UseConversationsOptions = {}): UseConv
   const [nextToken, setNextToken] = useState<string | null>(null);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [subscribeToUpdates, setSubscribeToUpdates] = useState(enableRealtime);
+  const [isSubscribedToUpdates, setSubscribeToUpdates] = useState(enableRealtime);
 
   // リアルタイム更新の購読管理
   const subscriptionRef = useRef<any>(null);
+  
+  // デバウンス検索用のタイマー
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // 楽観的更新用の一時ID管理
+  const optimisticIdsRef = useRef<Set<string>>(new Set());
 
   /**
    * 会話一覧の取得
@@ -141,6 +158,7 @@ export function useConversations(options: UseConversationsOptions = {}): UseConv
    * - ページネーションの実装
    * - エラーハンドリングのパターン
    * - 検索フィルターの適用
+   * - 実際のAmplify API呼び出しパターン
    */
   const fetchConversations = useCallback(async (
     token?: string | null,
@@ -160,13 +178,23 @@ export function useConversations(options: UseConversationsOptions = {}): UseConv
         };
       }
 
-      // GraphQL クエリの実行
-      // 注意: 実際のAmplify実装では client.models.Conversation.list() を使用
-      // ここでは学習用にモック実装を提供
-      const response = await mockListConversations({
-        filter: filter || undefined,
-        limit,
-        nextToken: token || undefined
+      // 実際のAmplify Data API呼び出し
+      // Phase 3以降で有効化される実装
+      const response = await withErrorHandling(async () => {
+        // 実際のAmplify実装（Phase 3で有効化）
+        // return await amplifyClient.models.Conversation.list({
+        //   filter: filter || undefined,
+        //   limit,
+        //   nextToken: token || undefined,
+        //   sortDirection: 'DESC' // 新しい会話から順番に
+        // });
+        
+        // Phase 1-2: モック実装を使用
+        return await mockListConversations({
+          filter: filter || undefined,
+          limit,
+          nextToken: token || undefined
+        });
       });
 
       return response;
@@ -210,24 +238,29 @@ export function useConversations(options: UseConversationsOptions = {}): UseConv
    * - GraphQL Subscriptions の使用方法
    * - リアルタイム更新の購読管理
    * - メモリリークの防止（cleanup）
+   * - 楽観的更新との競合回避
    */
   useEffect(() => {
-    if (!subscribeToUpdates) return;
+    if (!isSubscribedToUpdates) return;
 
-    // 実際のAmplify実装では以下のようなサブスクリプションを使用
-    // const subscription = client.models.Conversation.observeQuery().subscribe({
-    //   next: ({ items }) => {
-    //     setConversations(items);
-    //   },
-    //   error: (err) => {
-    //     console.error('Subscription error:', err);
-    //   }
-    // });
-
-    // 学習用モック実装
-    subscriptionRef.current = mockSubscribeToConversations((updatedConversations) => {
-      setConversations(updatedConversations);
-    });
+    // 実際のAmplify実装（Phase 3で有効化）
+    subscriptionRef.current = subscribeToUpdates<Conversation>(
+      'Conversation',
+      (updatedConversations: Conversation[]) => {
+        // 楽観的更新中のアイテムを除外してマージ
+        setConversations(prev => {
+          const optimisticItems = prev.filter(conv => 
+            optimisticIdsRef.current.has(conv.id)
+          );
+          const realItems = updatedConversations.filter((conv: Conversation) => 
+            !optimisticIdsRef.current.has(conv.id)
+          );
+          
+          // 楽観的更新アイテムを先頭に、実際のデータを後に配置
+          return [...optimisticItems, ...realItems];
+        });
+      }
+    );
 
     // クリーンアップ関数
     return () => {
@@ -236,7 +269,27 @@ export function useConversations(options: UseConversationsOptions = {}): UseConv
         subscriptionRef.current = null;
       }
     };
-  }, [subscribeToUpdates]);
+  }, [isSubscribedToUpdates]);
+
+  /**
+   * コンポーネントアンマウント時のクリーンアップ
+   * 
+   * 学習ポイント:
+   * - メモリリークの防止
+   * - タイマーのクリーンアップ
+   * - リソースの適切な解放
+   */
+  useEffect(() => {
+    return () => {
+      // 検索タイマーのクリーンアップ
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+      
+      // 楽観的更新IDのクリーンアップ
+      optimisticIdsRef.current.clear();
+    };
+  }, []);
 
   /**
    * 会話の作成
@@ -245,45 +298,61 @@ export function useConversations(options: UseConversationsOptions = {}): UseConv
    * - 楽観的更新の実装パターン
    * - エラー時のロールバック処理
    * - ユーザーIDの自動設定
+   * - 実際のAmplify API呼び出し
+   * - 一時IDの管理と重複防止
    */
   const createConversation = useCallback(async (
     input: Omit<CreateConversationInput, 'userId'>
   ): Promise<Conversation | null> => {
+    let optimisticId: string | null = null;
+    
     try {
       setError(null);
 
-      // 現在のユーザーIDを取得（実際の実装では認証コンテキストから取得）
-      const userId = await getCurrentUserId();
+      // 現在のユーザー情報を取得
+      const currentUser = await getCurrentAuthUser();
+      if (!currentUser) {
+        throw new Error('認証が必要です');
+      }
       
       const createInput: CreateConversationInput = {
         ...input,
-        userId,
+        userId: currentUser.userId,
       };
 
       // 楽観的更新: UIを即座に更新
       let optimisticConversation: Conversation | null = null;
       if (enableOptimisticUpdates) {
+        optimisticId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        optimisticIdsRef.current.add(optimisticId);
+        
         optimisticConversation = {
-          id: `temp-${Date.now()}`, // 一時的なID
+          id: optimisticId,
           ...createInput,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          owner: userId,
+          owner: currentUser.userId,
         };
         
         setConversations(prev => [optimisticConversation!, ...prev]);
       }
 
       // 実際のAPI呼び出し
-      // const result = await client.models.Conversation.create(createInput);
-      const result = await mockCreateConversation(createInput);
+      const result = await withErrorHandling(async () => {
+        // 実際のAmplify実装（Phase 3で有効化）
+        // return await amplifyClient.models.Conversation.create(createInput);
+        
+        // Phase 1-2: モック実装を使用
+        return await mockCreateConversation(createInput);
+      });
 
       if (result) {
         // 楽観的更新の置き換え
-        if (enableOptimisticUpdates && optimisticConversation) {
+        if (enableOptimisticUpdates && optimisticConversation && optimisticId) {
+          optimisticIdsRef.current.delete(optimisticId);
           setConversations(prev => 
             prev.map(conv => 
-              conv.id === optimisticConversation!.id ? result : conv
+              conv.id === optimisticId ? result : conv
             )
           );
         } else {
@@ -296,9 +365,10 @@ export function useConversations(options: UseConversationsOptions = {}): UseConv
       }
     } catch (err) {
       // エラー時のロールバック
-      if (enableOptimisticUpdates) {
+      if (enableOptimisticUpdates && optimisticId) {
+        optimisticIdsRef.current.delete(optimisticId);
         setConversations(prev => 
-          prev.filter(conv => !conv.id.startsWith('temp-'))
+          prev.filter(conv => conv.id !== optimisticId)
         );
       }
       
@@ -425,17 +495,47 @@ export function useConversations(options: UseConversationsOptions = {}): UseConv
   }, [conversations, enableOptimisticUpdates]);
 
   /**
-   * 会話の検索
+   * デバウンス検索の実装
    * 
    * 学習ポイント:
    * - デバウンス処理による検索最適化
    * - 検索状態の管理
    * - フィルター条件の動的変更
+   * - パフォーマンス最適化
+   */
+  const debouncedSearch = useCallback((query: string) => {
+    // 既存のタイマーをクリア
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // 新しいタイマーを設定（300ms後に検索実行）
+    searchTimeoutRef.current = setTimeout(() => {
+      setSearchQuery(query);
+    }, 300);
+  }, []);
+
+  /**
+   * 会話の検索（デバウンス処理付き）
+   * 
+   * 学習ポイント:
+   * - ユーザーフレンドリーな検索体験
+   * - 不要なAPI呼び出しの削減
+   * - リアルタイム検索の実装
    */
   const searchConversations = useCallback((query: string) => {
-    setSearchQuery(query);
-    // 検索実行は useEffect で自動的に行われる
-  }, []);
+    // 空文字の場合は即座に検索をクリア
+    if (!query.trim()) {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+      setSearchQuery('');
+      return;
+    }
+    
+    // デバウンス検索を実行
+    debouncedSearch(query);
+  }, [debouncedSearch]);
 
   /**
    * 追加データの読み込み（ページネーション）
@@ -513,7 +613,7 @@ export function useConversations(options: UseConversationsOptions = {}): UseConv
     refreshConversations,
     
     // リアルタイム制御
-    subscribeToUpdates,
+    subscribeToUpdates: isSubscribedToUpdates,
     setSubscribeToUpdates,
   };
 }
@@ -532,7 +632,10 @@ export function useConversations(options: UseConversationsOptions = {}): UseConv
 // 現在のユーザーIDを取得（モック実装）
 async function getCurrentUserId(): Promise<string> {
   // 実際の実装では認証コンテキストから取得
-  // const { userId } = await getCurrentUser();
+  // const currentUser = await getCurrentAuthUser();
+  // return currentUser?.userId || '';
+  
+  // Phase 1-2: モック実装
   return 'mock-user-id';
 }
 
@@ -542,10 +645,15 @@ async function mockListConversations(params: {
   limit: number;
   nextToken?: string | undefined;
 }): Promise<ModelConversationConnection> {
-  // 実際の実装では client.models.Conversation.list(params) を使用
-  await new Promise(resolve => setTimeout(resolve, 500)); // API遅延をシミュレート
+  // 実際の実装では amplifyClient.models.Conversation.list(params) を使用
+  await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400)); // リアルなAPI遅延をシミュレート
   
-  const mockConversations: Conversation[] = [
+  // エラーシミュレーション（5%の確率）
+  if (Math.random() < 0.05) {
+    throw new Error('ネットワークエラーが発生しました');
+  }
+  
+  const allMockConversations: Conversation[] = [
     {
       id: 'conv-1',
       userId: 'mock-user-id',
@@ -564,23 +672,75 @@ async function mockListConversations(params: {
       updatedAt: '2024-01-01T09:00:00Z',
       owner: 'mock-user-id',
     },
+    {
+      id: 'conv-3',
+      userId: 'mock-user-id',
+      title: 'データサイエンスの基礎',
+      agentPresetId: 'preset-default',
+      createdAt: '2024-01-01T08:00:00Z',
+      updatedAt: '2024-01-01T08:00:00Z',
+      owner: 'mock-user-id',
+    },
+    {
+      id: 'conv-4',
+      userId: 'mock-user-id',
+      title: 'プロダクト戦略の検討',
+      agentPresetId: 'preset-business',
+      createdAt: '2024-01-01T07:00:00Z',
+      updatedAt: '2024-01-01T07:00:00Z',
+      owner: 'mock-user-id',
+    },
   ];
 
+  // 検索フィルターの適用
+  let filteredConversations = allMockConversations;
+  if (params.filter?.or) {
+    const titleFilter = params.filter.or.find(f => f?.title?.contains);
+    if (titleFilter?.title?.contains) {
+      const searchTerm = titleFilter.title.contains.toLowerCase();
+      filteredConversations = allMockConversations.filter(conv =>
+        conv.title.toLowerCase().includes(searchTerm)
+      );
+    }
+  }
+
+  // ページネーション処理
+  const startIndex = params.nextToken ? parseInt(params.nextToken) : 0;
+  const endIndex = startIndex + params.limit;
+  const paginatedConversations = filteredConversations.slice(startIndex, endIndex);
+  const hasMore = endIndex < filteredConversations.length;
+
   return {
-    items: mockConversations,
-    nextToken: null,
+    items: paginatedConversations,
+    nextToken: hasMore ? endIndex.toString() : null,
   };
 }
 
 // 会話作成のモック実装
 async function mockCreateConversation(input: CreateConversationInput): Promise<Conversation> {
-  await new Promise(resolve => setTimeout(resolve, 300));
+  await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 300));
+  
+  // エラーシミュレーション（3%の確率）
+  if (Math.random() < 0.03) {
+    throw new Error('会話の作成に失敗しました。しばらく時間をおいて再試行してください。');
+  }
+  
+  // タイトルの検証
+  if (!input.title || input.title.trim().length === 0) {
+    throw new Error('会話のタイトルは必須です');
+  }
+  
+  if (input.title.length > 100) {
+    throw new Error('会話のタイトルは100文字以内で入力してください');
+  }
+  
+  const now = new Date().toISOString();
   
   return {
-    id: `conv-${Date.now()}`,
+    id: `conv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     ...input,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: now,
+    updatedAt: now,
     owner: input.userId,
   };
 }
