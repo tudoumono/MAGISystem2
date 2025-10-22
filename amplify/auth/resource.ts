@@ -97,21 +97,13 @@ export const auth = defineAuth({
   /**
    * ユーザー検証設定
    * 
-   * 学習ポイント:
-   * - autoVerifiedAttributes: 自動検証する属性
-   * - verificationEmailSubject: 検証メールの件名
-   * - verificationEmailBody: 検証メールの本文
+   * 注意: Amplify Gen2では、メール検証の設定はCognitoのデフォルト設定を使用
+   * カスタムメッセージが必要な場合は、Cognito User Poolの設定で直接指定
    */
-  verificationEmailSubject: 'MAGI Decision System - メールアドレスの確認',
-  verificationEmailBody: (createConfirmAccountLink: () => string) =>
-    `MAGI Decision Systemへようこそ！以下のリンクをクリックしてアカウントを確認してください: ${createConfirmAccountLink()}`,
 
   /**
    * サインアップ設定
    * 
-   * 学習ポイント:
-   * - allowUnauthenticatedIdentities: 未認証ユーザーのアクセス制御
-   * - セキュリティ重視のため false に設定
+   * 注意: allowUnauthenticatedIdentitiesはAmplify Gen2では自動管理される
    */
-  allowUnauthenticatedIdentities: false,
 });
