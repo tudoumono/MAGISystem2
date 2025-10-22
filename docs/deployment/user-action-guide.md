@@ -373,6 +373,12 @@ set AWS_PROFILE=magi-dev     # Windows
 - 「Access Denied」エラー → IAM権限を確認
 - SSO ログインエラー → SSO設定を確認
 
+**ビルドエラーの対処:**
+1. **Build history** で失敗したビルドを確認
+2. **Build logs** で具体的なエラーメッセージを確認
+3. **上記のトラブルシューティングセクション** を参照して対処
+4. **Build settings** で設定を調整後、再デプロイ
+
 **メリット:** 
 - 視覚的に確認でき、問題箇所を特定しやすい
 - AWS Console の使い方も同時に学習できる
@@ -692,19 +698,148 @@ npx ampx sandbox deploy
 
 ---
 
+## 🚨 トラブルシューティング: Amplifyビルドエラー
+
+### よくあるビルドエラーと解決方法
+
+<details>
+<summary>❌ <strong>Build failed with exit code 1</strong></summary>
+
+**エラーの特徴:**
+```
+Build failed
+!!! Error: Command failed with exit code 1
+```
+
+**主な原因と解決方法:**
+
+**1. メモリ不足エラー**
+```bash
+# Node.jsヒープメモリ不足の場合
+FATAL ERROR: Ineffective mark-compacts near heap limit
+```
+
+**解決方法:**
+- Amplify Console → App Settings → Build settings
+- Environment variables に追加:
+  - `NODE_OPTIONS`: `--max-old-space-size=4096`
+- または Build instance を Large/XLarge にアップグレード
+
+**2. Node.jsバージョンエラー**
+```bash
+NODE.JS VERSION NOT SUPPORTED
+Your application uses Node.js v18.x.x, which is no longer supported
+```
+
+**解決方法:**
+- `package.json` に Node.js 20+ を指定:
+```json
+{
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
+```
+
+**3. Next.js Edge API Routes エラー**
+```bash
+Edge API routes are not supported
+```
+
+**解決方法:**
+- Edge API Routes を通常のAPI Routes に変更
+- `export const runtime = 'edge'` を削除
+
+**4. ビルド出力サイズ超過**
+```bash
+Build output exceeds maximum allowed size (220MB)
+```
+
+**解決方法:**
+- `amplify.yml` に不要ファイル削除を追加:
+```yaml
+frontend:
+  phases:
+    build:
+      commands:
+        - npm run build
+        - rm -f node_modules/@swc/core-linux-x64-gnu/swc.linux-x64-gnu.node
+        - rm -f node_modules/@swc/core-linux-x64-musl/swc.linux-x64-musl.node
+```
+
+</details>
+
+<details>
+<summary>🔧 <strong>Build Instance のアップグレード</strong></summary>
+
+**大規模アプリケーションの場合:**
+
+1. **Amplify Console にアクセス**
+2. **App Settings → Build settings**
+3. **Build instance** を変更:
+   - **Medium**: 8 GiB memory, 4 vCPUs（デフォルト）
+   - **Large**: 16 GiB memory, 8 vCPUs
+   - **XLarge**: 72 GiB memory, 36 vCPUs
+
+**料金への影響:**
+- Large: 約2倍のコスト
+- XLarge: 約9倍のコスト
+
+</details>
+
+<details>
+<summary>📋 <strong>ビルドログの確認方法</strong></summary>
+
+**詳細なエラー情報の取得:**
+
+1. **Amplify Console → アプリ → Build history**
+2. **失敗したビルドをクリック**
+3. **各フェーズのログを確認:**
+   - Provision
+   - Build
+   - Deploy
+   - Verify
+
+**CLI での確認:**
+```bash
+# ビルドジョブの詳細取得
+aws amplify get-job --app-id [APP-ID] --branch-name main --job-id [JOB-ID]
+
+# ビルドアーティファクトのダウンロード
+# 上記コマンドの出力からartifacts URLを取得してダウンロード
+```
+
+</details>
+
+---
+
 ## 🏗️ Step 2: Amplify リソースのデプロイ
 
 ### 2.1 Amplify プロジェクトの初期化
 
+> **⚠️ 前提条件確認**  
+> Step 1.5でAmplify初期化が完了していることを確認してください。
+
 <details>
-<summary>💻 <strong>コマンドライン版</strong> - 自動化された設定</summary>
+<summary>💻 <strong>コマンドライン版</strong> - 継続開発</summary>
 
 ```bash
-# プロジェクトルートで実行
-npx ampx configure profile
+# 既に初期化済みの場合（Step 1.5完了後）
+npx ampx sandbox deploy
 
+# 初回の場合（管理者権限で実行済みの場合）
+npx ampx configure profile
 # プロファイル名を入力（例: magi-dev）
-# 上記で設定したAWS認証情報を使用
+```
+
+**ビルドエラーが発生した場合:**
+```bash
+# メモリ不足の場合
+export NODE_OPTIONS="--max-old-space-size=4096"
+npx ampx sandbox deploy
+
+# 詳細ログで確認
+npx ampx sandbox deploy --verbose
 ```
 
 **背景:** `amplify/team-provider-info.json` ファイルが作成され、プロジェクト設定が保存される
@@ -727,6 +862,11 @@ npx ampx configure profile
    - App name（アプリ名）: `magi-decision-system`
    - Environment name（環境名）: `dev`
    - 「Next（次へ）」をクリック
+
+**ビルドエラーが発生した場合:**
+1. **Build settings** でNode.js 20+を指定
+2. **Environment variables** で `NODE_OPTIONS` を設定
+3. **Build instance** をLargeにアップグレード（必要に応じて）
 
 **メリット:** Git連携が自動設定され、CI/CDパイプラインも同時に構築される
 </details>
