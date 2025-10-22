@@ -10,9 +10,11 @@
     "type-check": "tsc --noEmit",
     "setup-env": "node scripts/setup-env.js",
     "validate-env": "node scripts/setup-env.js validate",
+    "check:amplify": "node scripts/check-amplify-setup.js",
     "amplify:push": "npx ampx push",
     "amplify:status": "npx ampx status",
-    "amplify:logs": "npx ampx logs"
+    "amplify:logs": "npx ampx logs",
+    "amplify:generate": "npx ampx generate graphql-client-code --format modelgen --model-target typescript"
   },
   "dependencies": {
     "@aws-amplify/backend": "^1.6.0",
