@@ -22,19 +22,18 @@ import { defineFunction } from '@aws-amplify/backend';
  * - environment: 必要な環境変数を設定
  */
 export const agentGateway = defineFunction({
-  name: 'agent-gateway',
-  entry: './handler.ts',
-  
   /**
    * ランタイム設定
    * 
    * 学習ポイント:
-   * - runtime: 'nodejs20.x' - 最新のNode.js LTS版を使用
+   * - entry: ハンドラーファイルのパス
    * - timeout: 300秒 - エージェント実行時間を考慮した設定
    * - memoryMB: 1024MB - 複数エージェントの並列実行に必要なメモリ
+   * 
+   * 注意: Amplify Gen2では、runtimeとnameプロパティは自動設定される
    */
-  runtime: 'nodejs20.x',
-  timeout: 300, // 5分
+  entry: './handler.ts',
+  timeoutSeconds: 300, // 5分
   memoryMB: 1024,
   
   /**
