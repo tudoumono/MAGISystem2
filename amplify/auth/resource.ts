@@ -90,18 +90,9 @@ export const auth = defineAuth({
   /**
    * パスワードポリシー
    * 
-   * セキュリティ考慮:
-   * - 最小長: 8文字
-   * - 複雑性要件: 大文字、小文字、数字、記号を含む
-   * - 一般的なパスワードの使用を禁止
+   * 注意: Amplify Gen2では、パスワードポリシーはCognitoのデフォルト設定を使用
+   * カスタムポリシーが必要な場合は、Cognito User Poolの設定で直接指定
    */
-  passwordPolicy: {
-    minLength: 8,
-    requireLowercase: true,
-    requireUppercase: true,
-    requireNumbers: true,
-    requireSymbols: true,
-  },
 
   /**
    * ユーザー検証設定
