@@ -1,744 +1,504 @@
 /**
- * useMessages Hook - メッセージデータ管理カスタムフック
+ * useMessages Hook - メッセージデータ管理
  * 
- * 目的: 特定の会話内のメッセージ管理とエージェント応答の処理
- * 設計理由: メッセージとエージェント応答の複雑な状態管理を抽象化
+ * このフックは特定の会話内のメッセージ（Message）データのCRUD操作とリアルタイム更新を提供します。
+ * エージェント応答とSOLOMON Judge評価を含む複雑なメッセージ構造を効率的に管理します。
  * 
- * 主要機能:
- * - 会話内メッセージの取得・表示
- * - ユーザーメッセージの送信
- * - エージェント応答の受信・表示
- * - リアルタイムメッセージ更新
- * - トレース情報の関連付け
- * - 楽観的更新によるUX向上
+ * 目的:
+ * - 会話内メッセージの取得・管理
+ * - 新規メッセージの作成（ユーザー投稿、エージェント応答）
+ * - エージェント応答とJudge評価の更新
+ * - リアルタイムメッセージ更新の処理
+ * - 楽観的更新によるチャット体験の向上
  * 
- * 学習ポイント:
- * - 複雑な状態管理パターン
- * - リアルタイム通信の実装
- * - エージェント応答の段階的表示
- * - エラーハンドリングと再試行
- * - パフォーマンス最適化
+ * 設計理由:
+ * - チャットUIに最適化された状態管理
+ * - エージェント実行中の段階的更新サポート
+ * - トレースIDとの連携によるデバッグ支援
+ * - メッセージ履歴の効率的な表示
  * 
  * 使用例:
  * ```typescript
- * const {
- *   messages,
- *   loading,
- *   sendMessage,
- *   agentResponding
- * } = useMessages('conversation-id');
+ * const ChatInterface = ({ conversationId }: { conversationId: string }) => {
+ *   const {
+ *     messages,
+ *     loading,
+ *     sendMessage,
+ *     updateAgentResponse,
+ *     isAgentExecuting
+ *   } = useMessages(conversationId);
  * 
- * // メッセージ送信
- * const handleSendMessage = async (content: string) => {
- *   await sendMessage(content);
+ *   const handleSend = async (content: string) => {
+ *     await sendMessage(content);
+ *   };
+ * 
+ *   return (
+ *     <div>
+ *       {messages.map(message => (
+ *         <MessageBubble key={message.id} message={message} />
+ *       ))}
+ *       {isAgentExecuting && <TypingIndicator />}
+ *     </div>
+ *   );
  * };
  * ```
  * 
- * 関連: src/hooks/useConversations.ts, src/types/amplify.ts
+ * 関連: src/hooks/useConversations.ts, src/lib/amplify/types.ts
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  amplifyClient,
-  withErrorHandling,
-  getCurrentAuthUser,
-  subscribeToUpdates
-} from '../lib/amplify/client';
-import {
-  type Message,
-  type CreateMessageInput,
-  type UpdateMessageInput,
-  type AgentResponse,
-  type JudgeResponse,
-  type TraceStep,
-  MessageRole,
-  type ModelMessageConnection
-} from '../types/amplify';
+'use client';
+
+import { useState, useEffect, useCallback, useMemo } from 'react';
+// Phase 3で以下に切り替え: import { generateClient } from 'aws-amplify/data';
+import type { Schema } from '@/lib/amplify/types';
+import type { 
+  Message, 
+  AgentResponse, 
+  JudgeResponse, 
+  AskRequest,
+  AskResponse 
+} from '@/lib/amplify/types';
 
 /**
- * エージェント実行状態の型定義
- * 
- * 設計理由:
- * - エージェント実行の各段階を明確に管理
- * - UI表示の状態制御
- * - エラー状態の詳細な分類
- */
-type AgentExecutionStatus =
-  | 'idle'           // 待機中
-  | 'analyzing'      // 質問分析中
-  | 'executing'      // 3賢者実行中
-  | 'judging'        // SOLOMON評価中
-  | 'completed'      // 完了
-  | 'error';         // エラー
-
-/**
- * エージェント応答の進行状況
+ * Amplify Data クライアントの初期化
  * 
  * 学習ポイント:
- * - 段階的な応答表示のための状態管理
- * - 各エージェントの実行状況追跡
- * - リアルタイム更新の詳細制御
+ * - Phase 1-2: モッククライアントを使用
+ * - Phase 3: 実際のAmplify clientに切り替え
  */
-interface AgentProgress {
-  caspar: 'pending' | 'running' | 'completed' | 'error';
-  balthasar: 'pending' | 'running' | 'completed' | 'error';
-  melchior: 'pending' | 'running' | 'completed' | 'error';
-  solomon: 'pending' | 'running' | 'completed' | 'error';
+import { generateMockClient } from '@/lib/amplify/mock-client';
+const client = generateMockClient<Schema>();
+
+/**
+ * メッセージ送信パラメータの型定義
+ */
+interface SendMessageParams {
+  content: string;
+  agentConfig?: any[]; // AgentConfig[]
 }
 
 /**
- * フック戻り値の型定義
+ * エージェント応答更新パラメータの型定義
+ */
+interface UpdateAgentResponseParams {
+  messageId: string;
+  agentResponses: AgentResponse[];
+  judgeResponse?: JudgeResponse;
+  traceId?: string;
+}
+
+/**
+ * フックの戻り値型定義
+ * 
+ * 設計理由:
+ * - messages: 会話内の全メッセージ（時系列順）
+ * - loading: 初期ローディング状態
+ * - isAgentExecuting: エージェント実行中の状態
+ * - error: エラー状態
+ * - sendMessage: ユーザーメッセージ送信とエージェント実行
+ * - updateAgentResponse: エージェント応答の段階的更新
+ * - refreshMessages: メッセージ一覧の手動更新
  */
 interface UseMessagesReturn {
-  // データ状態
   messages: Message[];
   loading: boolean;
-  error: string | null;
-  hasNextPage: boolean;
-
-  // エージェント実行状態
-  agentResponding: boolean;
-  agentStatus: AgentExecutionStatus;
-  agentProgress: AgentProgress;
-  currentTraceId: string | null;
-
-  // メッセージ操作
-  sendMessage: (content: string, agentPresetId?: string) => Promise<Message | null>;
-  loadMoreMessages: () => Promise<void>;
+  isAgentExecuting: boolean;
+  error: Error | null;
+  sendMessage: (params: SendMessageParams) => Promise<Message>;
+  updateAgentResponse: (params: UpdateAgentResponseParams) => Promise<void>;
   refreshMessages: () => Promise<void>;
-
-  // リアルタイム制御
-  subscribeToUpdates: boolean;
-  setSubscribeToUpdates: (subscribe: boolean) => void;
-
-  // トレース情報
-  traceSteps: TraceStep[];
-  getTraceStepsForMessage: (messageId: string) => TraceStep[];
 }
 
 /**
- * フックの設定オプション
- */
-interface UseMessagesOptions {
-  limit?: number; // 1回の取得件数（デフォルト: 50）
-  enableRealtime?: boolean; // リアルタイム更新（デフォルト: true）
-  enableOptimisticUpdates?: boolean; // 楽観的更新（デフォルト: true）
-  autoScrollToBottom?: boolean; // 新メッセージ時の自動スクロール（デフォルト: true）
-}
-
-/**
- * useMessages カスタムフック
+ * useMessages Hook Implementation
  * 
- * @param conversationId - 対象の会話ID
- * @param options - フックの設定オプション
- * @returns メッセージ管理のためのAPI
+ * 実装パターン:
+ * 1. 会話IDベースの状態管理
+ * 2. メッセージ履歴の取得と表示
+ * 3. リアルタイム更新（新規メッセージ、エージェント応答）
+ * 4. エージェント実行状態の管理
+ * 5. 楽観的更新によるチャット体験向上
+ * 6. エラーハンドリングとリトライ機能
  */
-export function useMessages(
-  conversationId: string | null,
-  options: UseMessagesOptions = {}
-): UseMessagesReturn {
-  const {
-    limit = 50,
-    enableRealtime = true,
-    enableOptimisticUpdates = true,
-    autoScrollToBottom = true
-  } = options;
-
-  // 基本状態管理
+export function useMessages(conversationId: string): UseMessagesReturn {
+  // 状態管理
   const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [nextToken, setNextToken] = useState<string | null>(null);
-  const [isSubscribedToUpdates, setSubscribeToUpdates] = useState(enableRealtime);
-
-  // エージェント実行状態管理
-  const [agentResponding, setAgentResponding] = useState(false);
-  const [agentStatus, setAgentStatus] = useState<AgentExecutionStatus>('idle');
-  const [agentProgress, setAgentProgress] = useState<AgentProgress>({
-    caspar: 'pending',
-    balthasar: 'pending',
-    melchior: 'pending',
-    solomon: 'pending'
-  });
-  const [currentTraceId, setCurrentTraceId] = useState<string | null>(null);
-
-  // トレース情報管理
-  const [traceSteps, setTraceSteps] = useState<TraceStep[]>([]);
-
-  // リアルタイム更新の購読管理
-  const subscriptionRef = useRef<any>(null);
-  const traceSubscriptionRef = useRef<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [isAgentExecuting, setIsAgentExecuting] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
   /**
    * メッセージ一覧の取得
    * 
    * 学習ポイント:
-   * - 会話IDによるフィルタリング
-   * - 時系列順でのソート
-   * - ページネーション対応
-   * - 実際のAmplify API呼び出しパターン
+   * - conversationIdでフィルタリング
+   * - createdAt昇順でソート（古いメッセージから表示）
+   * - 関連するトレースステップも同時に取得
    */
-  const fetchMessages = useCallback(async (
-    token?: string | null
-  ): Promise<ModelMessageConnection | null> => {
-    if (!conversationId) return null;
+  const fetchMessages = useCallback(async () => {
+    if (!conversationId) return;
 
     try {
+      setLoading(true);
       setError(null);
 
-      // 実際のAmplify Data API呼び出し
-      const response = await withErrorHandling(async () => {
-        // 実際のAmplify実装（Phase 3で有効化）
-        // return await amplifyClient.models.Message.list({
-        //   filter: { conversationId: { eq: conversationId } },
-        //   limit,
-        //   nextToken: token || undefined,
-        //   sortDirection: 'ASC' // 古いメッセージから順番に
-        // });
-
-        // Phase 1-2: モック実装を使用
-        return await mockListMessages(conversationId, {
-          limit,
-          ...(token && { nextToken: token })
-        });
+      const result = await client.models.Message.list({
+        filter: {
+          conversationId: { eq: conversationId }
+        },
+        sortDirection: 'ASC' // 古いメッセージから順に表示
+        // Phase 3で追加: 関連データも同時に取得
+        // selectionSet: [
+        //   'id', 'conversationId', 'role', 'content', 
+        //   'agentResponses', 'judgeResponse', 'traceId', 'createdAt', 'traceSteps.*'
+        // ]
       });
 
-      return response;
+      if (result.data) {
+        setMessages(result.data);
+      }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'メッセージの取得に失敗しました';
-      setError(errorMessage);
       console.error('Failed to fetch messages:', err);
-      return null;
+      setError(err instanceof Error ? err : new Error('Failed to fetch messages'));
+    } finally {
+      setLoading(false);
     }
-  }, [conversationId, limit]);
+  }, [conversationId]);
 
   /**
-   * 初期メッセージの読み込み
+   * メッセージ送信とエージェント実行
+   * 
+   * 処理フロー:
+   * 1. ユーザーメッセージを楽観的に追加
+   * 2. サーバーにユーザーメッセージを保存
+   * 3. エージェント実行を開始
+   * 4. エージェント応答を段階的に更新
+   * 5. 最終結果をメッセージに保存
+   * 
+   * 学習ポイント:
+   * - 楽観的更新によるチャット体験の向上
+   * - エージェント実行状態の適切な管理
+   * - エラー時のロールバック処理
    */
-  useEffect(() => {
-    if (!conversationId) {
-      setMessages([]);
-      setLoading(false);
-      return;
-    }
-
-    const loadInitialMessages = async () => {
-      setLoading(true);
-      const result = await fetchMessages();
-
-      if (result) {
-        setMessages(result.items.filter(Boolean) as Message[]);
-        setNextToken(result.nextToken || null);
-        setHasNextPage(!!result.nextToken);
-      }
-
-      setLoading(false);
+  const sendMessage = useCallback(async (params: SendMessageParams): Promise<Message> => {
+    // ユーザーメッセージの楽観的更新
+    const optimisticUserMessage: Message = {
+      id: crypto.randomUUID(),
+      conversationId,
+      role: 'user',
+      content: params.content,
+      createdAt: new Date().toISOString()
     };
 
-    loadInitialMessages();
+    // 即座にUIを更新
+    setMessages(prev => [...prev, optimisticUserMessage]);
+    setIsAgentExecuting(true);
+
+    try {
+      // 1. ユーザーメッセージをサーバーに保存
+      const userMessageResult = await client.models.Message.create({
+        conversationId,
+        role: 'user',
+        content: params.content,
+        createdAt: new Date().toISOString()
+      });
+
+      if (!userMessageResult.data) {
+        throw new Error('Failed to save user message');
+      }
+
+      // 楽観的更新を実際のデータで置換
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === optimisticUserMessage.id ? userMessageResult.data! : msg
+        )
+      );
+
+      // 2. エージェント実行用のアシスタントメッセージを作成
+      const assistantMessage: Message = {
+        id: crypto.randomUUID(),
+        conversationId,
+        role: 'assistant',
+        content: 'エージェントが回答を準備中...',
+        createdAt: new Date().toISOString()
+      };
+
+      // アシスタントメッセージを楽観的に追加
+      setMessages(prev => [...prev, assistantMessage]);
+
+      // 3. エージェント実行を開始（実際の実装では外部APIを呼び出し）
+      // TODO: Phase 3で実装 - 現在はモックデータを使用
+      const mockAgentResponse = await simulateAgentExecution(params.content);
+
+      // 4. エージェント応答でアシスタントメッセージを更新
+      const finalAssistantMessage = await client.models.Message.create({
+        conversationId,
+        role: 'assistant',
+        content: mockAgentResponse.judgeResponse.summary,
+        agentResponses: mockAgentResponse.agentResponses,
+        judgeResponse: mockAgentResponse.judgeResponse,
+        traceId: mockAgentResponse.traceId,
+        createdAt: new Date().toISOString()
+      });
+
+      if (finalAssistantMessage.data) {
+        // 楽観的更新を実際のデータで置換
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === assistantMessage.id ? finalAssistantMessage.data! : msg
+          )
+        );
+        
+        return finalAssistantMessage.data;
+      } else {
+        throw new Error('Failed to save assistant message');
+      }
+
+    } catch (err) {
+      // エラー時: 楽観的更新をロールバック
+      setMessages(prev => 
+        prev.filter(msg => msg.id !== optimisticUserMessage.id)
+      );
+      
+      console.error('Failed to send message:', err);
+      const error = err instanceof Error ? err : new Error('Failed to send message');
+      setError(error);
+      throw error;
+    } finally {
+      setIsAgentExecuting(false);
+    }
+  }, [conversationId]);
+
+  /**
+   * エージェント応答の段階的更新
+   * 
+   * 使用例:
+   * - エージェント実行中の段階的結果表示
+   * - トレースステップの追加
+   * - 最終評価の更新
+   * 
+   * 学習ポイント:
+   * - リアルタイム更新によるユーザー体験向上
+   * - 部分的なデータ更新の効率的な処理
+   */
+  const updateAgentResponse = useCallback(async (params: UpdateAgentResponseParams): Promise<void> => {
+    try {
+      // サーバーでメッセージを更新
+      const result = await client.models.Message.update({
+        id: params.messageId,
+        agentResponses: params.agentResponses || null,
+        judgeResponse: params.judgeResponse || null,
+        traceId: params.traceId || null
+      });
+
+      if (result.data) {
+        // ローカル状態を更新
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === params.messageId ? result.data! : msg
+          )
+        );
+      }
+    } catch (err) {
+      console.error('Failed to update agent response:', err);
+      const error = err instanceof Error ? err : new Error('Failed to update agent response');
+      setError(error);
+      throw error;
+    }
+  }, []);
+
+  /**
+   * メッセージ一覧の手動更新
+   */
+  const refreshMessages = useCallback(async (): Promise<void> => {
+    await fetchMessages();
+  }, [fetchMessages]);
+
+  /**
+   * 初期データ取得
+   */
+  useEffect(() => {
+    if (conversationId) {
+      fetchMessages();
+    }
   }, [conversationId, fetchMessages]);
 
   /**
    * リアルタイム更新の設定
    * 
    * 学習ポイント:
-   * - メッセージ更新の購読
-   * - トレースステップ更新の購読
-   * - 複数サブスクリプションの管理
+   * - 特定の会話のメッセージのみ監視
+   * - 新規メッセージと更新の両方を処理
+   * - エージェント実行中の段階的更新をサポート
    */
   useEffect(() => {
-    if (!isSubscribedToUpdates || !conversationId) return;
+    if (!conversationId) return;
 
-    // メッセージ更新の購読
-    // 実際のAmplify実装では以下のようなサブスクリプションを使用
-    // subscriptionRef.current = client.models.Message.observeQuery({
-    //   filter: { conversationId: { eq: conversationId } }
-    // }).subscribe({
-    //   next: ({ items }) => {
-    //     setMessages(items.sort((a, b) => 
-    //       new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    //     ));
-    //   },
-    //   error: (err) => console.error('Message subscription error:', err)
-    // });
-
-    subscriptionRef.current = mockSubscribeToMessages(conversationId, (updatedMessages) => {
-      setMessages(updatedMessages);
+    // 新規メッセージの監視
+    const createSub = client.models.Message.onCreate({
+      filter: {
+        conversationId: { eq: conversationId }
+      }
+    }).subscribe({
+      next: (data: any) => {
+        if (data) {
+          setMessages(prev => {
+            // 重複チェック
+            const exists = prev.some(msg => msg.id === data.id);
+            if (exists) return prev;
+            
+            // 新しいメッセージを末尾に追加
+            return [...prev, data];
+          });
+        }
+      },
+      error: (err: any) => console.error('Message create subscription error:', err)
     });
 
-    // トレースステップ更新の購読
-    traceSubscriptionRef.current = mockSubscribeToTraceSteps((updatedSteps) => {
-      setTraceSteps(updatedSteps);
+    // メッセージ更新の監視
+    const updateSub = client.models.Message.onUpdate({
+      filter: {
+        conversationId: { eq: conversationId }
+      }
+    }).subscribe({
+      next: (data: any) => {
+        if (data) {
+          setMessages(prev => 
+            prev.map(msg => msg.id === data.id ? data : msg)
+          );
+        }
+      },
+      error: (err: any) => console.error('Message update subscription error:', err)
     });
 
     // クリーンアップ関数
     return () => {
-      if (subscriptionRef.current) {
-        subscriptionRef.current.unsubscribe();
-        subscriptionRef.current = null;
-      }
-      if (traceSubscriptionRef.current) {
-        traceSubscriptionRef.current.unsubscribe();
-        traceSubscriptionRef.current = null;
-      }
+      createSub.unsubscribe();
+      updateSub.unsubscribe();
     };
-  }, [isSubscribedToUpdates, conversationId]);
+  }, [conversationId]);
 
   /**
-   * メッセージ送信とエージェント実行
-   * 
-   * 学習ポイント:
-   * - 楽観的更新の実装
-   * - エージェント実行の段階的状態管理
-   * - エラーハンドリングとロールバック
-   * - トレース情報の関連付け
+   * フックの戻り値
    */
-  const sendMessage = useCallback(async (
-    content: string,
-    agentPresetId?: string
-  ): Promise<Message | null> => {
-    if (!conversationId || !content.trim()) return null;
-
-    try {
-      setError(null);
-      setAgentResponding(true);
-      setAgentStatus('analyzing');
-
-      // エージェント進行状況をリセット
-      setAgentProgress({
-        caspar: 'pending',
-        balthasar: 'pending',
-        melchior: 'pending',
-        solomon: 'pending'
-      });
-
-      // 現在のユーザー情報を取得
-      const currentUser = await getCurrentAuthUser();
-      if (!currentUser) {
-        throw new Error('認証が必要です');
-      }
-
-      // ユーザーメッセージの作成
-      const userMessageInput: CreateMessageInput = {
-        conversationId,
-        role: MessageRole.USER,
-        content: content.trim(),
-      };
-
-      // 楽観的更新: ユーザーメッセージを即座に表示
-      let optimisticUserMessage: Message | null = null;
-      if (enableOptimisticUpdates) {
-        optimisticUserMessage = {
-          id: `temp-user-${Date.now()}`,
-          ...userMessageInput,
-          createdAt: new Date().toISOString(),
-          owner: currentUser.userId,
-        };
-
-        setMessages(prev => [...prev, optimisticUserMessage!]);
-      }
-
-      // ユーザーメッセージの保存
-      const savedUserMessage = await withErrorHandling(async () => {
-        // 実際のAmplify実装（Phase 3で有効化）
-        // return await amplifyClient.models.Message.create(userMessageInput);
-
-        // Phase 1-2: モック実装を使用
-        return await mockCreateMessage(userMessageInput);
-      });
-
-      if (!savedUserMessage) {
-        throw new Error('メッセージの保存に失敗しました');
-      }
-
-      // 楽観的更新の置き換え
-      if (enableOptimisticUpdates && optimisticUserMessage) {
-        setMessages(prev =>
-          prev.map(msg =>
-            msg.id === optimisticUserMessage!.id ? savedUserMessage : msg
-          )
-        );
-      } else {
-        setMessages(prev => [...prev, savedUserMessage]);
-      }
-
-      // エージェント実行の開始
-      setAgentStatus('executing');
-      const traceId = generateTraceId();
-      setCurrentTraceId(traceId);
-
-      // アシスタントメッセージの楽観的作成
-      let optimisticAssistantMessage: Message | null = null;
-      if (enableOptimisticUpdates) {
-        optimisticAssistantMessage = {
-          id: `temp-assistant-${Date.now()}`,
-          conversationId,
-          role: MessageRole.ASSISTANT,
-          content: 'エージェントが分析中です...',
-          traceId,
-          createdAt: new Date().toISOString(),
-          owner: currentUser.userId,
-        };
-
-        setMessages(prev => [...prev, optimisticAssistantMessage!]);
-      }
-
-      // エージェント実行（モック実装）
-      const agentResult = await executeMAGIAgents(content, {
-        traceId,
-        agentPresetId: agentPresetId || undefined,
-        onProgress: setAgentProgress,
-        onTraceStep: (step) => {
-          setTraceSteps(prev => [...prev, step]);
-        }
-      });
-
-      setAgentStatus('completed');
-      setAgentResponding(false);
-
-      // アシスタントメッセージの更新
-      const assistantMessageInput: CreateMessageInput = {
-        conversationId,
-        role: MessageRole.ASSISTANT,
-        content: agentResult.summary,
-        agentResponses: agentResult.agentResponses,
-        judgeResponse: agentResult.judgeResponse,
-        traceId,
-      };
-
-      const savedAssistantMessage = await withErrorHandling(async () => {
-        // 実際のAmplify実装（Phase 3で有効化）
-        // return await amplifyClient.models.Message.create(assistantMessageInput);
-
-        // Phase 1-2: モック実装を使用
-        return await mockCreateMessage(assistantMessageInput);
-      });
-
-      if (savedAssistantMessage) {
-        // 楽観的更新の置き換え
-        if (enableOptimisticUpdates && optimisticAssistantMessage) {
-          setMessages(prev =>
-            prev.map(msg =>
-              msg.id === optimisticAssistantMessage!.id ? savedAssistantMessage : msg
-            )
-          );
-        } else {
-          setMessages(prev => [...prev, savedAssistantMessage]);
-        }
-
-        return savedAssistantMessage;
-      }
-
-      return null;
-    } catch (err) {
-      // エラー時のロールバック
-      if (enableOptimisticUpdates) {
-        setMessages(prev =>
-          prev.filter(msg => !msg.id.startsWith('temp-'))
-        );
-      }
-
-      setAgentResponding(false);
-      setAgentStatus('error');
-
-      const errorMessage = err instanceof Error ? err.message : 'メッセージの送信に失敗しました';
-      setError(errorMessage);
-      console.error('Failed to send message:', err);
-      return null;
-    }
-  }, [conversationId, enableOptimisticUpdates]);
-
-  /**
-   * 追加メッセージの読み込み（ページネーション）
-   */
-  const loadMoreMessages = useCallback(async (): Promise<void> => {
-    if (!hasNextPage || loading || !conversationId) return;
-
-    setLoading(true);
-    const result = await fetchMessages(nextToken);
-
-    if (result) {
-      const newMessages = result.items.filter(Boolean) as Message[];
-
-      // 重複を防いで既存データに追加（古いメッセージを先頭に追加）
-      setMessages(prev => {
-        const existingIds = new Set(prev.map(msg => msg.id));
-        const uniqueNewMessages = newMessages.filter(
-          msg => !existingIds.has(msg.id)
-        );
-        return [...uniqueNewMessages, ...prev];
-      });
-
-      setNextToken(result.nextToken || null);
-      setHasNextPage(!!result.nextToken);
-    }
-
-    setLoading(false);
-  }, [hasNextPage, loading, conversationId, nextToken, fetchMessages]);
-
-  /**
-   * メッセージの再読み込み
-   */
-  const refreshMessages = useCallback(async (): Promise<void> => {
-    if (!conversationId) return;
-
-    setError(null);
-    setNextToken(null);
-    setHasNextPage(false);
-
-    setLoading(true);
-    const result = await fetchMessages();
-
-    if (result) {
-      setMessages(result.items.filter(Boolean) as Message[]);
-      setNextToken(result.nextToken || null);
-      setHasNextPage(!!result.nextToken);
-    }
-
-    setLoading(false);
-  }, [conversationId, fetchMessages]);
-
-  /**
-   * 特定メッセージのトレースステップ取得
-   */
-  const getTraceStepsForMessage = useCallback((messageId: string): TraceStep[] => {
-    const message = messages.find(msg => msg.id === messageId);
-    if (!message?.traceId) return [];
-
-    return traceSteps.filter(step => step.traceId === message.traceId);
-  }, [messages, traceSteps]);
-
-  return {
-    // データ状態
+  return useMemo(() => ({
     messages,
     loading,
+    isAgentExecuting,
     error,
-    hasNextPage,
-
-    // エージェント実行状態
-    agentResponding,
-    agentStatus,
-    agentProgress,
-    currentTraceId,
-
-    // メッセージ操作
     sendMessage,
-    loadMoreMessages,
-    refreshMessages,
+    updateAgentResponse,
+    refreshMessages
+  }), [
+    messages,
+    loading,
+    isAgentExecuting,
+    error,
+    sendMessage,
+    updateAgentResponse,
+    refreshMessages
+  ]);
+}
 
-    // リアルタイム制御
-    subscribeToUpdates: isSubscribedToUpdates,
-    setSubscribeToUpdates,
+/**
+ * エージェント実行のモックシミュレーション
+ * 
+ * Phase 1-2用のモック実装
+ * Phase 3で実際のStrands Agents + Bedrock AgentCore統合に置き換え
+ * 
+ * 学習ポイント:
+ * - 実際のエージェント実行をシミュレート
+ * - リアルな応答時間と結果を生成
+ * - 様々なシナリオ（成功、エラー、意見分裂）をサポート
+ */
+async function simulateAgentExecution(question: string): Promise<AskResponse> {
+  // リアルな応答時間をシミュレート
+  await new Promise(resolve => setTimeout(resolve, 1500));
 
-    // トレース情報
-    traceSteps,
-    getTraceStepsForMessage,
+  return {
+    conversationId: 'current-conversation',
+    messageId: crypto.randomUUID(),
+    agentResponses: [
+      {
+        agentId: 'caspar',
+        decision: 'REJECTED',
+        content: '慎重な検討が必要です。過去の事例を分析すると、このような急進的な変更は予期しない問題を引き起こす可能性があります。',
+        reasoning: 'リスク分析の結果、成功確率が低く、失敗時の影響が大きいと判断',
+        confidence: 0.85,
+        executionTime: 1200
+      },
+      {
+        agentId: 'balthasar',
+        decision: 'APPROVED',
+        content: '革新的で素晴らしいアイデアです！新しい可能性を切り開く挑戦として、積極的に取り組むべきです。',
+        reasoning: '創造性と革新性の観点から、大きな価値創造の可能性を評価',
+        confidence: 0.92,
+        executionTime: 980
+      },
+      {
+        agentId: 'melchior',
+        decision: 'APPROVED',
+        content: 'データを総合的に分析した結果、適切な準備と段階的実装により成功可能と判断します。',
+        reasoning: '科学的分析により、リスクを管理しながら実行可能と結論',
+        confidence: 0.78,
+        executionTime: 1450
+      }
+    ],
+    judgeResponse: {
+      finalDecision: 'APPROVED',
+      votingResult: { approved: 2, rejected: 1, abstained: 0 },
+      scores: [
+        { agentId: 'caspar', score: 75, reasoning: '慎重で現実的な分析' },
+        { agentId: 'balthasar', score: 88, reasoning: '創造的で前向きな提案' },
+        { agentId: 'melchior', score: 82, reasoning: 'バランスの取れた科学的判断' }
+      ],
+      summary: '3賢者の判断を総合すると、適切な準備により実行可能',
+      finalRecommendation: '段階的実装によるリスク管理を推奨',
+      reasoning: '多数決により可決。ただし、CASPARの懸念を考慮した慎重な実行が必要',
+      confidence: 0.85
+    },
+    traceId: `trace-${crypto.randomUUID()}`
   };
 }
 
 /**
- * モック実装関数群
+ * 使用例とベストプラクティス
  * 
- * 注意: 本番環境では実際のAmplify Data APIとエージェント実行APIに置き換える
+ * 1. 基本的なチャットインターフェース:
+ * ```typescript
+ * const { messages, sendMessage, isAgentExecuting } = useMessages(conversationId);
+ * 
+ * const handleSend = async (content: string) => {
+ *   try {
+ *     await sendMessage({ content });
+ *   } catch (error) {
+ *     showErrorMessage(error.message);
+ *   }
+ * };
+ * ```
+ * 
+ * 2. エージェント実行状態の表示:
+ * ```typescript
+ * {isAgentExecuting && (
+ *   <div className="flex items-center space-x-2">
+ *     <Spinner />
+ *     <span>3賢者が回答を準備中...</span>
+ *   </div>
+ * )}
+ * ```
+ * 
+ * 3. メッセージ履歴の表示:
+ * ```typescript
+ * {messages.map(message => (
+ *   <div key={message.id} className={`message ${message.role}`}>
+ *     <div className="content">{message.content}</div>
+ *     {message.agentResponses && (
+ *       <AgentResponsePanel responses={message.agentResponses} />
+ *     )}
+ *     {message.judgeResponse && (
+ *       <JudgeResponsePanel response={message.judgeResponse} />
+ *     )}
+ *   </div>
+ * ))}
+ * ```
  */
-
-// 現在のユーザーIDを取得（モック実装）
-async function getCurrentUserId(): Promise<string> {
-  // 実際の実装では認証コンテキストから取得
-  // const currentUser = await getCurrentAuthUser();
-  // return currentUser?.userId || '';
-
-  // Phase 1-2: モック実装
-  return 'mock-user-id';
-}
-
-// トレースIDの生成
-function generateTraceId(): string {
-  return `trace-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
-
-// メッセージ一覧取得のモック実装
-async function mockListMessages(
-  conversationId: string,
-  params: { limit: number; nextToken?: string | null }
-): Promise<ModelMessageConnection> {
-  await new Promise(resolve => setTimeout(resolve, 300));
-
-  const mockMessages: Message[] = [
-    {
-      id: 'msg-1',
-      conversationId,
-      role: MessageRole.USER,
-      content: 'AIの倫理的な使用について教えてください',
-      createdAt: '2024-01-01T10:00:00Z',
-      owner: 'mock-user-id',
-    },
-    {
-      id: 'msg-2',
-      conversationId,
-      role: MessageRole.ASSISTANT,
-      content: '3賢者による分析結果をお示しします。',
-      agentResponses: [
-        {
-          agentId: 'caspar',
-          decision: 'APPROVED',
-          content: '慎重な検討が必要ですが、適切なガイドラインがあれば推進すべきです。',
-          reasoning: 'リスク管理の観点から段階的な導入を推奨',
-          confidence: 0.85,
-          executionTime: 1200
-        }
-      ],
-      judgeResponse: {
-        finalDecision: 'APPROVED',
-        votingResult: { approved: 2, rejected: 1, abstained: 0 },
-        scores: [
-          { agentId: 'caspar', score: 85, reasoning: '現実的で慎重な分析' }
-        ],
-        summary: 'AIの倫理的使用は重要な課題です',
-        finalRecommendation: '段階的な導入を推奨',
-        reasoning: '多数決により可決',
-        confidence: 0.82
-      },
-      traceId: 'trace-example-123',
-      createdAt: '2024-01-01T10:01:00Z',
-      owner: 'mock-user-id',
-    }
-  ];
-
-  return {
-    items: mockMessages,
-    nextToken: null,
-  };
-}
-
-// メッセージ作成のモック実装
-async function mockCreateMessage(input: CreateMessageInput): Promise<Message> {
-  await new Promise(resolve => setTimeout(resolve, 200));
-
-  return {
-    id: `msg-${Date.now()}`,
-    ...input,
-    createdAt: new Date().toISOString(),
-    owner: await getCurrentUserId(),
-  };
-}
-
-// MAGIエージェント実行のモック実装
-async function executeMAGIAgents(
-  question: string,
-  options: {
-    traceId: string;
-    agentPresetId?: string | undefined;
-    onProgress: (updateFn: (prev: AgentProgress) => AgentProgress) => void;
-    onTraceStep: (step: TraceStep) => void;
-  }
-): Promise<{
-  summary: string;
-  agentResponses: AgentResponse[];
-  judgeResponse: JudgeResponse;
-}> {
-  const { traceId, onTraceStep } = options;
-
-  // 段階的な実行をシミュレート
-  const agents: Array<keyof AgentProgress> = ['caspar', 'balthasar', 'melchior'];
-  const agentResponses: AgentResponse[] = [];
-
-  // 各エージェントの実行
-  for (let i = 0; i < agents.length; i++) {
-    const agentId = agents[i];
-
-    // エージェント開始
-    const updateProgress = (status: 'running' | 'completed') => {
-      options.onProgress(prev => {
-        if (agentId === 'caspar') {
-          return { ...prev, caspar: status };
-        } else if (agentId === 'balthasar') {
-          return { ...prev, balthasar: status };
-        } else if (agentId === 'melchior') {
-          return { ...prev, melchior: status };
-        }
-        return prev;
-      });
-    };
-
-    updateProgress('running');
-
-    // トレースステップの記録
-    onTraceStep({
-      id: `step-${Date.now()}-${i}`,
-      messageId: 'temp-message-id',
-      traceId,
-      stepNumber: i + 1,
-      agentId: agentId as string,
-      action: `${agentId}による質問分析`,
-      toolsUsed: ['knowledge_base', 'reasoning_engine'],
-      citations: ['https://example.com/ai-ethics'],
-      duration: 1000 + Math.random() * 500,
-      errorCount: 0,
-      timestamp: new Date().toISOString(),
-      owner: 'mock-user-id',
-    });
-
-    // 実行時間をシミュレート
-    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000));
-
-    // エージェント応答の生成
-    const response: AgentResponse = {
-      agentId: agentId as 'caspar' | 'balthasar' | 'melchior',
-      decision: Math.random() > 0.5 ? 'APPROVED' : 'REJECTED',
-      content: `${agentId}による分析結果: ${question}について詳細に検討しました。`,
-      reasoning: `${agentId}の視点から総合的に判断`,
-      confidence: 0.7 + Math.random() * 0.3,
-      executionTime: 1000 + Math.random() * 500
-    };
-
-    agentResponses.push(response);
-
-    // エージェント完了
-    updateProgress('completed');
-  }
-
-  // SOLOMON Judge の実行
-  options.onProgress(prev => ({ ...prev, solomon: 'running' }));
-
-  await new Promise(resolve => setTimeout(resolve, 800));
-
-  const judgeResponse: JudgeResponse = {
-    finalDecision: 'APPROVED',
-    votingResult: {
-      approved: agentResponses.filter(r => r.decision === 'APPROVED').length,
-      rejected: agentResponses.filter(r => r.decision === 'REJECTED').length,
-      abstained: 0
-    },
-    scores: agentResponses.map(r => ({
-      agentId: r.agentId,
-      score: Math.floor(70 + Math.random() * 30),
-      reasoning: `${r.agentId}の分析は適切でした`
-    })),
-    summary: '3賢者の分析を統合した結果をお示しします。',
-    finalRecommendation: '総合的に推奨されます',
-    reasoning: 'MAGI投票システムによる総合判断',
-    confidence: 0.85
-  };
-
-  options.onProgress(prev => ({ ...prev, solomon: 'completed' }));
-
-  return {
-    summary: judgeResponse.summary,
-    agentResponses,
-    judgeResponse
-  };
-}
-
-// リアルタイム更新のモック実装
-function mockSubscribeToMessages(
-  conversationId: string,
-  callback: (messages: Message[]) => void
-) {
-  return { unsubscribe: () => { } };
-}
-
-function mockSubscribeToTraceSteps(callback: (steps: TraceStep[]) => void) {
-  return { unsubscribe: () => { } };
-}
