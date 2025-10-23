@@ -45,35 +45,35 @@ export default function AgentResponseTestPage() {
     solomonThought?: string; // SOLOMONの思考
   } | null>(null);
 
-  // 思考メッセージのパターン
+  // Claude風拡張思考パターン
   const thoughtPatterns = {
     caspar: [
-      "リスク分析を開始しています...",
-      "過去の事例データを検索中...",
-      "安全性指標を評価中...",
-      "実現可能性を慎重に検討...",
-      "保守的観点から総合判断中..."
+      "質問を受信しました。保守的・現実的な視点から分析を開始します。",
+      "まず、過去の類似事例を検索しています...\n- 成功事例: 12件\n- 失敗事例: 8件\n- 不明確な結果: 3件",
+      "リスク要因を特定中:\n• 技術的リスク: 中程度\n• 財務的リスク: 高\n• 運用リスク: 低\n• 規制リスク: 中程度",
+      "実現可能性を評価しています...\n現在のリソースと制約を考慮すると、段階的アプローチが必要と判断。",
+      "保守的観点から総合判断を実行中...\nリスクと利益のバランスを慎重に検討し、最終的な可決/否決を決定します。"
     ],
     balthasar: [
-      "創造的可能性を探索中...",
-      "感情的価値を分析しています...",
-      "革新性の評価を実行中...",
-      "人間中心の視点で検討...",
-      "直感的判断を統合中..."
+      "創造的・感情的な視点から分析を開始します。人間の心に響く価値を探求しましょう。",
+      "この提案の革新性を評価中...\n• 新規性: 高\n• 創造性: 中程度\n• 社会的インパクト: 高\n• 感情的共感度: 中程度",
+      "人間中心の価値観で検討しています:\n- ユーザー体験の向上\n- 社会的意義の創出\n- 倫理的配慮の確認",
+      "直感的判断を統合中...\n論理だけでなく、感情や直感も重要な判断要素として考慮しています。",
+      "革新的視点から最終判断を形成中...\n創造性と人間性のバランスを取りながら、可決/否決を決定します。"
     ],
     melchior: [
-      "データ収集・分析を開始...",
-      "論理的整合性を検証中...",
-      "科学的根拠を評価しています...",
-      "バランス型判断を実行中...",
-      "客観的結論を導出中..."
+      "バランス型・科学的な視点から客観的分析を開始します。",
+      "データ収集を実行中...\n• 定量的データ: 収集完了\n• 定性的データ: 分析中\n• 統計的有意性: 検証中",
+      "論理的整合性を検証しています:\n1. 前提条件の妥当性\n2. 推論プロセスの正確性\n3. 結論の論理的一貫性",
+      "科学的手法による評価を実行中...\n仮説検証、データ分析、統計的推論を組み合わせて客観的判断を形成。",
+      "バランス型判断を完成中...\n保守性と革新性、論理と直感、リスクと機会のバランスを総合的に評価し、最終判断を決定します。"
     ],
     solomon: [
-      "3賢者の判断を収集中...",
-      "矛盾点の分析を実行...",
-      "統合評価アルゴリズム実行中...",
-      "最終スコアを算出しています...",
-      "MAGI最終判断を生成中..."
+      "SOLOMON Judge起動。3賢者の判断を統合評価します。",
+      "各エージェントの判断を収集・分析中:\n• CASPAR: 保守的視点での評価\n• BALTHASAR: 革新的視点での評価\n• MELCHIOR: バランス型視点での評価",
+      "矛盾点と一致点を分析しています...\n- 共通認識: 特定済み\n- 意見の相違: 詳細分析中\n- 判断根拠の妥当性: 検証中",
+      "統合評価アルゴリズムを実行中...\n各エージェントの確信度、論理的整合性、専門性を重み付けして総合スコアを算出。",
+      "MAGI最終判断を生成中...\n3賢者の多様な視点を統合し、最も適切な可決/否決判断を決定します。人類の未来のために。"
     ]
   };
 
@@ -100,9 +100,9 @@ export default function AgentResponseTestPage() {
         completedAgents: [],
         activeAgents: ['caspar', 'balthasar', 'melchior'],
         agentThoughts: {
-          caspar: thoughtPatterns.caspar[0],
-          balthasar: thoughtPatterns.balthasar[0],
-          melchior: thoughtPatterns.melchior[0],
+          caspar: thoughtPatterns.caspar[0] || "思考開始...",
+          balthasar: thoughtPatterns.balthasar[0] || "思考開始...",
+          melchior: thoughtPatterns.melchior[0] || "思考開始...",
         },
       });
 
@@ -113,7 +113,7 @@ export default function AgentResponseTestPage() {
       // 各エージェントの思考更新タイマーを開始
       agents.forEach(agentId => {
         agentTimers[agentId] = [];
-        const patterns = thoughtPatterns[agentId as keyof typeof thoughtPatterns];
+        const patterns = thoughtPatterns[agentId as keyof typeof thoughtPatterns] || [];
         
         patterns.forEach((thought, index) => {
           const timer = setTimeout(() => {
@@ -124,9 +124,11 @@ export default function AgentResponseTestPage() {
                 [agentId]: thought
               }
             } : null);
-          }, (index + 1) * 800 + Math.random() * 400); // ランダムな間隔で更新
+          }, (index + 1) * 1200 + Math.random() * 600); // より長い間隔で深い思考を表現
           
-          agentTimers[agentId].push(timer);
+          if (agentTimers[agentId]) {
+            agentTimers[agentId].push(timer);
+          }
         });
       });
 
@@ -166,17 +168,17 @@ export default function AgentResponseTestPage() {
           ...prev,
           phase: 'judge_evaluating',
           activeAgents: [],
-          solomonThought: thoughtPatterns.solomon[0]
+          solomonThought: thoughtPatterns.solomon[0] || "SOLOMON思考開始..."
         } : null);
 
-        // SOLOMON思考プロセス
+        // SOLOMON思考プロセス（より深い思考時間）
         thoughtPatterns.solomon.forEach((thought, index) => {
           setTimeout(() => {
             setExecutionProgress(prev => prev ? {
               ...prev,
               solomonThought: thought
             } : null);
-          }, index * 600);
+          }, index * 1000); // より長い思考時間
         });
 
       }, Math.max(...completionTimes.map(c => c.time)) + 500);
@@ -327,6 +329,23 @@ export default function AgentResponseTestPage() {
               <Button
                 variant="ghost"
                 size="sm"
+                onClick={() => setExecutionProgress({
+                  phase: 'agents_thinking',
+                  completedAgents: [],
+                  activeAgents: ['caspar', 'balthasar', 'melchior'],
+                  agentThoughts: {
+                    caspar: "質問を受信しました。保守的・現実的な視点から分析を開始します。",
+                    balthasar: "創造的・感情的な視点から分析を開始します。人間の心に響く価値を探求しましょう。",
+                    melchior: "バランス型・科学的な視点から客観的分析を開始します。",
+                  },
+                })}
+                disabled={loading}
+              >
+                Claude風思考デモ
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setExecutionProgress(null)}
                 disabled={loading}
               >
@@ -451,15 +470,15 @@ export default function AgentResponseTestPage() {
               </ul>
             </div>
             <div>
-              <h3 className="font-medium mb-2">🚀 並列実行 + 思考表示</h3>
+              <h3 className="font-medium mb-2">🧠 Claude風拡張思考システム</h3>
               <ul className="space-y-1">
                 <li>• 🔄 3賢者完全並列実行</li>
-                <li>• 💭 リアルタイム思考プロセス表示</li>
-                <li>• 🧠 各エージェント個別思考パターン</li>
+                <li>• 💭 &lt;antml:thinking&gt;風思考表示</li>
+                <li>• 🧠 段階的深層思考プロセス</li>
                 <li>• 🤖 SOLOMON統合思考可視化</li>
                 <li>• ⚡ 非同期完了タイミング</li>
                 <li>• 📊 並列実行状況サマリー</li>
-                <li>• 🎮 動的デモ制御拡張</li>
+                <li>• 🎮 Claude風思考デモ制御</li>
               </ul>
             </div>
           </div>
