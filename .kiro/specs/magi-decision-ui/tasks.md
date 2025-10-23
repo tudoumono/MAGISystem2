@@ -69,7 +69,12 @@
     - _要件: 2.1, 2.2, 2.3_
 
 - [ ] 3. エージェントゲートウェイとStrands Agents統合
-  - [ ] 3.1 Strands Agents基本セットアップ **[🤖 Kiro]**
+  - [x] 3.1 Strands Agents基本セットアップ **[🤖 Kiro]**
+
+
+
+
+
     - 3賢者（CASPAR、BALTHASAR、MELCHIOR）エージェントを作成
     - SOLOMON Judgeエージェントを実装
     - A2A（Agent-to-Agent）プロトコルでの通信を設定
