@@ -256,18 +256,32 @@ const ExecutionProgress: React.FC<{
                     </div>
                   </div>
                   
-                  {/* 思考プロセス表示 */}
+                  {/* Claude風拡張思考表示 */}
                   {thought && (
-                    <div className="mt-3 p-2 bg-black/20 rounded text-xs text-blue-100 min-h-[2.5rem] flex items-center">
-                      <div className="flex items-start gap-2">
-                        {(isActive && !isCompleted) && (
-                          <div className="flex gap-1 mt-1 flex-shrink-0">
-                            <div className="w-1 h-1 bg-orange-400 rounded-full animate-bounce"></div>
-                            <div className="w-1 h-1 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                            <div className="w-1 h-1 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    <div className="mt-3 p-3 bg-black/30 rounded-lg border border-white/10 text-xs text-blue-100 min-h-[4rem]">
+                      <div className="flex items-start gap-2 mb-2">
+                        <div className="flex-shrink-0 mt-0.5">
+                          {(isActive && !isCompleted) ? (
+                            <div className="flex gap-1">
+                              <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce"></div>
+                              <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                              <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                            </div>
+                          ) : (
+                            <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-xs font-mono text-blue-300 mb-1">
+                            &lt;antml:thinking&gt;
                           </div>
-                        )}
-                        <span className="leading-relaxed">{thought}</span>
+                          <div className="whitespace-pre-line leading-relaxed text-blue-100 font-mono text-xs">
+                            {thought}
+                          </div>
+                          <div className="text-xs font-mono text-blue-300 mt-1">
+                            &lt;/antml:thinking&gt;
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -332,18 +346,26 @@ const ExecutionProgress: React.FC<{
             </div>
           </div>
           
-          {/* SOLOMON思考プロセス表示 */}
+          {/* SOLOMON Claude風拡張思考表示 */}
           {solomonThought && (
-            <div className="max-w-md mx-auto">
-              <div className="p-4 bg-gradient-to-r from-orange-900/50 to-red-900/50 rounded-lg border border-orange-500/30">
+            <div className="max-w-2xl mx-auto">
+              <div className="p-4 bg-gradient-to-r from-orange-900/60 to-red-900/60 rounded-lg border border-orange-500/40 backdrop-blur-sm">
                 <div className="flex items-start gap-3">
                   <div className="flex gap-1 mt-1 flex-shrink-0">
-                    <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce"></div>
-                    <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
-                    <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
+                    <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
+                    <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
                   </div>
-                  <div className="text-sm text-orange-100 leading-relaxed">
-                    {solomonThought}
+                  <div className="flex-1">
+                    <div className="text-xs font-mono text-orange-300 mb-2">
+                      &lt;solomon:thinking&gt;
+                    </div>
+                    <div className="whitespace-pre-line leading-relaxed text-orange-100 font-mono text-sm">
+                      {solomonThought}
+                    </div>
+                    <div className="text-xs font-mono text-orange-300 mt-2">
+                      &lt;/solomon:thinking&gt;
+                    </div>
                   </div>
                 </div>
               </div>
