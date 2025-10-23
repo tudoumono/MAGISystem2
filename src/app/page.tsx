@@ -95,9 +95,15 @@ export default function HomePage() {
                   <li>• 認証システムの実装</li>
                 </ul>
                 <div className="mt-4 pt-4 border-t border-border">
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-xs text-muted-foreground mb-3">
                     学習効果: 視覚的フィードバックでモチベーション維持
                   </div>
+                  <Link
+                    href="/test"
+                    className="inline-flex items-center text-sm text-green-600 hover:text-green-700 font-medium"
+                  >
+                    🧪 動作テストページ →
+                  </Link>
                 </div>
               </div>
             </div>
@@ -344,6 +350,12 @@ export default function HomePage() {
                 実際のエージェント機能を体験してみましょう。
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link
+                  href="/test"
+                  className="bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 transition-colors focus-visible-ring"
+                >
+                  🧪 テストページを開く
+                </Link>
                 <Link
                   href="/dashboard"
                   className="bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors focus-visible-ring"
