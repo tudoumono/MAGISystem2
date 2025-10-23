@@ -21,7 +21,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AgentResponse, JudgeResponse } from '@/types/domain';
 import { AskAgentResponse } from '@/types/api';
 import { AgentResponseComparison } from './AgentResponseComparison';
@@ -46,7 +46,9 @@ interface MAGISystemInterfaceProps {
   executionProgress?: {
     phase: 'initializing' | 'agents_thinking' | 'judge_evaluating' | 'completed';
     completedAgents: string[];
-    currentAgent?: string;
+    activeAgents: string[]; // 並列実行中のエージェント
+    agentThoughts: { [agentId: string]: string }; // 各エージェントの現在の思考
+    solomonThought?: string; // SOLOMONの思考
   } | undefined;
   /** 再実行コールバック */
   onRetry?: (() => void) | undefined;
@@ -67,12 +69,51 @@ interface MAGISystemInterfaceProps {
  * - ユーザーに現在の処理状況を明確に伝える
  * - エヴァンゲリオン風のプログレス表示
  * - 各エージェントの実行状況を個別に表示
+ * - リアルタイム動的更新
  */
 const ExecutionProgress: React.FC<{
   progress: NonNullable<MAGISystemInterfaceProps['executionProgress']>;
   question: string;
 }> = ({ progress, question }) => {
-  const { phase, completedAgents, currentAgent } = progress;
+  const { phase, completedAgents, activeAgents, agentThoughts, solomonThought } = progress;
+  
+  // リアルタイムタイマー
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [systemPulse, setSystemPulse] = useState(false);
+  
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setElapsedTime(prev => prev + 1);
+    }, 1000);
+    
+    const pulseTimer = setInterval(() => {
+      setSystemPulse(prev => !prev);
+    }, 1500);
+    
+    return () => {
+      clearInterval(timer);
+      clearInterval(pulseTimer);
+    };
+  }, []);
+  
+  // 進行率計算
+  const calculateProgress = () => {
+    const phaseWeights = {
+      'initializing': 10,
+      'agents_thinking': 70,
+      'judge_evaluating': 15,
+      'completed': 5
+    };
+    
+    let progress = 0;
+    if (phase === 'initializing') progress = 10;
+    else if (phase === 'agents_thinking') {
+      progress = 10 + (completedAgents.length / 3) * 70;
+    } else if (phase === 'judge_evaluating') progress = 85;
+    else if (phase === 'completed') progress = 100;
+    
+    return Math.min(progress, 100);
+  };
   
   const phases = [
     { id: 'initializing', label: 'SOLOMON初期化', description: '統括システム起動中...' },
@@ -84,13 +125,39 @@ const ExecutionProgress: React.FC<{
   const currentPhaseIndex = phases.findIndex(p => p.id === phase);
   const agents = ['caspar', 'balthasar', 'melchior'];
   
+  const progressPercentage = calculateProgress();
+  
   return (
-    <Card className="p-6 bg-gradient-to-br from-blue-900 to-purple-900 text-white">
+    <Card className={`p-6 bg-gradient-to-br from-blue-900 to-purple-900 text-white transition-all duration-500 ${
+      systemPulse ? 'shadow-2xl shadow-blue-500/20' : 'shadow-xl'
+    }`}>
       {/* システムヘッダー */}
       <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold mb-2">MAGI SYSTEM ACTIVE</h2>
-        <div className="w-24 h-1 bg-gradient-to-r from-orange-400 to-red-400 mx-auto rounded-full"></div>
-        <p className="text-blue-200 text-sm mt-3 max-w-2xl mx-auto">
+        <div className="flex items-center justify-center gap-3 mb-2">
+          <div className={`w-3 h-3 rounded-full ${
+            systemPulse ? 'bg-red-500 animate-pulse' : 'bg-orange-500'
+          }`}></div>
+          <h2 className="text-2xl font-bold">MAGI SYSTEM ACTIVE</h2>
+          <div className={`w-3 h-3 rounded-full ${
+            systemPulse ? 'bg-red-500 animate-pulse' : 'bg-orange-500'
+          }`}></div>
+        </div>
+        
+        {/* 動的プログレスバー */}
+        <div className="w-32 h-2 bg-gray-700 mx-auto rounded-full overflow-hidden mb-2">
+          <div 
+            className="h-full bg-gradient-to-r from-orange-400 to-red-400 transition-all duration-1000 ease-out"
+            style={{ width: `${progressPercentage}%` }}
+          />
+        </div>
+        
+        {/* 実行時間とプログレス */}
+        <div className="flex justify-center gap-4 text-xs text-blue-200 mb-3">
+          <span>実行時間: {Math.floor(elapsedTime / 60)}:{(elapsedTime % 60).toString().padStart(2, '0')}</span>
+          <span>進行率: {Math.round(progressPercentage)}%</span>
+        </div>
+        
+        <p className="text-blue-200 text-sm max-w-2xl mx-auto">
           {question}
         </p>
       </div>
@@ -125,50 +192,204 @@ const ExecutionProgress: React.FC<{
         </div>
       </div>
 
-      {/* エージェント個別進行状況 */}
+      {/* エージェント並列実行状況 */}
       {phase === 'agents_thinking' && (
-        <div className="grid grid-cols-3 gap-4">
-          {agents.map(agentId => {
-            const isCompleted = completedAgents.includes(agentId);
-            const isCurrent = currentAgent === agentId;
-            const agentName = agentId.toUpperCase();
-            
-            return (
-              <div 
-                key={agentId}
-                className={`p-3 rounded-lg border ${
-                  isCompleted ? 'bg-green-900 border-green-500' :
-                  isCurrent ? 'bg-orange-900 border-orange-500 animate-pulse' :
-                  'bg-blue-800 border-blue-600'
-                }`}
-              >
-                <div className="text-center">
-                  <div className={`w-6 h-6 mx-auto mb-2 rounded-full flex items-center justify-center text-xs font-bold ${
-                    isCompleted ? 'bg-green-500' :
-                    isCurrent ? 'bg-orange-500' :
-                    'bg-blue-600'
-                  }`}>
-                    {isCompleted ? '✓' : agentName[0]}
+        <div className="space-y-6">
+          {/* エージェント状態表示 */}
+          <div className="grid grid-cols-3 gap-4">
+            {agents.map((agentId, index) => {
+              const isCompleted = completedAgents.includes(agentId);
+              const isActive = activeAgents.includes(agentId);
+              const agentName = agentId.toUpperCase();
+              const thought = agentThoughts[agentId];
+              
+              // 各エージェントの個別タイマー（デモ用）
+              const agentProgress = isCompleted ? 100 : 
+                                  isActive ? Math.min((elapsedTime * 8) % 100, 95) : 0;
+              
+              return (
+                <div 
+                  key={agentId}
+                  className={`p-4 rounded-lg border transition-all duration-500 ${
+                    isCompleted ? 'bg-green-900 border-green-500 shadow-lg shadow-green-500/20' :
+                    isActive ? 'bg-orange-900 border-orange-500 animate-pulse shadow-lg shadow-orange-500/20' :
+                    'bg-blue-800 border-blue-600'
+                  }`}
+                >
+                  <div className="text-center mb-3">
+                    <div className={`w-10 h-10 mx-auto mb-2 rounded-full flex items-center justify-center text-sm font-bold relative ${
+                      isCompleted ? 'bg-green-500' :
+                      isActive ? 'bg-orange-500' :
+                      'bg-blue-600'
+                    }`}>
+                      {isCompleted ? '✓' : agentName[0]}
+                      
+                      {/* 進行中の場合のプログレスリング */}
+                      {isActive && !isCompleted && (
+                        <svg className="absolute inset-0 w-10 h-10 -rotate-90" viewBox="0 0 40 40">
+                          <circle
+                            cx="20"
+                            cy="20"
+                            r="18"
+                            fill="none"
+                            stroke="rgba(255,255,255,0.3)"
+                            strokeWidth="2"
+                          />
+                          <circle
+                            cx="20"
+                            cy="20"
+                            r="18"
+                            fill="none"
+                            stroke="white"
+                            strokeWidth="2"
+                            strokeDasharray={`${agentProgress * 1.13} 113`}
+                            className="transition-all duration-500"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="text-sm font-medium">{agentName}</div>
+                    <div className="text-xs text-blue-200 mt-1">
+                      {isCompleted ? '判断完了' : 
+                       isActive ? `思考中... ${Math.round(agentProgress)}%` : 
+                       '待機中'}
+                    </div>
                   </div>
-                  <div className="text-xs font-medium">{agentName}</div>
-                  <div className="text-xs text-blue-200 mt-1">
-                    {isCompleted ? '完了' : isCurrent ? '分析中...' : '待機中'}
-                  </div>
+                  
+                  {/* 思考プロセス表示 */}
+                  {thought && (
+                    <div className="mt-3 p-2 bg-black/20 rounded text-xs text-blue-100 min-h-[2.5rem] flex items-center">
+                      <div className="flex items-start gap-2">
+                        {(isActive && !isCompleted) && (
+                          <div className="flex gap-1 mt-1 flex-shrink-0">
+                            <div className="w-1 h-1 bg-orange-400 rounded-full animate-bounce"></div>
+                            <div className="w-1 h-1 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                            <div className="w-1 h-1 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                          </div>
+                        )}
+                        <span className="leading-relaxed">{thought}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
+              );
+            })}
+          </div>
+          
+          {/* 並列実行状況サマリー */}
+          <div className="text-center">
+            <div className="inline-flex items-center gap-4 bg-black/20 rounded-full px-4 py-2 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span>完了: {completedAgents.length}</span>
               </div>
-            );
-          })}
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                <span>実行中: {activeAgents.length}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <span>待機中: {3 - completedAgents.length - activeAgents.length}</span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
       {/* SOLOMON評価中の表示 */}
       {phase === 'judge_evaluating' && (
-        <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-orange-500 to-red-500 rounded-full flex items-center justify-center">
-            <span className="text-2xl font-bold animate-pulse">S</span>
+        <div className="space-y-6">
+          <div className="text-center">
+            <div className="relative w-24 h-24 mx-auto mb-4">
+              {/* 回転するリング */}
+              <div className="absolute inset-0 border-4 border-orange-500/30 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-transparent border-t-orange-500 rounded-full animate-spin"></div>
+              
+              {/* 中央のSOLOMONアイコン */}
+              <div className="absolute inset-3 bg-gradient-to-br from-orange-500 to-red-500 rounded-full flex items-center justify-center shadow-lg">
+                <span className="text-xl font-bold animate-pulse">S</span>
+              </div>
+              
+              {/* パルス効果 */}
+              <div className={`absolute inset-0 bg-orange-500/20 rounded-full ${
+                systemPulse ? 'scale-125 opacity-0' : 'scale-100 opacity-100'
+              } transition-all duration-1000`}></div>
+            </div>
+            
+            <h3 className="text-lg font-bold text-orange-200 mb-2">
+              SOLOMON Judge 統合評価中
+            </h3>
+            
+            {/* 評価プロセス表示 */}
+            <div className="flex justify-center gap-2 text-xs text-orange-300 mb-4">
+              <span className={elapsedTime % 4 === 0 ? 'opacity-100' : 'opacity-50'}>データ統合</span>
+              <span>•</span>
+              <span className={elapsedTime % 4 === 1 ? 'opacity-100' : 'opacity-50'}>矛盾検証</span>
+              <span>•</span>
+              <span className={elapsedTime % 4 === 2 ? 'opacity-100' : 'opacity-50'}>スコア算出</span>
+              <span>•</span>
+              <span className={elapsedTime % 4 === 3 ? 'opacity-100' : 'opacity-50'}>最終判断</span>
+            </div>
           </div>
-          <p className="text-orange-200 text-sm">
-            SOLOMON Judgeが3賢者の判断を統合評価中...
+          
+          {/* SOLOMON思考プロセス表示 */}
+          {solomonThought && (
+            <div className="max-w-md mx-auto">
+              <div className="p-4 bg-gradient-to-r from-orange-900/50 to-red-900/50 rounded-lg border border-orange-500/30">
+                <div className="flex items-start gap-3">
+                  <div className="flex gap-1 mt-1 flex-shrink-0">
+                    <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce"></div>
+                    <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
+                    <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
+                  </div>
+                  <div className="text-sm text-orange-100 leading-relaxed">
+                    {solomonThought}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* 3賢者の判断サマリー */}
+          <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto">
+            {agents.map(agentId => {
+              const agentName = agentId.toUpperCase();
+              const isCompleted = completedAgents.includes(agentId);
+              
+              return (
+                <div 
+                  key={agentId}
+                  className={`p-2 rounded text-center text-xs ${
+                    isCompleted ? 'bg-green-900/50 border border-green-500/30 text-green-200' :
+                    'bg-gray-800/50 border border-gray-600/30 text-gray-400'
+                  }`}
+                >
+                  <div className="font-medium">{agentName}</div>
+                  <div className="mt-1">
+                    {isCompleted ? '判断済み' : '待機中'}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      
+      {/* システム初期化中の表示 */}
+      {phase === 'initializing' && (
+        <div className="text-center">
+          <div className="grid grid-cols-4 gap-2 max-w-xs mx-auto mb-4">
+            {Array.from({ length: 16 }).map((_, i) => (
+              <div
+                key={i}
+                className={`h-2 rounded-full transition-all duration-200 ${
+                  i <= (elapsedTime * 2) % 16 ? 'bg-blue-400' : 'bg-blue-800'
+                }`}
+              />
+            ))}
+          </div>
+          <p className="text-blue-200 text-sm">
+            システム初期化中... コアモジュール読み込み
           </p>
         </div>
       )}

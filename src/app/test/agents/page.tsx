@@ -36,19 +36,177 @@ export default function AgentResponseTestPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
 
-  // シナリオ実行関数
-  const runScenario = async (scenarioName: string, scenarioFn: () => Promise<AskAgentResponse>) => {
+  // 動的実行進行状況の状態（並列実行対応）
+  const [executionProgress, setExecutionProgress] = useState<{
+    phase: 'initializing' | 'agents_thinking' | 'judge_evaluating' | 'completed';
+    completedAgents: string[];
+    activeAgents: string[]; // 並列実行中のエージェント
+    agentThoughts: { [agentId: string]: string }; // 各エージェントの現在の思考
+    solomonThought?: string; // SOLOMONの思考
+  } | null>(null);
+
+  // 思考メッセージのパターン
+  const thoughtPatterns = {
+    caspar: [
+      "リスク分析を開始しています...",
+      "過去の事例データを検索中...",
+      "安全性指標を評価中...",
+      "実現可能性を慎重に検討...",
+      "保守的観点から総合判断中..."
+    ],
+    balthasar: [
+      "創造的可能性を探索中...",
+      "感情的価値を分析しています...",
+      "革新性の評価を実行中...",
+      "人間中心の視点で検討...",
+      "直感的判断を統合中..."
+    ],
+    melchior: [
+      "データ収集・分析を開始...",
+      "論理的整合性を検証中...",
+      "科学的根拠を評価しています...",
+      "バランス型判断を実行中...",
+      "客観的結論を導出中..."
+    ],
+    solomon: [
+      "3賢者の判断を収集中...",
+      "矛盾点の分析を実行...",
+      "統合評価アルゴリズム実行中...",
+      "最終スコアを算出しています...",
+      "MAGI最終判断を生成中..."
+    ]
+  };
+
+  // 並列実行シミュレーション関数
+  const runParallelScenario = async (scenarioName: string, scenarioFn: () => Promise<AskAgentResponse>) => {
     setCurrentScenario(scenarioName);
     setLoading(true);
     setError('');
     setMockData(null);
-
+    
     try {
-      const result = await scenarioFn();
-      setMockData(result);
+      // Phase 1: 初期化
+      setExecutionProgress({
+        phase: 'initializing',
+        completedAgents: [],
+        activeAgents: [],
+        agentThoughts: {},
+      });
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Phase 2: 3賢者並列実行開始
+      setExecutionProgress({
+        phase: 'agents_thinking',
+        completedAgents: [],
+        activeAgents: ['caspar', 'balthasar', 'melchior'],
+        agentThoughts: {
+          caspar: thoughtPatterns.caspar[0],
+          balthasar: thoughtPatterns.balthasar[0],
+          melchior: thoughtPatterns.melchior[0],
+        },
+      });
+
+      // 並列思考プロセスシミュレーション
+      const agents = ['caspar', 'balthasar', 'melchior'];
+      const agentTimers: { [key: string]: NodeJS.Timeout[] } = {};
+      
+      // 各エージェントの思考更新タイマーを開始
+      agents.forEach(agentId => {
+        agentTimers[agentId] = [];
+        const patterns = thoughtPatterns[agentId as keyof typeof thoughtPatterns];
+        
+        patterns.forEach((thought, index) => {
+          const timer = setTimeout(() => {
+            setExecutionProgress(prev => prev ? {
+              ...prev,
+              agentThoughts: {
+                ...prev.agentThoughts,
+                [agentId]: thought
+              }
+            } : null);
+          }, (index + 1) * 800 + Math.random() * 400); // ランダムな間隔で更新
+          
+          agentTimers[agentId].push(timer);
+        });
+      });
+
+      // エージェント完了をランダムなタイミングでシミュレート
+      const completionTimes = [
+        { agent: 'balthasar', time: 2200 + Math.random() * 800 },
+        { agent: 'melchior', time: 2800 + Math.random() * 600 },
+        { agent: 'caspar', time: 3400 + Math.random() * 400 },
+      ];
+
+      for (const { agent, time } of completionTimes) {
+        setTimeout(() => {
+          setExecutionProgress(prev => {
+            if (!prev) return null;
+            const newCompleted = [...prev.completedAgents, agent];
+            const newActive = prev.activeAgents.filter(a => a !== agent);
+            
+            return {
+              ...prev,
+              completedAgents: newCompleted,
+              activeAgents: newActive,
+              agentThoughts: {
+                ...prev.agentThoughts,
+                [agent]: `${agent.toUpperCase()}判断完了！`
+              }
+            };
+          });
+        }, time);
+      }
+
+      // 全エージェント完了後、SOLOMON評価開始
+      setTimeout(() => {
+        // 全タイマーをクリア
+        Object.values(agentTimers).flat().forEach(timer => clearTimeout(timer));
+        
+        setExecutionProgress(prev => prev ? {
+          ...prev,
+          phase: 'judge_evaluating',
+          activeAgents: [],
+          solomonThought: thoughtPatterns.solomon[0]
+        } : null);
+
+        // SOLOMON思考プロセス
+        thoughtPatterns.solomon.forEach((thought, index) => {
+          setTimeout(() => {
+            setExecutionProgress(prev => prev ? {
+              ...prev,
+              solomonThought: thought
+            } : null);
+          }, index * 600);
+        });
+
+      }, Math.max(...completionTimes.map(c => c.time)) + 500);
+      
+      // 実際のデータ取得（SOLOMON完了後）
+      setTimeout(async () => {
+        const result = await scenarioFn();
+        setMockData(result);
+        
+        // Phase 4: 完了
+        setExecutionProgress({
+          phase: 'completed',
+          completedAgents: ['caspar', 'balthasar', 'melchior'],
+          activeAgents: [],
+          agentThoughts: {
+            caspar: "CASPAR判断完了",
+            balthasar: "BALTHASAR判断完了", 
+            melchior: "MELCHIOR判断完了"
+          },
+          solomonThought: "SOLOMON統合評価完了"
+        });
+        
+        setLoading(false);
+        
+        // 少し待ってからプログレス状態をクリア
+        setTimeout(() => setExecutionProgress(null), 3000);
+      }, Math.max(...completionTimes.map(c => c.time)) + 3500);
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
       setLoading(false);
     }
   };
@@ -95,12 +253,12 @@ export default function AgentResponseTestPage() {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
             テストシナリオ選択
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             {scenarios.map((scenario) => (
               <Button
                 key={scenario.name}
                 variant={currentScenario === scenario.name ? "primary" : "secondary"}
-                onClick={() => runScenario(scenario.name, scenario.fn)}
+                onClick={() => runParallelScenario(scenario.name, scenario.fn)}
                 disabled={loading}
                 className="h-auto p-4 text-left"
               >
@@ -112,6 +270,69 @@ export default function AgentResponseTestPage() {
                 </div>
               </Button>
             ))}
+          </div>
+          
+          {/* 動的デモ制御 */}
+          <div className="border-t pt-4">
+            <h3 className="font-medium text-gray-800 mb-2">🎮 動的デモ制御</h3>
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setExecutionProgress({
+                  phase: 'initializing',
+                  completedAgents: [],
+                  activeAgents: [],
+                  agentThoughts: {},
+                })}
+                disabled={loading}
+              >
+                初期化デモ
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setExecutionProgress({
+                  phase: 'agents_thinking',
+                  completedAgents: ['caspar'],
+                  activeAgents: ['balthasar', 'melchior'],
+                  agentThoughts: {
+                    caspar: "CASPAR判断完了",
+                    balthasar: "創造的可能性を探索中...",
+                    melchior: "データ収集・分析を開始...",
+                  },
+                })}
+                disabled={loading}
+              >
+                並列実行デモ
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setExecutionProgress({
+                  phase: 'judge_evaluating',
+                  completedAgents: ['caspar', 'balthasar', 'melchior'],
+                  activeAgents: [],
+                  agentThoughts: {
+                    caspar: "CASPAR判断完了",
+                    balthasar: "BALTHASAR判断完了",
+                    melchior: "MELCHIOR判断完了",
+                  },
+                  solomonThought: "3賢者の判断を収集中...",
+                })}
+                disabled={loading}
+              >
+                SOLOMON評価デモ
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setExecutionProgress(null)}
+                disabled={loading}
+              >
+                デモ停止
+              </Button>
+            </div>
           </div>
         </Card>
 
@@ -138,16 +359,13 @@ export default function AgentResponseTestPage() {
               response={mockData ?? undefined}
               loading={loading}
               error={error}
-              executionProgress={loading ? {
-                phase: 'agents_thinking',
-                completedAgents: ['caspar'],
-                currentAgent: 'balthasar'
-              } : undefined}
-              onRetry={() => runScenario(currentScenario, scenarios.find(s => s.name === currentScenario)?.fn || (() => Promise.resolve({} as AskAgentResponse)))}
+              executionProgress={executionProgress ?? undefined}
+              onRetry={() => runParallelScenario(currentScenario, scenarios.find(s => s.name === currentScenario)?.fn || (() => Promise.resolve({} as AskAgentResponse)))}
               onNewQuestion={() => {
                 setCurrentScenario('');
                 setMockData(null);
                 setError('');
+                setExecutionProgress(null);
               }}
             />
           </div>
@@ -221,7 +439,7 @@ export default function AgentResponseTestPage() {
               </ul>
             </div>
             <div>
-              <h3 className="font-medium mb-2">✅ Task 7.2 完了</h3>
+              <h3 className="font-medium mb-2">✅ Task 7.2 完了 + 動的機能</h3>
               <ul className="space-y-1">
                 <li>• SOLOMON Judge統合評価</li>
                 <li>• CSS-basedスコア可視化</li>
@@ -229,19 +447,19 @@ export default function AgentResponseTestPage() {
                 <li>• 最終判断表示</li>
                 <li>• エヴァ風MAGIデザイン</li>
                 <li>• Multi-Agent対応</li>
-                <li>• 完全システム統合</li>
+                <li>• 🔥 リアルタイム動的更新</li>
               </ul>
             </div>
             <div>
-              <h3 className="font-medium mb-2">🎨 デザイン特徴</h3>
+              <h3 className="font-medium mb-2">🚀 並列実行 + 思考表示</h3>
               <ul className="space-y-1">
-                <li>• エヴァンゲリオン風UI</li>
-                <li>• アクセシビリティ対応</li>
-                <li>• 色覚特性対応</li>
-                <li>• レスポンシブデザイン</li>
-                <li>• 実行進行状況表示</li>
-                <li>• アニメーション効果</li>
-                <li>• 統合システム表示</li>
+                <li>• 🔄 3賢者完全並列実行</li>
+                <li>• 💭 リアルタイム思考プロセス表示</li>
+                <li>• 🧠 各エージェント個別思考パターン</li>
+                <li>• 🤖 SOLOMON統合思考可視化</li>
+                <li>• ⚡ 非同期完了タイミング</li>
+                <li>• 📊 並列実行状況サマリー</li>
+                <li>• 🎮 動的デモ制御拡張</li>
               </ul>
             </div>
           </div>
