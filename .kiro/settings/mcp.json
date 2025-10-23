@@ -47,6 +47,10 @@
         "search",
         "get_page_content",
         "brave_web_search"
+      ],
+      "disabledTools": [
+        "brave_web_search",
+        "brave_local_search"
       ]
     }
   }
