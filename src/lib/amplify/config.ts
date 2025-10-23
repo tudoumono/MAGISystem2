@@ -90,13 +90,19 @@ try {
  * 3. 本番環境（NODE_ENV=production）の場合は PRODUCTION
  * 4. それ以外は MOCK
  */
+// ログの重複を防ぐためのフラグ
+let hasLoggedMockMode = false;
+
 export function getCurrentEnvironmentMode(): EnvironmentMode {
   // 🔄 Phase 2完了まではMOCKモードを強制
   // Phase 3の先行実施を一時的に無効化し、正しい順序で実装
   const FORCE_MOCK_UNTIL_PHASE2_COMPLETE = true;
   if (FORCE_MOCK_UNTIL_PHASE2_COMPLETE) {
-    console.log('🔄 Phase 2完了まではMOCKモードで実装します（設計通りの順序）');
-    console.log('💡 Phase 2のUI実装完了後、この設定を無効化してPhase 3に進みます');
+    if (!hasLoggedMockMode) {
+      console.log('🔄 Phase 2完了まではMOCKモードで実装します（設計通りの順序）');
+      console.log('💡 Phase 2のUI実装完了後、この設定を無効化してPhase 3に進みます');
+      hasLoggedMockMode = true;
+    }
     return 'MOCK';
   }
 
