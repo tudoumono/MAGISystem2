@@ -202,6 +202,7 @@ interface AskResponse {
   agentResponses: AgentResponse[];
   judgeResponse: JudgeResponse;
   traceId: string;
+  executionTime: number;
 }
 
 interface AgentResponse {
@@ -348,6 +349,7 @@ interface AgentConfig {
   systemPrompt: string;
   temperature: number;
   maxTokens: number;
+  enabled: boolean;
 }
 
 interface AgentPreset {
@@ -356,6 +358,19 @@ interface AgentPreset {
   description: string;
   configs: AgentConfig[];
   isDefault: boolean;
+  isPublic: boolean;
+  createdBy?: string;
+  createdAt: Date;
+}
+
+// プリセット管理用の追加インターフェース
+interface PresetManagement {
+  createPreset: (preset: Omit<AgentPreset, 'id' | 'createdAt'>) => Promise<AgentPreset>;
+  updatePreset: (id: string, updates: Partial<AgentPreset>) => Promise<AgentPreset>;
+  deletePreset: (id: string) => Promise<void>;
+  duplicatePreset: (id: string, newName: string) => Promise<AgentPreset>;
+  exportPreset: (id: string) => Promise<string>;
+  importPreset: (data: string) => Promise<AgentPreset>;
 }
 ```
 
@@ -571,17 +586,26 @@ def test_solomon_judge_scoring():
 - **Code Splitting**: Next.js App Routerによる自動コード分割
 - **Image Optimization**: Next.js Image componentによる最適化
 - **Bundle Analysis**: `@next/bundle-analyzer`による継続監視
-- **Virtual Scrolling**: 大量の会話履歴の効率的表示
+- **Virtual Scrolling**: 大量の会話履歴の効率的表示（要件5.4対応）
+- **Skeleton Loading**: エージェント実行中の逐次到着描画（要件5.3対応）
 
 ### Real-time Updates
-- **GraphQL Subscriptions**: AWS AppSyncによるリアルタイム更新
-- **Optimistic Updates**: UI応答性向上のための楽観的更新
+- **GraphQL Subscriptions**: AWS AppSyncによるリアルタイム更新（要件4.1対応）
+- **Optimistic Updates**: UI応答性向上のための楽観的更新（要件5.2対応）
 - **Connection Management**: WebSocket接続の効率的管理
+- **Progressive Loading**: トレースステップの段階的表示（要件4.2対応）
 
 ### Caching Strategy
 - **Browser Caching**: 静的アセットの適切なキャッシュ設定
 - **API Response Caching**: 頻繁にアクセスされるデータのキャッシュ
 - **Agent Response Caching**: 同一質問の結果キャッシュ（オプション）
+- **Conversation Pagination**: 無限スクロールによる効率的データ読み込み（要件2.5対応）
+
+### Performance Targets
+- **First Contentful Paint**: <1.0秒（要件5.1対応）
+- **UI Response Time**: <100ms（要件5.2対応）
+- **Agent Response**: 初回応答<2秒（KPI要件対応）
+- **Error Recovery**: 適切なエラーメッセージと再試行（要件5.5対応）
 
 ## Security Considerations
 
@@ -599,3 +623,270 @@ def test_solomon_judge_scoring():
 - **Prompt Injection Protection**: システムプロンプトの保護
 - **Output Filtering**: 不適切な出力の検出とブロック
 - **Rate Limiting**: API呼び出し頻度制限
+
+## Accessibility and Internationalization
+
+### User-Friendly Accessibility
+```typescript
+// src/components/ui/AccessibleComponents.tsx
+// ユーザーフレンドリーなアクセシビリティ実装
+
+// フォーカス管理とキーボードナビゲーション
+export const AccessibleButton: React.FC<{
+  children: React.ReactNode;
+  onClick: () => void;
+  variant?: 'primary' | 'secondary';
+  disabled?: boolean;
+}> = ({ children, onClick, variant = 'primary', disabled = false }) => {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`
+        px-4 py-2 rounded-md font-medium transition-all duration-200
+        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+        disabled:opacity-50 disabled:cursor-not-allowed
+        ${variant === 'primary' 
+          ? 'bg-blue-600 text-white hover:bg-blue-700' 
+          : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+        }
+      `}
+      aria-disabled={disabled}
+    >
+      {children}
+    </button>
+  );
+};
+
+// スクリーンリーダー対応のステータス表示
+export const AccessibleStatus: React.FC<{
+  status: 'loading' | 'success' | 'error';
+  message: string;
+}> = ({ status, message }) => {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      className={`
+        p-3 rounded-md flex items-center gap-2
+        ${status === 'loading' ? 'bg-blue-50 text-blue-800' : ''}
+        ${status === 'success' ? 'bg-green-50 text-green-800' : ''}
+        ${status === 'error' ? 'bg-red-50 text-red-800' : ''}
+      `}
+    >
+      <span className="sr-only">
+        {status === 'loading' && '読み込み中: '}
+        {status === 'success' && '成功: '}
+        {status === 'error' && 'エラー: '}
+      </span>
+      {message}
+    </div>
+  );
+};
+```
+
+### Enhanced Decision Display
+```typescript
+// src/styles/colors.ts
+// 色覚特性に配慮した視覚的区別
+export const DECISION_STYLES = {
+  APPROVED: {
+    color: 'green',
+    icon: '✓',
+    label: '可決',
+    bgColor: 'bg-green-50',
+    borderColor: 'border-green-200',
+    textColor: 'text-green-800',
+    // アクセシビリティ強化
+    ariaLabel: '可決されました',
+    pattern: 'diagonal-lines', // 色以外の視覚的手がかり
+    contrast: 'high' // 高コントラスト対応
+  },
+  REJECTED: {
+    color: 'red', 
+    icon: '✗',
+    label: '否決',
+    bgColor: 'bg-red-50',
+    borderColor: 'border-red-200',
+    textColor: 'text-red-800',
+    // アクセシビリティ強化
+    ariaLabel: '否決されました',
+    pattern: 'cross-hatch', // 色以外の視覚的手がかり
+    contrast: 'high' // 高コントラスト対応
+  }
+};
+
+// キーボードナビゲーション対応
+export const KEYBOARD_SHORTCUTS = {
+  'Ctrl+Enter': '質問を送信',
+  'Escape': 'モーダルを閉じる',
+  'Tab': '次の要素に移動',
+  'Shift+Tab': '前の要素に移動',
+  'Space': 'ボタンを実行',
+  'Enter': '選択を確定'
+};
+```
+
+### Screen Reader Support
+```typescript
+// src/hooks/useScreenReader.ts
+// スクリーンリーダー対応の強化
+export const useScreenReader = () => {
+  const announceToScreenReader = (message: string, priority: 'polite' | 'assertive' = 'polite') => {
+    const announcement = document.createElement('div');
+    announcement.setAttribute('aria-live', priority);
+    announcement.setAttribute('aria-atomic', 'true');
+    announcement.className = 'sr-only';
+    announcement.textContent = message;
+    
+    document.body.appendChild(announcement);
+    
+    // クリーンアップ
+    setTimeout(() => {
+      document.body.removeChild(announcement);
+    }, 1000);
+  };
+  
+  return { announceToScreenReader };
+};
+
+// 使用例: エージェント応答完了時の通知
+// announceToScreenReader('3賢者の回答が完了しました。SOLOMON Judgeによる評価を開始します。');
+```
+
+### Japanese Language Support
+```typescript
+// src/lib/constants/labels.ts
+// 日本語ラベルの定数管理（i18nライブラリは使用せず）
+export const LABELS = {
+  agents: {
+    caspar: 'CASPAR（保守的）',
+    balthasar: 'BALTHASAR（革新的）', 
+    melchior: 'MELCHIOR（バランス型）',
+    solomon: 'SOLOMON Judge'
+  },
+  decisions: {
+    approved: '可決',
+    rejected: '否決'
+  },
+  ui: {
+    loading: '読み込み中...',
+    error: 'エラーが発生しました',
+    retry: '再試行'
+  }
+};
+```
+
+## Observability and Tracing (Basic Implementation)
+
+### Basic Trace Display
+```typescript
+// src/lib/tracing/basic-trace.ts
+// シンプルなトレース表示（Phase 1-2はモックデータ）
+interface BasicTraceStep {
+  id: string;
+  traceId: string;
+  stepNumber: number;
+  agentId: string;
+  action: string;
+  duration: number;
+  timestamp: Date;
+}
+
+// 要件4.1, 4.2対応: 基本的なトレース表示
+export const displayTraceSteps = (steps: BasicTraceStep[]) => {
+  return steps.map(step => ({
+    ...step,
+    formattedDuration: `${step.duration}ms`,
+    formattedTime: step.timestamp.toLocaleTimeString('ja-JP')
+  }));
+};
+```
+
+### AgentCore Integration (Phase 4以降)
+```typescript
+// src/lib/observability/agentcore-basic.ts
+// Phase 4以降で実装予定の基本的なAgentCore連携
+interface AgentCoreTrace {
+  traceId: string;
+  agentId: string;
+  latency: number;
+  tokenUsage: number;
+  errorCount: number;
+}
+
+// 将来の拡張ポイント
+export const integrateAgentCoreObservability = () => {
+  // Phase 4以降で詳細実装
+  console.log('AgentCore Observability integration - Phase 4');
+};
+```
+
+## Agent Configuration and Preset Management
+
+### Configuration Interface Design
+```typescript
+// src/components/config/AgentConfigPanel.tsx
+// 要件7.1対応: 3賢者とSOLOMONの独立した設定画面
+interface AgentConfigPanelProps {
+  agentId: AgentType;
+  config: AgentConfig;
+  onConfigChange: (config: AgentConfig) => void;
+  presets: AgentPreset[];
+  onPresetSelect: (preset: AgentPreset) => void;
+}
+
+// 要件7.2対応: 複数の事前プリセット提供
+export const DEFAULT_PRESETS: AgentPreset[] = [
+  {
+    id: 'default',
+    name: 'デフォルト設定',
+    description: 'バランスの取れた標準設定',
+    configs: [
+      { agentId: 'caspar', modelId: 'claude-3-sonnet', temperature: 0.3, maxTokens: 1000, enabled: true },
+      { agentId: 'balthasar', modelId: 'claude-3-sonnet', temperature: 0.8, maxTokens: 1000, enabled: true },
+      { agentId: 'melchior', modelId: 'claude-3-sonnet', temperature: 0.5, maxTokens: 1000, enabled: true }
+    ],
+    isDefault: true,
+    isPublic: true,
+    createdAt: new Date()
+  },
+  {
+    id: 'academic',
+    name: '学術研究用',
+    description: '厳密性と論理性を重視した設定',
+    configs: [
+      { agentId: 'caspar', modelId: 'claude-3-opus', temperature: 0.1, maxTokens: 2000, enabled: true },
+      { agentId: 'balthasar', modelId: 'claude-3-sonnet', temperature: 0.4, maxTokens: 2000, enabled: true },
+      { agentId: 'melchior', modelId: 'claude-3-opus', temperature: 0.2, maxTokens: 2000, enabled: true }
+    ],
+    isDefault: false,
+    isPublic: true,
+    createdAt: new Date()
+  }
+];
+```
+
+### Dynamic Configuration Management
+```typescript
+// src/lib/config/presetManager.ts
+// 要件7.3, 7.4, 7.5対応: プリセット管理と動的設定変更
+export class PresetManager {
+  async createCustomPreset(preset: Omit<AgentPreset, 'id' | 'createdAt'>): Promise<AgentPreset> {
+    // カスタムプリセットの作成・保存
+  }
+  
+  async applyPreset(presetId: string, conversationId?: string): Promise<void> {
+    // プリセットの適用と設定変更通知
+  }
+  
+  async compareConfigurations(config1: AgentConfig[], config2: AgentConfig[]): Promise<ConfigDiff> {
+    // 設定比較と差分可視化
+  }
+  
+  async reExecuteWithSettings(messageId: string, newConfig: AgentConfig[]): Promise<AskResponse> {
+    // 要件7.6対応: 設定変更後の再実行と結果比較
+  }
+}
+```
