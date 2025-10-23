@@ -14,6 +14,7 @@
 import type { Metadata } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
+import ClientEnvironmentStatus from '../components/dev/ClientEnvironmentStatus';
 
 /**
  * フォント設定
@@ -160,16 +161,8 @@ export default function RootLayout({
         {/* ポータル用のコンテナ（モーダル、トースト等） */}
         <div id="portal-root" />
         
-        {/* 開発環境でのデバッグ情報 */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="fixed bottom-4 right-4 z-50 opacity-50 hover:opacity-100 transition-opacity">
-            <div className="bg-black text-white text-xs px-2 py-1 rounded font-mono">
-              <div>Next.js 15 + TypeScript</div>
-              <div>Tailwind CSS + Amplify</div>
-              <div>Phase 1: Frontend First</div>
-            </div>
-          </div>
-        )}
+        {/* 開発環境での環境ステータス表示 */}
+        <ClientEnvironmentStatus />
       </body>
     </html>
   );
