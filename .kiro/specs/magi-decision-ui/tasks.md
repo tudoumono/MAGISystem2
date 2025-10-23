@@ -71,7 +71,12 @@
     - A2A（Agent-to-Agent）プロトコルでの通信を設定
     - _要件: 3.1, 3.2_
 
-  - [ ] 3.2 Amazon Bedrock AgentCore統合 **[👤 Human + 🤖 Kiro]**
+  - [x] 3.2 Amazon Bedrock AgentCore統合 **[👤 Human + 🤖 Kiro]**
+
+
+
+
+
     - **[🤖 Kiro]** **AWS MCP参照**: 最新のBedrock AgentCore権限とセットアップ手順を確認
     - **[👤 Human]** IAMユーザーに `AmazonBedrockFullAccess` と `BedrockAgentCoreFullAccess` 権限を追加
     - **[👤 Human]** AWS ConsoleでBedrock モデルアクセス権限を有効化
