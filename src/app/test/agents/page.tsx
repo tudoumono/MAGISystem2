@@ -36,13 +36,13 @@ export default function AgentResponseTestPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
 
-  // 動的実行進行状況の状態（並列実行対応）
+  // 動的実行進行状況の状態（チャット形式思考履歴対応）
   const [executionProgress, setExecutionProgress] = useState<{
     phase: 'initializing' | 'agents_thinking' | 'judge_evaluating' | 'completed';
     completedAgents: string[];
     activeAgents: string[]; // 並列実行中のエージェント
-    agentThoughts: { [agentId: string]: string }; // 各エージェントの現在の思考
-    solomonThought?: string; // SOLOMONの思考
+    agentThoughtHistory: { [agentId: string]: string[] }; // 各エージェントの思考履歴
+    solomonThoughtHistory: string[]; // SOLOMONの思考履歴
   } | null>(null);
 
   // Claude風拡張思考パターン
@@ -90,7 +90,8 @@ export default function AgentResponseTestPage() {
         phase: 'initializing',
         completedAgents: [],
         activeAgents: [],
-        agentThoughts: {},
+        agentThoughtHistory: {},
+        solomonThoughtHistory: [],
       });
       await new Promise(resolve => setTimeout(resolve, 1500));
       
@@ -99,11 +100,12 @@ export default function AgentResponseTestPage() {
         phase: 'agents_thinking',
         completedAgents: [],
         activeAgents: ['caspar', 'balthasar', 'melchior'],
-        agentThoughts: {
-          caspar: thoughtPatterns.caspar[0] || "思考開始...",
-          balthasar: thoughtPatterns.balthasar[0] || "思考開始...",
-          melchior: thoughtPatterns.melchior[0] || "思考開始...",
+        agentThoughtHistory: {
+          caspar: [thoughtPatterns.caspar[0] || "思考開始..."],
+          balthasar: [thoughtPatterns.balthasar[0] || "思考開始..."],
+          melchior: [thoughtPatterns.melchior[0] || "思考開始..."],
         },
+        solomonThoughtHistory: [],
       });
 
       // 並列思考プロセスシミュレーション
@@ -116,15 +118,17 @@ export default function AgentResponseTestPage() {
         const patterns = thoughtPatterns[agentId as keyof typeof thoughtPatterns] || [];
         
         patterns.forEach((thought, index) => {
+          if (index === 0) return; // 最初の思考は既に追加済み
+          
           const timer = setTimeout(() => {
             setExecutionProgress(prev => prev ? {
               ...prev,
-              agentThoughts: {
-                ...prev.agentThoughts,
-                [agentId]: thought
+              agentThoughtHistory: {
+                ...prev.agentThoughtHistory,
+                [agentId]: [...(prev.agentThoughtHistory[agentId] || []), thought]
               }
             } : null);
-          }, (index + 1) * 1200 + Math.random() * 600); // より長い間隔で深い思考を表現
+          }, (index + 1) * 1500 + Math.random() * 800); // より長い間隔で深い思考を表現
           
           if (agentTimers[agentId]) {
             agentTimers[agentId].push(timer);
@@ -150,9 +154,9 @@ export default function AgentResponseTestPage() {
               ...prev,
               completedAgents: newCompleted,
               activeAgents: newActive,
-              agentThoughts: {
-                ...prev.agentThoughts,
-                [agent]: `${agent.toUpperCase()}判断完了！`
+              agentThoughtHistory: {
+                ...prev.agentThoughtHistory,
+                [agent]: [...(prev.agentThoughtHistory[agent] || []), `${agent.toUpperCase()}判断完了！`]
               }
             };
           });
@@ -168,17 +172,19 @@ export default function AgentResponseTestPage() {
           ...prev,
           phase: 'judge_evaluating',
           activeAgents: [],
-          solomonThought: thoughtPatterns.solomon[0] || "SOLOMON思考開始..."
+          solomonThoughtHistory: [thoughtPatterns.solomon[0] || "SOLOMON思考開始..."]
         } : null);
 
-        // SOLOMON思考プロセス（より深い思考時間）
+        // SOLOMON思考プロセス（チャット形式で蓄積）
         thoughtPatterns.solomon.forEach((thought, index) => {
+          if (index === 0) return; // 最初の思考は既に追加済み
+          
           setTimeout(() => {
             setExecutionProgress(prev => prev ? {
               ...prev,
-              solomonThought: thought
+              solomonThoughtHistory: [...prev.solomonThoughtHistory, thought]
             } : null);
-          }, index * 1000); // より長い思考時間
+          }, (index + 1) * 1200); // より長い思考時間
         });
 
       }, Math.max(...completionTimes.map(c => c.time)) + 500);
@@ -189,17 +195,13 @@ export default function AgentResponseTestPage() {
         setMockData(result);
         
         // Phase 4: 完了
-        setExecutionProgress({
+        setExecutionProgress(prev => ({
           phase: 'completed',
           completedAgents: ['caspar', 'balthasar', 'melchior'],
           activeAgents: [],
-          agentThoughts: {
-            caspar: "CASPAR判断完了",
-            balthasar: "BALTHASAR判断完了", 
-            melchior: "MELCHIOR判断完了"
-          },
-          solomonThought: "SOLOMON統合評価完了"
-        });
+          agentThoughtHistory: prev?.agentThoughtHistory || {},
+          solomonThoughtHistory: [...(prev?.solomonThoughtHistory || []), "SOLOMON統合評価完了"]
+        }));
         
         setLoading(false);
         
@@ -285,7 +287,8 @@ export default function AgentResponseTestPage() {
                   phase: 'initializing',
                   completedAgents: [],
                   activeAgents: [],
-                  agentThoughts: {},
+                  agentThoughtHistory: {},
+                  solomonThoughtHistory: [],
                 })}
                 disabled={loading}
               >
@@ -298,11 +301,12 @@ export default function AgentResponseTestPage() {
                   phase: 'agents_thinking',
                   completedAgents: ['caspar'],
                   activeAgents: ['balthasar', 'melchior'],
-                  agentThoughts: {
-                    caspar: "CASPAR判断完了",
-                    balthasar: "創造的可能性を探索中...",
-                    melchior: "データ収集・分析を開始...",
+                  agentThoughtHistory: {
+                    caspar: ["質問を受信しました。保守的・現実的な視点から分析を開始します。", "CASPAR判断完了"],
+                    balthasar: ["創造的・感情的な視点から分析を開始します。人間の心に響く価値を探求しましょう。", "創造的可能性を探索中..."],
+                    melchior: ["バランス型・科学的な視点から客観的分析を開始します。", "データ収集・分析を開始..."],
                   },
+                  solomonThoughtHistory: [],
                 })}
                 disabled={loading}
               >
@@ -315,12 +319,12 @@ export default function AgentResponseTestPage() {
                   phase: 'judge_evaluating',
                   completedAgents: ['caspar', 'balthasar', 'melchior'],
                   activeAgents: [],
-                  agentThoughts: {
-                    caspar: "CASPAR判断完了",
-                    balthasar: "BALTHASAR判断完了",
-                    melchior: "MELCHIOR判断完了",
+                  agentThoughtHistory: {
+                    caspar: ["質問を受信しました。保守的・現実的な視点から分析を開始します。", "CASPAR判断完了"],
+                    balthasar: ["創造的・感情的な視点から分析を開始します。人間の心に響く価値を探求しましょう。", "BALTHASAR判断完了"],
+                    melchior: ["バランス型・科学的な視点から客観的分析を開始します。", "MELCHIOR判断完了"],
                   },
-                  solomonThought: "3賢者の判断を収集中...",
+                  solomonThoughtHistory: ["SOLOMON Judge起動。3賢者の判断を統合評価します。", "3賢者の判断を収集中..."],
                 })}
                 disabled={loading}
               >
@@ -333,11 +337,12 @@ export default function AgentResponseTestPage() {
                   phase: 'agents_thinking',
                   completedAgents: [],
                   activeAgents: ['caspar', 'balthasar', 'melchior'],
-                  agentThoughts: {
-                    caspar: "質問を受信しました。保守的・現実的な視点から分析を開始します。",
-                    balthasar: "創造的・感情的な視点から分析を開始します。人間の心に響く価値を探求しましょう。",
-                    melchior: "バランス型・科学的な視点から客観的分析を開始します。",
+                  agentThoughtHistory: {
+                    caspar: ["質問を受信しました。保守的・現実的な視点から分析を開始します。"],
+                    balthasar: ["創造的・感情的な視点から分析を開始します。人間の心に響く価値を探求しましょう。"],
+                    melchior: ["バランス型・科学的な視点から客観的分析を開始します。"],
                   },
+                  solomonThoughtHistory: [],
                 })}
                 disabled={loading}
               >
@@ -470,15 +475,15 @@ export default function AgentResponseTestPage() {
               </ul>
             </div>
             <div>
-              <h3 className="font-medium mb-2">🧠 Claude風拡張思考システム</h3>
+              <h3 className="font-medium mb-2">🎯 結果優先表示システム</h3>
               <ul className="space-y-1">
-                <li>• 🔄 3賢者完全並列実行</li>
-                <li>• 💭 &lt;antml:thinking&gt;風思考表示</li>
-                <li>• 🧠 段階的深層思考プロセス</li>
-                <li>• 🤖 SOLOMON統合思考可視化</li>
-                <li>• ⚡ 非同期完了タイミング</li>
-                <li>• 📊 並列実行状況サマリー</li>
-                <li>• 🎮 Claude風思考デモ制御</li>
+                <li>• 🏆 最終結論を最優先表示</li>
+                <li>• 📊 SOLOMON総括を先頭配置</li>
+                <li>• 🔍 3賢者詳細比較を後続表示</li>
+                <li>• 💭 チャット形式思考履歴</li>
+                <li>• 🧠 判断根拠比較分析</li>
+                <li>• 📜 スクロール可能思考履歴</li>
+                <li>• ✨ 段階的情報開示</li>
               </ul>
             </div>
           </div>

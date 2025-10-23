@@ -12,6 +12,7 @@
  * - エヴァンゲリオン風UIデザイン
  * - Multi-Agent Collaborationパターン対応
  * - 段階的ローディングアニメーション
+ * - チャット形式思考履歴表示
  * 
  * 学習ポイント:
  * - 複雑なUIコンポーネントの構成
@@ -20,6 +21,8 @@
  */
 
 'use client';
+
+
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { AgentResponse, JudgeResponse } from '@/types/domain';
@@ -47,8 +50,8 @@ interface MAGISystemInterfaceProps {
     phase: 'initializing' | 'agents_thinking' | 'judge_evaluating' | 'completed';
     completedAgents: string[];
     activeAgents: string[]; // 並列実行中のエージェント
-    agentThoughts: { [agentId: string]: string }; // 各エージェントの現在の思考
-    solomonThought?: string; // SOLOMONの思考
+    agentThoughtHistory: { [agentId: string]: string[] }; // 各エージェントの思考履歴
+    solomonThoughtHistory: string[]; // SOLOMONの思考履歴
   } | undefined;
   /** 再実行コールバック */
   onRetry?: (() => void) | undefined;
@@ -75,7 +78,7 @@ const ExecutionProgress: React.FC<{
   progress: NonNullable<MAGISystemInterfaceProps['executionProgress']>;
   question: string;
 }> = ({ progress, question }) => {
-  const { phase, completedAgents, activeAgents, agentThoughts, solomonThought } = progress;
+  const { phase, completedAgents, activeAgents, agentThoughtHistory, solomonThoughtHistory } = progress;
   
   // リアルタイムタイマー
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -201,7 +204,7 @@ const ExecutionProgress: React.FC<{
               const isCompleted = completedAgents.includes(agentId);
               const isActive = activeAgents.includes(agentId);
               const agentName = agentId.toUpperCase();
-              const thought = agentThoughts[agentId];
+              const thoughtHistory = agentThoughtHistory[agentId] || [];
               
               // 各エージェントの個別タイマー（デモ用）
               const agentProgress = isCompleted ? 100 : 
@@ -256,32 +259,38 @@ const ExecutionProgress: React.FC<{
                     </div>
                   </div>
                   
-                  {/* Claude風拡張思考表示 */}
-                  {thought && (
-                    <div className="mt-3 p-3 bg-black/30 rounded-lg border border-white/10 text-xs text-blue-100 min-h-[4rem]">
-                      <div className="flex items-start gap-2 mb-2">
-                        <div className="flex-shrink-0 mt-0.5">
-                          {(isActive && !isCompleted) ? (
-                            <div className="flex gap-1">
-                              <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce"></div>
-                              <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                              <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  {/* チャット形式思考履歴表示 */}
+                  {thoughtHistory.length > 0 && (
+                    <div className="mt-3 space-y-2 max-h-48 overflow-y-auto thought-history">
+                      <div className="text-xs font-mono text-blue-300 mb-2">
+                        &lt;antml:thinking&gt;
+                      </div>
+                      {thoughtHistory.map((thought, index) => (
+                        <div 
+                          key={index}
+                          className="p-2 bg-black/30 rounded border border-white/10 text-xs text-blue-100 animate-fadeIn"
+                          style={{ animationDelay: `${index * 0.1}s` }}
+                        >
+                          <div className="flex items-start gap-2">
+                            <div className="flex-shrink-0 mt-0.5">
+                              {index === thoughtHistory.length - 1 && isActive && !isCompleted ? (
+                                <div className="flex gap-1">
+                                  <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce"></div>
+                                  <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                                  <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                                </div>
+                              ) : (
+                                <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                              )}
                             </div>
-                          ) : (
-                            <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-xs font-mono text-blue-300 mb-1">
-                            &lt;antml:thinking&gt;
-                          </div>
-                          <div className="whitespace-pre-line leading-relaxed text-blue-100 font-mono text-xs">
-                            {thought}
-                          </div>
-                          <div className="text-xs font-mono text-blue-300 mt-1">
-                            &lt;/antml:thinking&gt;
+                            <div className="flex-1 whitespace-pre-line leading-relaxed font-mono">
+                              {thought}
+                            </div>
                           </div>
                         </div>
+                      ))}
+                      <div className="text-xs font-mono text-blue-300 mt-2">
+                        &lt;/antml:thinking&gt;
                       </div>
                     </div>
                   )}
@@ -346,27 +355,41 @@ const ExecutionProgress: React.FC<{
             </div>
           </div>
           
-          {/* SOLOMON Claude風拡張思考表示 */}
-          {solomonThought && (
-            <div className="max-w-2xl mx-auto">
+          {/* SOLOMON チャット形式思考履歴表示 */}
+          {solomonThoughtHistory.length > 0 && (
+            <div className="max-w-3xl mx-auto">
               <div className="p-4 bg-gradient-to-r from-orange-900/60 to-red-900/60 rounded-lg border border-orange-500/40 backdrop-blur-sm">
-                <div className="flex items-start gap-3">
-                  <div className="flex gap-1 mt-1 flex-shrink-0">
-                    <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
-                    <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-xs font-mono text-orange-300 mb-2">
-                      &lt;solomon:thinking&gt;
+                <div className="text-xs font-mono text-orange-300 mb-3">
+                  &lt;solomon:thinking&gt;
+                </div>
+                <div className="space-y-3 max-h-64 overflow-y-auto thought-history">
+                  {solomonThoughtHistory.map((thought, index) => (
+                    <div 
+                      key={index}
+                      className="p-3 bg-black/20 rounded border border-orange-500/20 animate-fadeIn"
+                      style={{ animationDelay: `${index * 0.2}s` }}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 mt-1">
+                          {index === solomonThoughtHistory.length - 1 ? (
+                            <div className="flex gap-1">
+                              <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce"></div>
+                              <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
+                              <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
+                            </div>
+                          ) : (
+                            <div className="w-2.5 h-2.5 bg-orange-400 rounded-full"></div>
+                          )}
+                        </div>
+                        <div className="flex-1 whitespace-pre-line leading-relaxed text-orange-100 font-mono text-sm">
+                          {thought}
+                        </div>
+                      </div>
                     </div>
-                    <div className="whitespace-pre-line leading-relaxed text-orange-100 font-mono text-sm">
-                      {solomonThought}
-                    </div>
-                    <div className="text-xs font-mono text-orange-300 mt-2">
-                      &lt;/solomon:thinking&gt;
-                    </div>
-                  </div>
+                  ))}
+                </div>
+                <div className="text-xs font-mono text-orange-300 mt-3">
+                  &lt;/solomon:thinking&gt;
                 </div>
               </div>
             </div>
@@ -559,39 +582,67 @@ export const MAGISystemInterface: React.FC<MAGISystemInterfaceProps> = ({
 
         {showDetails ? (
           <>
-            {/* 3賢者の応答比較 */}
-            <AgentResponseComparison
-              responses={response.agentResponses}
-              comparisonMode={true}
-            />
-
-            {/* SOLOMON Judge統合評価 */}
+            {/* 最終結論と総括（最優先表示） */}
             <JudgeResponsePanel
               judgeResponse={response.judgeResponse}
               agentResponses={response.agentResponses}
             />
+
+            {/* 3賢者の詳細判断比較（総括後に表示） */}
+            <div className="mt-8">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                3賢者の判断詳細比較
+              </h3>
+              <AgentResponseComparison
+                responses={response.agentResponses}
+                comparisonMode={true}
+              />
+            </div>
           </>
         ) : (
           /* 簡易表示モード */
-          <Card className="p-6">
-            <div className="text-center">
-              <div className={`inline-flex items-center gap-3 px-6 py-3 rounded-full text-lg font-bold ${
-                response.judgeResponse.finalDecision === 'APPROVED'
-                  ? 'bg-green-100 text-green-800'
-                  : 'bg-red-100 text-red-800'
-              }`}>
-                <span className="text-2xl">
-                  {response.judgeResponse.finalDecision === 'APPROVED' ? '✓' : '✗'}
-                </span>
-                <span>
-                  {response.judgeResponse.finalDecision === 'APPROVED' ? '可決' : '否決'}
-                </span>
+          <div className="space-y-6">
+            {/* 最終結論（簡易版） */}
+            <Card className="p-8 bg-gradient-to-br from-gray-900 to-blue-900 text-white">
+              <div className="text-center">
+                <div className={`inline-flex items-center gap-4 px-8 py-4 rounded-full text-xl font-bold border-2 ${
+                  response.judgeResponse.finalDecision === 'APPROVED'
+                    ? 'bg-green-900/50 border-green-400 text-green-100'
+                    : 'bg-red-900/50 border-red-400 text-red-100'
+                }`}>
+                  <span className="text-3xl">
+                    {response.judgeResponse.finalDecision === 'APPROVED' ? '✓' : '✗'}
+                  </span>
+                  <span>
+                    {response.judgeResponse.finalDecision === 'APPROVED' ? '可決' : '否決'}
+                  </span>
+                </div>
+                <p className="text-blue-200 mt-6 max-w-2xl mx-auto text-lg leading-relaxed">
+                  {response.judgeResponse.summary}
+                </p>
               </div>
-              <p className="text-gray-600 mt-4 max-w-2xl mx-auto">
-                {response.judgeResponse.summary}
-              </p>
-            </div>
-          </Card>
+            </Card>
+            
+            {/* 3賢者の判断サマリー */}
+            <Card className="p-6">
+              <h3 className="font-semibold text-gray-900 mb-4 text-center">3賢者の判断</h3>
+              <div className="flex justify-center gap-4">
+                {response.agentResponses.map((agentResponse) => (
+                  <div 
+                    key={agentResponse.agentId}
+                    className={`px-4 py-2 rounded-lg text-center ${
+                      agentResponse.decision === 'APPROVED' 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}
+                  >
+                    <div className="font-medium">{agentResponse.agentId.toUpperCase()}</div>
+                    <div className="text-sm">{agentResponse.decision === 'APPROVED' ? '可決' : '否決'}</div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
         )}
       </div>
     );

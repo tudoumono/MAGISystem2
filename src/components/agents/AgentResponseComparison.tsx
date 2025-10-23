@@ -204,25 +204,39 @@ export const AgentResponseComparison: React.FC<AgentResponseComparisonProps> = (
 
   return (
     <div className={`space-y-6 ${className}`}>
-      {/* 投票結果サマリー */}
+      {/* 判断結果サマリー（簡潔版） */}
       {orderedResponses.length > 0 && (
-        <VotingSummary responses={orderedResponses} />
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-medium text-gray-700">各賢者の判断:</span>
+              <div className="flex gap-2">
+                {orderedResponses.map((response) => (
+                  <div
+                    key={response.agentId}
+                    className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      response.decision === 'APPROVED' 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}
+                  >
+                    {response.agentId.toUpperCase()}: {response.decision === 'APPROVED' ? '可決' : '否決'}
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setAllExpanded(!allExpanded)}
+              className="text-gray-600 hover:text-gray-800"
+            >
+              {allExpanded ? '詳細を隠す' : '詳細を見る'}
+            </Button>
+          </div>
+        </div>
       )}
-
-      {/* 全体制御ボタン */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold text-gray-900">
-          3賢者の判断比較
-        </h2>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setAllExpanded(!allExpanded)}
-          className="text-gray-600 hover:text-gray-800"
-        >
-          {allExpanded ? '全て折りたたむ' : '全て展開'}
-        </Button>
-      </div>
 
       {/* エージェント応答の比較表示 */}
       <div className={`grid gap-6 ${
@@ -242,29 +256,42 @@ export const AgentResponseComparison: React.FC<AgentResponseComparisonProps> = (
         ))}
       </div>
 
-      {/* 比較分析サマリー（3つ全て揃った場合） */}
+      {/* 判断根拠比較サマリー */}
       {orderedResponses.length === 3 && (
-        <Card className="p-4 bg-gray-50 border-gray-200">
-          <h3 className="font-medium text-gray-900 mb-2">分析サマリー</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-            <div>
-              <span className="font-medium text-blue-600">CASPAR (保守的)</span>
-              <p className="text-gray-600 mt-1">
-                リスク重視の慎重な判断
-              </p>
-            </div>
-            <div>
-              <span className="font-medium text-purple-600">BALTHASAR (革新的)</span>
-              <p className="text-gray-600 mt-1">
-                創造性と感情を重視した判断
-              </p>
-            </div>
-            <div>
-              <span className="font-medium text-green-600">MELCHIOR (バランス型)</span>
-              <p className="text-gray-600 mt-1">
-                論理的で科学的な判断
-              </p>
-            </div>
+        <Card className="p-6 bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+          <h3 className="font-semibold text-gray-900 mb-4">判断根拠の比較分析</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {orderedResponses.map((response) => {
+              const agentName = response.agentId.toUpperCase();
+              const agentColor = 
+                response.agentId === 'caspar' ? 'blue' :
+                response.agentId === 'balthasar' ? 'purple' :
+                'green';
+              
+              return (
+                <div key={response.agentId} className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-3 h-3 bg-${agentColor}-500 rounded-full`}></div>
+                    <span className={`font-semibold text-${agentColor}-700`}>
+                      {agentName}
+                    </span>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      response.decision === 'APPROVED' 
+                        ? 'bg-green-100 text-green-700' 
+                        : 'bg-red-100 text-red-700'
+                    }`}>
+                      {response.decision === 'APPROVED' ? '可決' : '否決'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-700 leading-relaxed">
+                    {response.reasoning}
+                  </p>
+                  <div className="text-xs text-gray-500">
+                    確信度: {Math.round(response.confidence * 100)}%
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </Card>
       )}

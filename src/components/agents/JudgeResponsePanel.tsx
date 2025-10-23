@@ -339,6 +339,46 @@ export const JudgeResponsePanel: React.FC<JudgeResponsePanelProps> = ({
         </div>
       </div>
 
+      {/* 最終結論（最優先表示） */}
+      <div className="mb-8 p-6 bg-gradient-to-br from-gray-900 to-blue-900 rounded-xl border-2 border-orange-400 text-white">
+        <div className="text-center mb-4">
+          <h3 className="text-2xl font-bold text-orange-300 mb-2">
+            MAGI SYSTEM 最終判断
+          </h3>
+          <div className="w-32 h-1 bg-gradient-to-r from-orange-400 to-red-400 mx-auto rounded-full"></div>
+        </div>
+        
+        <div className={`text-center p-6 rounded-lg border-2 ${
+          judgeResponse.finalDecision === 'APPROVED' 
+            ? 'bg-green-900/50 border-green-400 text-green-100' 
+            : 'bg-red-900/50 border-red-400 text-red-100'
+        }`}>
+          <div className="flex items-center justify-center gap-4 mb-4">
+            <span className={`text-4xl font-bold ${
+              judgeResponse.finalDecision === 'APPROVED' ? 'text-green-400' : 'text-red-400'
+            }`}>
+              {judgeResponse.finalDecision === 'APPROVED' ? '✓' : '✗'}
+            </span>
+            <div>
+              <div className="text-3xl font-bold">
+                {judgeResponse.finalDecision === 'APPROVED' ? '可決' : '否決'}
+              </div>
+              <div className="text-sm opacity-75">
+                確信度: {Math.round(judgeResponse.confidence * 100)}%
+              </div>
+            </div>
+          </div>
+          
+          <div className="text-lg leading-relaxed mb-4">
+            {judgeResponse.summary}
+          </div>
+          
+          <div className="text-base leading-relaxed opacity-90">
+            {judgeResponse.finalRecommendation}
+          </div>
+        </div>
+      </div>
+
       {/* MAGI投票結果表示 */}
       <MAGIVotingDisplay 
         judgeResponse={judgeResponse} 
