@@ -335,7 +335,7 @@ export const JudgeResponsePanel: React.FC<JudgeResponsePanelProps> = ({
           </div>
         </div>
         <div className="text-xs text-gray-500">
-          {judgeResponse.executionTime}ms
+          統合評価完了
         </div>
       </div>
 
@@ -438,11 +438,7 @@ export const JudgeResponsePanel: React.FC<JudgeResponsePanelProps> = ({
       {/* メタデータ */}
       <div className="flex justify-between items-center text-xs text-gray-500 pt-4 mt-4 border-t border-gray-100">
         <span>
-          {judgeResponse.timestamp.toLocaleTimeString('ja-JP', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-          })}
+          信頼度: {Math.round(judgeResponse.confidence * 100)}%
         </span>
         <span className="text-orange-600 font-medium">
           SOLOMON Judge v2025.1

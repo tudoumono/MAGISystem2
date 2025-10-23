@@ -297,11 +297,7 @@ export const AgentResponsePanel: React.FC<AgentResponsePanelProps> = ({
       {/* メタデータ表示 */}
       <div className="flex justify-between items-center text-xs text-gray-500 pt-2 border-t border-gray-100">
         <span>
-          {response.timestamp.toLocaleTimeString('ja-JP', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-          })}
+          実行時間: {response.executionTime}ms
         </span>
         <span className={confidenceColor}>
           信頼度: {confidencePercentage}%

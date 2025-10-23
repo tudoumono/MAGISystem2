@@ -101,7 +101,6 @@ export interface AgentResponse {
   reasoning: string;               // 判断に至った論理的根拠
   confidence: number;              // 判断の確信度 (0.0-1.0)
   executionTime: number;           // 実行時間（ミリ秒）
-  timestamp: Date;                 // 応答生成時刻
 }
 
 /**
@@ -128,8 +127,6 @@ export interface JudgeResponse {
   finalRecommendation: string;     // 最終推奨（従来機能）
   reasoning: string;               // 最終判断の根拠
   confidence: number;              // 最終判断の確信度
-  executionTime: number;           // 評価実行時間
-  timestamp: Date;                 // 評価生成時刻
 }
 
 /**
@@ -163,10 +160,10 @@ export interface Conversation {
   id: string;
   userId: string;
   title: string;
-  agentPresetId?: string;          // 使用したプリセット設定
+  agentPresetId?: string | null;   // 使用したプリセット設定
   createdAt: Date;
   updatedAt: Date;
-  messages: Message[];
+  messages?: Message[];
 }
 
 /**
@@ -184,9 +181,9 @@ export interface Message {
   conversationId: string;
   role: 'user' | 'assistant';
   content: string;
-  agentResponses?: AgentResponse[]; // 3賢者の応答
-  judgeResponse?: JudgeResponse;    // SOLOMON評価
-  traceId?: string;                // 実行トレースID
+  agentResponses?: AgentResponse[] | null; // 3賢者の応答
+  judgeResponse?: JudgeResponse | null;    // SOLOMON評価
+  traceId?: string | null;                // 実行トレースID
   createdAt: Date;
 }
 
