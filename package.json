@@ -11,7 +11,11 @@
     "setup-env": "node scripts/setup-env.js",
     "validate-env": "node scripts/setup-env.js validate",
     "check:amplify": "node scripts/check-amplify-setup.js",
-    "amplify:push": "npx ampx push",
+    "setup:amplify": "node scripts/setup-amplify-environment.js",
+    "amplify:sandbox": "npx ampx sandbox",
+    "amplify:deploy": "npx ampx sandbox --once",
+    "amplify:sso-login": "aws sso login",
+    "amplify:deploy-sso": "aws sso login && npx ampx sandbox --once",
     "amplify:status": "npx ampx status",
     "amplify:logs": "npx ampx logs",
     "amplify:generate": "npx ampx generate graphql-client-code --format modelgen --model-target typescript"

@@ -33,58 +33,48 @@ import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/data';
 import { getCurrentUser, signOut } from 'aws-amplify/auth';
 import type { Schema } from '../../types/amplify';
+import { getAmplifyConfig, getCurrentEnvironmentMode, isMockMode } from './config';
 
 /**
  * Amplify 設定の初期化
  * 
  * 学習ポイント:
- * - Amplify.configure(): 設定の初期化
- * - 環境変数からの設定読み込み
+ * - 環境に応じた自動設定切り替え
+ * - amplify_outputs.json からの実設定読み込み
+ * - モック設定との動的切り替え
  * - SSR対応の考慮事項
  * 
- * 注意: 実際の本番環境では amplify_outputs.json から設定を読み込む
+ * 設計理由:
+ * - Phase 1-2: モック設定でフロントエンド開発
+ * - Phase 3: 実AWS設定で部分統合
+ * - Phase 4-6: 本番設定で完全統合
  */
-const amplifyConfig = {
-  Auth: {
-    Cognito: {
-      userPoolId: process.env.NEXT_PUBLIC_USER_POOL_ID || 'mock-user-pool-id',
-      userPoolClientId: process.env.NEXT_PUBLIC_USER_POOL_CLIENT_ID || 'mock-client-id',
-      identityPoolId: process.env.NEXT_PUBLIC_IDENTITY_POOL_ID || 'mock-identity-pool-id',
-      loginWith: {
-        email: true,
-      },
-      signUpVerificationMethod: 'code' as const,
-      userAttributes: {
-        email: {
-          required: true,
-        },
-      },
-      allowGuestAccess: false,
-      passwordFormat: {
-        minLength: 8,
-        requireLowercase: true,
-        requireUppercase: true,
-        requireNumbers: true,
-        requireSpecialCharacters: true,
-      },
-    },
-  },
-  API: {
-    GraphQL: {
-      endpoint: process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || 'https://mock-api.example.com/graphql',
-      region: process.env.NEXT_PUBLIC_AWS_REGION || 'us-east-1',
-      defaultAuthMode: 'userPool' as const,
-      ...(process.env.NEXT_PUBLIC_API_KEY && { apiKey: process.env.NEXT_PUBLIC_API_KEY }),
-    },
-  },
-};
+
+// 環境に応じたAmplify設定を取得
+const amplifyConfig = getAmplifyConfig({
+  mode: getCurrentEnvironmentMode(),
+  enableLogging: process.env.NODE_ENV === 'development',
+});
 
 // Amplify の初期化（クライアントサイドでのみ実行）
 if (typeof window !== 'undefined') {
   try {
     Amplify.configure(amplifyConfig);
+    
+    // 開発環境での設定確認
+    if (process.env.NODE_ENV === 'development') {
+      const mode = getCurrentEnvironmentMode();
+      console.log(`🚀 Amplify initialized in ${mode} mode`);
+      
+      if (isMockMode()) {
+        console.log('📱 Using mock data - no AWS connection required');
+      } else {
+        console.log('☁️ Connected to AWS resources');
+      }
+    }
   } catch (error) {
-    console.warn('Amplify configuration failed (using mock configuration):', error);
+    console.error('Amplify configuration failed:', error);
+    console.warn('Falling back to mock configuration');
   }
 }
 
@@ -262,6 +252,7 @@ function normalizeError(error: unknown): APIError {
  * - 共通的なGraphQL操作の抽象化
  * - 型安全性の確保
  * - エラーハンドリングの統一
+ * - 環境に応じた実装切り替え
  */
 
 /**
@@ -281,17 +272,25 @@ export async function listWithPagination<T>(
   } = {}
 ): Promise<{ items: T[]; nextToken?: string } | null> {
   return withErrorHandling(async () => {
-    // 実際のAmplify実装では以下のようなコードを使用
-    // const result = await amplifyClient.models[modelName].list(options);
-    // return {
-    //   items: result.data,
-    //   nextToken: result.nextToken
-    // };
-    
-    // モック実装
-    return {
-      items: [] as T[],
-    };
+    if (isMockMode()) {
+      // モック実装（Phase 1-2）
+      console.log(`📱 Mock: Listing ${modelName} with options:`, options);
+      return {
+        items: [] as T[],
+      };
+    } else {
+      // 実際のAmplify実装（Phase 3以降）
+      try {
+        const result = await (amplifyClient.models as any)[modelName].list(options);
+        return {
+          items: result.data || [],
+          nextToken: result.nextToken,
+        };
+      } catch (error) {
+        console.error(`Failed to list ${modelName}:`, error);
+        throw error;
+      }
+    }
   });
 }
 
@@ -307,12 +306,20 @@ export async function getById<T>(
   id: string
 ): Promise<T | null> {
   return withErrorHandling(async () => {
-    // 実際のAmplify実装では以下のようなコードを使用
-    // const result = await amplifyClient.models[modelName].get({ id });
-    // return result.data;
-    
-    // モック実装
-    return null;
+    if (isMockMode()) {
+      // モック実装（Phase 1-2）
+      console.log(`📱 Mock: Getting ${modelName} with id: ${id}`);
+      return null;
+    } else {
+      // 実際のAmplify実装（Phase 3以降）
+      try {
+        const result = await (amplifyClient.models as any)[modelName].get({ id });
+        return result.data;
+      } catch (error) {
+        console.error(`Failed to get ${modelName} with id ${id}:`, error);
+        throw error;
+      }
+    }
   });
 }
 
@@ -328,12 +335,25 @@ export async function createItem<T, U>(
   input: U
 ): Promise<T | null> {
   return withErrorHandling(async () => {
-    // 実際のAmplify実装では以下のようなコードを使用
-    // const result = await amplifyClient.models[modelName].create(input);
-    // return result.data;
-    
-    // モック実装
-    return null;
+    if (isMockMode()) {
+      // モック実装（Phase 1-2）
+      console.log(`📱 Mock: Creating ${modelName} with data:`, input);
+      return {
+        id: `mock-${Date.now()}`,
+        ...input,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as T;
+    } else {
+      // 実際のAmplify実装（Phase 3以降）
+      try {
+        const result = await (amplifyClient.models as any)[modelName].create(input);
+        return result.data;
+      } catch (error) {
+        console.error(`Failed to create ${modelName}:`, error);
+        throw error;
+      }
+    }
   });
 }
 
@@ -349,12 +369,23 @@ export async function updateItem<T, U extends { id: string }>(
   input: U
 ): Promise<T | null> {
   return withErrorHandling(async () => {
-    // 実際のAmplify実装では以下のようなコードを使用
-    // const result = await amplifyClient.models[modelName].update(input);
-    // return result.data;
-    
-    // モック実装
-    return null;
+    if (isMockMode()) {
+      // モック実装（Phase 1-2）
+      console.log(`📱 Mock: Updating ${modelName} with data:`, input);
+      return {
+        ...input,
+        updatedAt: new Date().toISOString(),
+      } as T;
+    } else {
+      // 実際のAmplify実装（Phase 3以降）
+      try {
+        const result = await (amplifyClient.models as any)[modelName].update(input);
+        return result.data;
+      } catch (error) {
+        console.error(`Failed to update ${modelName}:`, error);
+        throw error;
+      }
+    }
   });
 }
 
@@ -370,12 +401,20 @@ export async function deleteItem(
   id: string
 ): Promise<boolean> {
   const result = await withErrorHandling(async () => {
-    // 実際のAmplify実装では以下のようなコードを使用
-    // const result = await amplifyClient.models[modelName].delete({ id });
-    // return result.data;
-    
-    // モック実装
-    return true;
+    if (isMockMode()) {
+      // モック実装（Phase 1-2）
+      console.log(`📱 Mock: Deleting ${modelName} with id: ${id}`);
+      return true;
+    } else {
+      // 実際のAmplify実装（Phase 3以降）
+      try {
+        const result = await (amplifyClient.models as any)[modelName].delete({ id });
+        return result.data;
+      } catch (error) {
+        console.error(`Failed to delete ${modelName} with id ${id}:`, error);
+        throw error;
+      }
+    }
   });
   
   return result !== null;
@@ -388,6 +427,7 @@ export async function deleteItem(
  * - GraphQL Subscriptionsの使用方法
  * - リアルタイム更新の管理
  * - 購読の開始と停止
+ * - 環境に応じた実装切り替え
  * 
  * @param modelName - モデル名
  * @param callback - 更新時のコールバック
@@ -397,56 +437,59 @@ export function subscribeToUpdates<T>(
   modelName: keyof Schema,
   callback: (items: T[]) => void
 ): { unsubscribe: () => void } {
-  // 実際のAmplify実装では以下のようなコードを使用
-  // const subscription = amplifyClient.models[modelName].observeQuery().subscribe({
-  //   next: ({ items }) => callback(items),
-  //   error: (error) => console.error('Subscription error:', error)
-  // });
-  // 
-  // return {
-  //   unsubscribe: () => subscription.unsubscribe()
-  // };
-  
-  // モック実装
-  return {
-    unsubscribe: () => {},
-  };
+  if (isMockMode()) {
+    // モック実装（Phase 1-2）
+    console.log(`📱 Mock: Subscribing to ${modelName} updates`);
+    
+    // モックデータの定期更新をシミュレート
+    const interval = setInterval(() => {
+      // 実際の実装では、モックデータストアから更新を通知
+      callback([]);
+    }, 5000);
+    
+    return {
+      unsubscribe: () => {
+        clearInterval(interval);
+        console.log(`📱 Mock: Unsubscribed from ${modelName} updates`);
+      },
+    };
+  } else {
+    // 実際のAmplify実装（Phase 3以降）
+    try {
+      const subscription = (amplifyClient.models as any)[modelName].observeQuery().subscribe({
+        next: ({ items }: { items: T[] }) => callback(items),
+        error: (error: any) => console.error(`Subscription error for ${modelName}:`, error)
+      });
+      
+      return {
+        unsubscribe: () => subscription.unsubscribe()
+      };
+    } catch (error) {
+      console.error(`Failed to subscribe to ${modelName}:`, error);
+      return {
+        unsubscribe: () => {},
+      };
+    }
+  }
 }
 
 /**
- * 設定の検証
+ * 設定の検証（レガシー関数 - 後方互換性のため保持）
  * 
  * 学習ポイント:
- * - 設定値の妥当性確認
- * - 開発環境での設定チェック
- * - エラーの早期発見
+ * - 新しい設定システムへの移行
+ * - 後方互換性の維持
+ * - 段階的なリファクタリング
+ * 
+ * @deprecated Use validateAmplifyConfig from './config' instead
  */
 export function validateAmplifyConfig(): boolean {
-  const requiredEnvVars = [
-    'NEXT_PUBLIC_USER_POOL_ID',
-    'NEXT_PUBLIC_USER_POOL_CLIENT_ID',
-    'NEXT_PUBLIC_GRAPHQL_ENDPOINT',
-  ];
-  
-  const missingVars = requiredEnvVars.filter(
-    varName => !process.env[varName] || process.env[varName]?.startsWith('mock-')
-  );
-  
-  if (missingVars.length > 0) {
-    console.warn(
-      'Missing or mock Amplify configuration:',
-      missingVars.join(', ')
-    );
-    console.warn(
-      'Please run `amplify push` to deploy resources and update environment variables.'
-    );
-    return false;
-  }
-  
-  return true;
+  const { validateAmplifyConfig: newValidateConfig } = require('./config');
+  const result = newValidateConfig();
+  return result.isValid;
 }
 
-// 開発環境での設定チェック
+// 開発環境での設定チェック（新しいシステムを使用）
 if (process.env.NODE_ENV === 'development') {
-  validateAmplifyConfig();
+  // 新しい設定システムで自動チェックが実行される
 }
