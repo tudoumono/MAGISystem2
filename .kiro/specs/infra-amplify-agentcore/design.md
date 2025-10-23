@@ -709,6 +709,275 @@ agentGateway.addCloudWatchAlarm({
 });
 ```
 
+## Error Handling and Resilience
+
+### 1. Fault Tolerance Design
+```typescript
+// lib/resilience/fault-tolerance.ts
+
+/**
+ * システム障害対応とフェイルオーバー機構
+ * 学習ポイント: 分散システムの耐障害性設計
+ */
+export class FaultToleranceManager {
+  // 自動復旧機能
+  async handleSystemFailure(error: SystemError): Promise<void> {
+    const recoveryStrategy = this.determineRecoveryStrategy(error);
+    
+    switch (recoveryStrategy) {
+      case 'RESTART_SERVICE':
+        await this.restartFailedService(error.serviceId);
+        break;
+      case 'FAILOVER_REGION':
+        await this.executeRegionalFailover(error.region);
+        break;
+      case 'SCALE_RESOURCES':
+        await this.emergencyScaleUp(error.resourceType);
+        break;
+      case 'CIRCUIT_BREAKER':
+        await this.activateCircuitBreaker(error.endpoint);
+        break;
+    }
+  }
+
+  // AgentCore実行の自動リトライ
+  async executeWithRetry<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3,
+    backoffMs: number = 1000
+  ): Promise<T> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        if (attempt === maxRetries) throw error;
+        
+        const delay = backoffMs * Math.pow(2, attempt - 1);
+        await this.sleep(delay);
+        
+        // エラーログとメトリクス記録
+        await this.recordRetryAttempt(error, attempt, delay);
+      }
+    }
+    throw new Error('Max retries exceeded');
+  }
+
+  // リソース解放の確実な実行
+  async ensureResourceCleanup(traceId: string): Promise<void> {
+    try {
+      // AgentCore実行リソースの解放
+      await this.releaseAgentCoreResources(traceId);
+      
+      // 一時的なデータの削除
+      await this.cleanupTemporaryData(traceId);
+      
+      // メモリキャッシュのクリア
+      await this.clearTraceCache(traceId);
+      
+    } catch (error) {
+      // クリーンアップ失敗時の緊急処理
+      await this.scheduleDelayedCleanup(traceId, error);
+    }
+  }
+}
+```
+
+### 2. Circuit Breaker Pattern
+```typescript
+// lib/resilience/circuit-breaker.ts
+
+/**
+ * サーキットブレーカーパターン実装
+ * 学習ポイント: 外部サービス呼び出しの保護機構
+ */
+export class CircuitBreaker {
+  private state: 'CLOSED' | 'OPEN' | 'HALF_OPEN' = 'CLOSED';
+  private failureCount = 0;
+  private lastFailureTime = 0;
+  
+  constructor(
+    private readonly failureThreshold: number = 5,
+    private readonly recoveryTimeoutMs: number = 60000
+  ) {}
+
+  async execute<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.state === 'OPEN') {
+      if (Date.now() - this.lastFailureTime > this.recoveryTimeoutMs) {
+        this.state = 'HALF_OPEN';
+      } else {
+        throw new Error('Circuit breaker is OPEN');
+      }
+    }
+
+    try {
+      const result = await operation();
+      this.onSuccess();
+      return result;
+    } catch (error) {
+      this.onFailure();
+      throw error;
+    }
+  }
+
+  private onSuccess(): void {
+    this.failureCount = 0;
+    this.state = 'CLOSED';
+  }
+
+  private onFailure(): void {
+    this.failureCount++;
+    this.lastFailureTime = Date.now();
+    
+    if (this.failureCount >= this.failureThreshold) {
+      this.state = 'OPEN';
+    }
+  }
+}
+```
+
+## Development and Operations Efficiency
+
+### 1. One-Command Environment Setup
+```typescript
+// scripts/setup-environment.ts
+
+/**
+ * ワンコマンド環境構築スクリプト
+ * 学習ポイント: 開発効率化のための自動化
+ */
+export class EnvironmentSetup {
+  async setupCompleteEnvironment(): Promise<void> {
+    console.log('🚀 MAGI System Environment Setup Starting...');
+    
+    // 1. 依存関係のインストール
+    await this.installDependencies();
+    
+    // 2. AWS Amplify初期化
+    await this.initializeAmplify();
+    
+    // 3. 環境変数の設定
+    await this.setupEnvironmentVariables();
+    
+    // 4. データベーススキーマの作成
+    await this.createDatabaseSchema();
+    
+    // 5. AgentCoreの設定
+    await this.configureAgentCore();
+    
+    // 6. 開発用データの投入
+    await this.seedDevelopmentData();
+    
+    // 7. 監視・ログ設定
+    await this.setupObservability();
+    
+    console.log('✅ Environment setup completed successfully!');
+  }
+
+  private async installDependencies(): Promise<void> {
+    // Node.js依存関係
+    await this.runCommand('npm install');
+    
+    // Python依存関係（Strands Agents）
+    await this.runCommand('cd agents && pip install -r requirements.txt');
+    
+    // AWS CLI設定確認
+    await this.verifyAWSConfiguration();
+  }
+
+  private async initializeAmplify(): Promise<void> {
+    // Amplify Gen2プロジェクト初期化
+    await this.runCommand('npx amplify configure');
+    await this.runCommand('npx amplify init');
+    
+    // バックエンドリソースのデプロイ
+    await this.runCommand('npx amplify push --yes');
+  }
+}
+```
+
+### 2. CI/CD Pipeline Configuration
+```typescript
+// .github/workflows/deploy.yml の設定内容
+
+/**
+ * GitHub Actions CI/CDパイプライン
+ * 学習ポイント: 自動テスト・ビルド・デプロイの実装
+ */
+export const cicdPipelineConfig = {
+  // 自動テスト実行
+  testStage: {
+    unitTests: 'npm run test:unit',
+    integrationTests: 'npm run test:integration',
+    e2eTests: 'npm run test:e2e',
+    securityScan: 'npm audit && snyk test',
+    typeCheck: 'npm run type-check'
+  },
+  
+  // ビルドとデプロイ
+  deployStage: {
+    buildOptimization: 'npm run build:production',
+    amplifyDeploy: 'npx amplify push --yes',
+    agentCoreDeploy: 'python agents/deploy.py',
+    smokeTests: 'npm run test:smoke'
+  },
+  
+  // カナリアデプロイメント
+  canaryDeployment: {
+    trafficSplit: '10%', // 初期トラフィック
+    monitoringPeriod: '30min',
+    rollbackThreshold: '5%', // エラー率閾値
+    fullDeploymentDelay: '2hours'
+  }
+};
+```
+
+### 3. Rollback and Recovery
+```typescript
+// lib/deployment/rollback-manager.ts
+
+/**
+ * 迅速なロールバック機能
+ * 学習ポイント: 本番環境での安全なデプロイメント管理
+ */
+export class RollbackManager {
+  async executeRollback(deploymentId: string): Promise<void> {
+    const rollbackPlan = await this.createRollbackPlan(deploymentId);
+    
+    // 1. トラフィックの段階的切り替え
+    await this.redirectTraffic(rollbackPlan.previousVersion);
+    
+    // 2. データベーススキーマのロールバック
+    if (rollbackPlan.requiresSchemaRollback) {
+      await this.rollbackDatabaseSchema(rollbackPlan.schemaVersion);
+    }
+    
+    // 3. AgentCore設定の復元
+    await this.restoreAgentCoreConfig(rollbackPlan.agentConfig);
+    
+    // 4. 監視とヘルスチェック
+    await this.monitorRollbackHealth(rollbackPlan.healthChecks);
+    
+    // 5. 通知とドキュメント更新
+    await this.notifyRollbackCompletion(deploymentId, rollbackPlan);
+  }
+
+  async createRollbackPlan(deploymentId: string): Promise<RollbackPlan> {
+    const deployment = await this.getDeploymentDetails(deploymentId);
+    const previousVersion = await this.getPreviousStableVersion(deployment);
+    
+    return {
+      deploymentId,
+      previousVersion: previousVersion.id,
+      schemaVersion: previousVersion.schemaVersion,
+      agentConfig: previousVersion.agentConfig,
+      requiresSchemaRollback: this.requiresSchemaRollback(deployment, previousVersion),
+      healthChecks: this.generateHealthChecks(previousVersion),
+      estimatedDuration: this.calculateRollbackDuration(deployment)
+    };
+  }
+}
+```
+
 ## Cost Optimization
 
 ### 1. Resource Management
@@ -789,6 +1058,114 @@ export class CostMonitor {
       threshold: 50, // $50/日
       action: 'NOTIFY_AND_THROTTLE'
     });
+  }
+
+  // 予算上限に近づいた際の自動制限機能
+  async handleBudgetThreshold(currentSpend: number, budgetLimit: number): Promise<void> {
+    const utilizationRate = currentSpend / budgetLimit;
+    
+    if (utilizationRate >= 0.9) {
+      // 90%到達時：緊急制限
+      await this.activateEmergencyThrottling();
+      await this.notifyBudgetCritical(currentSpend, budgetLimit);
+    } else if (utilizationRate >= 0.8) {
+      // 80%到達時：警告とソフト制限
+      await this.activateSoftThrottling();
+      await this.notifyBudgetWarning(currentSpend, budgetLimit);
+    }
+  }
+
+  private async activateEmergencyThrottling(): Promise<void> {
+    // AgentCore実行の一時停止
+    await this.pauseAgentCoreExecution();
+    
+    // 新規会話の制限
+    await this.limitNewConversations();
+    
+    // 非必須機能の無効化
+    await this.disableNonEssentialFeatures();
+  }
+}
+
+/**
+ * 統合ダッシュボード設定
+ * 学習ポイント: システム全体状況の可視化
+ */
+export class UnifiedDashboard {
+  async createSystemOverviewDashboard(): Promise<void> {
+    const dashboard = {
+      // システム状態セクション
+      systemHealth: {
+        widgets: [
+          'amplify-hosting-status',
+          'agentcore-availability',
+          'database-performance',
+          'authentication-metrics'
+        ]
+      },
+      
+      // パフォーマンスセクション
+      performance: {
+        widgets: [
+          'response-latency-trends',
+          'agent-execution-times',
+          'database-query-performance',
+          'cache-hit-rates'
+        ]
+      },
+      
+      // コスト分析セクション
+      costAnalysis: {
+        widgets: [
+          'monthly-cost-breakdown',
+          'service-cost-distribution',
+          'usage-vs-budget-tracking',
+          'cost-optimization-recommendations'
+        ]
+      },
+      
+      // ビジネスメトリクス
+      businessMetrics: {
+        widgets: [
+          'active-users-count',
+          'conversation-volume',
+          'agent-success-rates',
+          'user-satisfaction-scores'
+        ]
+      }
+    };
+    
+    await this.deployDashboard(dashboard);
+  }
+
+  // リアルタイムアラート管理
+  async setupAlertManagement(): Promise<void> {
+    const alertConfig = {
+      // 階層化アラート設定
+      alertLevels: {
+        INFO: { threshold: 'low', notification: 'dashboard-only' },
+        WARNING: { threshold: 'medium', notification: 'email' },
+        CRITICAL: { threshold: 'high', notification: 'email+sms' },
+        EMERGENCY: { threshold: 'severe', notification: 'email+sms+call' }
+      },
+      
+      // 自動エスカレーション
+      escalation: {
+        timeToEscalate: '15min',
+        escalationChain: ['dev-team', 'ops-team', 'management'],
+        autoResolveAfter: '24hours'
+      },
+      
+      // インシデント対応
+      incidentResponse: {
+        autoCreateTicket: true,
+        assignToOnCall: true,
+        runPlaybook: true,
+        notifyStakeholders: true
+      }
+    };
+    
+    await this.configureAlerts(alertConfig);
   }
 }
 ```
