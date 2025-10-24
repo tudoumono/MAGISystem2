@@ -37,7 +37,7 @@
  */
 
 import { getAmplifyClient, getRealAmplifyClient } from './client';
-import { isMockMode, getCurrentEnvironmentMode } from './config';
+import { getCurrentEnvironmentMode } from './config';
 import type { 
   AgentPreset, 
   AgentConfig, 
@@ -476,7 +476,8 @@ export async function seedDefaultPresets(options: SeedingOptions = {}): Promise<
   created: number;
   errors: string[];
 }> {
-  if (isMockMode()) {
+  const currentMode = getCurrentEnvironmentMode();
+  if (currentMode === 'MOCK') {
     if (options.verbose) {
       console.log('📝 Mock mode: Preset seeding handled by mock client');
     }
@@ -558,7 +559,8 @@ export async function seedSampleConversations(options: SeedingOptions = {}): Pro
   created: { conversations: number; messages: number };
   errors: string[];
 }> {
-  if (isMockMode()) {
+  const currentMode = getCurrentEnvironmentMode();
+  if (currentMode === 'MOCK') {
     if (options.verbose) {
       console.log('📝 Mock mode: Conversation seeding handled by mock client');
     }
@@ -749,7 +751,8 @@ export async function clearAllData(options: { confirm?: boolean } = {}): Promise
     throw new Error('Data clearing is not allowed in production mode');
   }
 
-  if (isMockMode()) {
+  const currentMode = getCurrentEnvironmentMode();
+  if (currentMode === 'MOCK') {
     console.log('📝 Mock mode: Data clearing handled by mock client');
     return { success: true, cleared: { presets: 0, conversations: 0, messages: 0 }, errors: [] };
   }

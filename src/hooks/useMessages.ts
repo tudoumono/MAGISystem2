@@ -336,9 +336,10 @@ export function useMessages(conversationId: string): UseMessagesReturn {
   useEffect(() => {
     if (!conversationId) return;
 
-    const { isMockMode } = require('@/lib/amplify/config');
+    const { getCurrentEnvironmentMode } = require('@/lib/amplify/config');
+    const currentMode = getCurrentEnvironmentMode();
     
-    if (isMockMode()) {
+    if (currentMode === 'MOCK') {
       // モックモード: 従来の実装
       const createSub = client.models.Message.onCreate({
         filter: {

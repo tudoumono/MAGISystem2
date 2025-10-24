@@ -52,11 +52,7 @@ interface ProtectedLayoutProps {
  * - 子コンポーネントへの適切な props 渡し
  */
 export default function ProtectedLayout({ children }: ProtectedLayoutProps) {
-  // Phase 2: 認証ガードを一時的に無効化
-  return <>{children}</>;
-  
-  // Phase 3以降で以下のコードを有効化
-  /*
+  // Phase 3: 認証ガードを有効化
   return (
     <ProtectedRoute
       redirectTo="/signin"
@@ -65,5 +61,4 @@ export default function ProtectedLayout({ children }: ProtectedLayoutProps) {
       {children}
     </ProtectedRoute>
   );
-  */
 }
