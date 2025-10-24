@@ -180,19 +180,31 @@ export async function getCurrentUserServer(): Promise<ServerAuthUser | null> {
     // 実環境での処理
     ensureAmplifyConfigured();
     
-    const user = await getCurrentUser();
-    
-    if (user) {
-      return {
-        userId: user.userId,
-        username: user.username,
-        email: user.signInDetails?.loginId || undefined,
-        name: user.signInDetails?.loginId || undefined, // 実際の実装では attributes から取得
-        lastSignIn: new Date().toISOString(),
-      };
+    try {
+      const user = await getCurrentUser();
+      
+      if (user) {
+        return {
+          userId: user.userId,
+          username: user.username,
+          email: user.signInDetails?.loginId || undefined,
+          name: user.signInDetails?.loginId || undefined, // 実際の実装では attributes から取得
+          lastSignIn: new Date().toISOString(),
+        };
+      }
+      
+      return null;
+    } catch (authError) {
+      // 認証エラーは正常な状態（未サインイン）として扱う
+      if (authError instanceof Error && authError.name === 'UserUnAuthenticatedException') {
+        console.log('User not authenticated - this is normal for unauthenticated access');
+        return null;
+      }
+      
+      // その他のエラーはログに記録
+      console.error('Authentication error:', authError);
+      return null;
     }
-    
-    return null;
   } catch (error) {
     console.error('Failed to get current user on server:', error);
     return null;

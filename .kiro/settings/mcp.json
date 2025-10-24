@@ -7,7 +7,8 @@
         "@modelcontextprotocol/server-github"
       ],
       "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}",
+        "PATH": "C:\\fnm\\data\\node-versions\\v22.12.0\\installation;${PATH}"
       },
       "disabled": false,
       "autoApprove": [
@@ -24,12 +25,14 @@
         "@modelcontextprotocol/server-filesystem",
         "."
       ],
+      "env": {
+        "PATH": "C:\\fnm\\data\\node-versions\\v22.12.0\\installation;${PATH}"
+      },
       "disabled": false,
       "autoApprove": [
         "read_file",
         "list_directory",
         "search_files",
-        "create_directory",
         "create_directory"
       ]
     },
@@ -40,7 +43,8 @@
         "@modelcontextprotocol/server-brave-search"
       ],
       "env": {
-        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+        "BRAVE_API_KEY": "${BRAVE_API_KEY}",
+        "PATH": "C:\\fnm\\data\\node-versions\\v22.12.0\\installation;${PATH}"
       },
       "disabled": false,
       "autoApprove": [
@@ -51,6 +55,28 @@
       "disabledTools": [
         "brave_web_search",
         "brave_local_search"
+      ]
+    },
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "chrome-devtools-mcp@latest"
+      ],
+      "env": {
+        "PATH": "C:\\fnm\\data\\node-versions\\v22.12.0\\installation;${PATH}"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "performance_start_trace",
+        "list_pages",
+        "navigate_page",
+        "take_snapshot",
+        "fill",
+        "list_console_messages",
+        "click",
+        "wait_for",
+        "evaluate_script",
+        "list_network_requests"
       ]
     }
   }

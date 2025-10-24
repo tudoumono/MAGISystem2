@@ -64,9 +64,10 @@ import type { Conversation, User } from '@/lib/amplify/types';
  * - Phase 1-2: モッククライアントを使用
  * - Phase 3: 実際のAmplify clientに切り替え
  * - Schema型により完全な型安全性を確保
+ * - 環境変数による自動切り替え
  */
-import { generateMockClient } from '@/lib/amplify/mock-client';
-const client = generateMockClient<Schema>();
+import { getAmplifyClient } from '@/lib/amplify/client';
+const client = getAmplifyClient();
 
 /**
  * 会話作成パラメータの型定義
@@ -169,50 +170,117 @@ export function useConversations(): UseConversationsReturn {
    * - 一意IDの生成（crypto.randomUUID()）
    */
   const createConversation = useCallback(async (params: CreateConversationParams): Promise<Conversation> => {
-    // 楽観的更新用の仮データ作成
-    const optimisticConversation: Conversation = {
-      id: crypto.randomUUID(), // 仮ID
-      userId: 'current-user', // 実際は認証情報から取得
-      title: params.title,
-      agentPresetId: params.agentPresetId || null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    // 楽観的更新: 即座にUIを更新
-    setConversations(prev => [optimisticConversation, ...prev]);
-
-    try {
-      // サーバーに作成リクエスト
-      const result = await client.models.Conversation.create({
+    const { isMockMode } = require('@/lib/amplify/config');
+    
+    if (isMockMode()) {
+      // モックモード: 従来の楽観的更新
+      const optimisticConversation: Conversation = {
+        id: crypto.randomUUID(),
+        userId: 'current-user',
         title: params.title,
         agentPresetId: params.agentPresetId || null,
-        userId: 'current-user', // 実際は認証情報から取得
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
-      });
+      };
 
-      if (result.data) {
-        // 成功時: サーバーデータでUIを更新
+      setConversations(prev => [optimisticConversation, ...prev]);
+
+      try {
+        const result = await client.models.Conversation.create({
+          title: params.title,
+          agentPresetId: params.agentPresetId || null,
+          userId: 'current-user',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+
+        if (result.data) {
+          setConversations(prev => 
+            prev.map(conv => 
+              conv.id === optimisticConversation.id ? result.data! : conv
+            )
+          );
+          return result.data;
+        } else {
+          throw new Error('Failed to create conversation');
+        }
+      } catch (err) {
         setConversations(prev => 
-          prev.map(conv => 
-            conv.id === optimisticConversation.id ? result.data! : conv
-          )
+          prev.filter(conv => conv.id !== optimisticConversation.id)
         );
-        return result.data;
-      } else {
-        throw new Error('Failed to create conversation');
+        
+        console.error('Failed to create conversation:', err);
+        const error = err instanceof Error ? err : new Error('Failed to create conversation');
+        setError(error);
+        throw error;
       }
-    } catch (err) {
-      // 失敗時: 楽観的更新をロールバック
-      setConversations(prev => 
-        prev.filter(conv => conv.id !== optimisticConversation.id)
-      );
+    } else {
+      // 実環境: オフライン対応統合
+      const { offlineManager } = require('@/lib/realtime/offline-support');
+      const { optimisticHelpers } = require('@/lib/optimistic-updates');
       
-      console.error('Failed to create conversation:', err);
-      const error = err instanceof Error ? err : new Error('Failed to create conversation');
-      setError(error);
-      throw error;
+      const optimisticConversation: Conversation = {
+        id: crypto.randomUUID(),
+        userId: 'current-user',
+        title: params.title,
+        agentPresetId: params.agentPresetId || null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      // 楽観的更新
+      setConversations(prev => optimisticHelpers.addToArray(prev, optimisticConversation, 'start'));
+
+      try {
+        if (offlineManager.isOnline()) {
+          // オンライン: 直接実行
+          const result = await client.models.Conversation.create({
+            title: params.title,
+            agentPresetId: params.agentPresetId || null,
+            userId: 'current-user',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+
+          if (result.data) {
+            setConversations(prev => 
+              prev.map(conv => 
+                conv.id === optimisticConversation.id ? result.data! : conv
+              )
+            );
+            return result.data;
+          } else {
+            throw new Error('Failed to create conversation');
+          }
+        } else {
+          // オフライン: キューに追加
+          await offlineManager.queueOperation({
+            type: 'CREATE_CONVERSATION',
+            data: {
+              title: params.title,
+              agentPresetId: params.agentPresetId || null,
+              userId: 'current-user',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            },
+            retry: true,
+            priority: 'normal'
+          });
+
+          // オフライン時は楽観的データをそのまま返す
+          return optimisticConversation;
+        }
+      } catch (err) {
+        // エラー時: ロールバック
+        setConversations(prev => 
+          prev.filter(conv => conv.id !== optimisticConversation.id)
+        );
+        
+        console.error('Failed to create conversation:', err);
+        const error = err instanceof Error ? err : new Error('Failed to create conversation');
+        setError(error);
+        throw error;
+      }
     }
   }, []);
 
@@ -357,59 +425,91 @@ export function useConversations(): UseConversationsReturn {
    * リアルタイム更新の設定
    * 
    * 学習ポイント:
-   * - GraphQL Subscriptionによるリアルタイム更新
-   * - onCreate, onUpdate, onDeleteイベントを監視
-   * - オーナーベースアクセス制御により、自分の会話のみ通知される
-   * - クリーンアップ関数でサブスクリプションを解除
+   * - SubscriptionManager による一元管理
+   * - エラーハンドリングと自動再接続
+   * - オフライン対応との統合
+   * - パフォーマンス最適化
    */
   useEffect(() => {
-    // 新規作成の監視
-    const createSub = client.models.Conversation.onCreate().subscribe({
-      next: (data: any) => {
-        if (data) {
+    // Phase 3以降: 実際のSubscriptionManagerを使用
+    // Phase 1-2: モックモードでは従来の実装を維持
+    const { isMockMode } = require('@/lib/amplify/config');
+    
+    if (isMockMode()) {
+      // モックモード: 従来の実装
+      const createSub = client.models.Conversation.onCreate().subscribe({
+        next: (data: any) => {
+          if (data) {
+            setConversations(prev => {
+              const exists = prev.some(conv => conv.id === data.id);
+              if (exists) return prev;
+              return [data, ...prev];
+            });
+          }
+        },
+        error: (err: any) => console.error('Conversation create subscription error:', err)
+      });
+
+      const updateSub = client.models.Conversation.onUpdate().subscribe({
+        next: (data: any) => {
+          if (data) {
+            setConversations(prev => 
+              prev.map(conv => conv.id === data.id ? data : conv)
+            );
+          }
+        },
+        error: (err: any) => console.error('Conversation update subscription error:', err)
+      });
+
+      const deleteSub = client.models.Conversation.onDelete().subscribe({
+        next: (data: any) => {
+          if (data) {
+            setConversations(prev => 
+              prev.filter(conv => conv.id !== data.id)
+            );
+          }
+        },
+        error: (err: any) => console.error('Conversation delete subscription error:', err)
+      });
+
+      return () => {
+        createSub.unsubscribe();
+        updateSub.unsubscribe();
+        deleteSub.unsubscribe();
+      };
+    } else {
+      // 実環境: SubscriptionManagerを使用
+      const { subscriptionManager } = require('@/lib/realtime/subscription-manager');
+      const { offlineManager } = require('@/lib/realtime/offline-support');
+      
+      const subscriptionId = subscriptionManager.subscribeToConversations('current-user', {
+        onCreate: (conversation: Conversation) => {
           setConversations(prev => {
-            // 重複チェック
-            const exists = prev.some(conv => conv.id === data.id);
+            const exists = prev.some(conv => conv.id === conversation.id);
             if (exists) return prev;
-            
-            // 新しい会話を先頭に追加
-            return [data, ...prev];
+            return [conversation, ...prev];
           });
-        }
-      },
-      error: (err: any) => console.error('Conversation create subscription error:', err)
-    });
-
-    // 更新の監視
-    const updateSub = client.models.Conversation.onUpdate().subscribe({
-      next: (data: any) => {
-        if (data) {
+        },
+        onUpdate: (conversation: Conversation) => {
           setConversations(prev => 
-            prev.map(conv => conv.id === data.id ? data : conv)
+            prev.map(conv => conv.id === conversation.id ? conversation : conv)
           );
-        }
-      },
-      error: (err: any) => console.error('Conversation update subscription error:', err)
-    });
-
-    // 削除の監視
-    const deleteSub = client.models.Conversation.onDelete().subscribe({
-      next: (data: any) => {
-        if (data) {
+        },
+        onDelete: (conversation: Conversation) => {
           setConversations(prev => 
-            prev.filter(conv => conv.id !== data.id)
+            prev.filter(conv => conv.id !== conversation.id)
           );
+        },
+        onError: (error: Error) => {
+          console.error('Conversation subscription error:', error);
+          setError(error);
         }
-      },
-      error: (err: any) => console.error('Conversation delete subscription error:', err)
-    });
+      });
 
-    // クリーンアップ関数
-    return () => {
-      createSub.unsubscribe();
-      updateSub.unsubscribe();
-      deleteSub.unsubscribe();
-    };
+      return () => {
+        subscriptionManager.unsubscribe(subscriptionId);
+      };
+    }
   }, []);
 
   /**

@@ -98,7 +98,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({
    * 
    * 学習ポイント:
    * - 正規表現によるパスワード要件チェック
-   * - セキュリティベストプラクティス
+   * - Cognitoのパスワードポリシーに準拠
    * - ユーザーフレンドリーなフィードバック
    */
   const validatePassword = (password: string): string | undefined => {
@@ -120,6 +120,10 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({
     
     if (!/(?=.*\d)/.test(password)) {
       return 'パスワードには数字を含めてください';
+    }
+    
+    if (!/(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/.test(password)) {
+      return 'パスワードには記号文字を含めてください (!@#$%^&* など)';
     }
     
     return undefined;
@@ -281,11 +285,11 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({
           {/* パスワード入力 */}
           <PasswordInput
             label="パスワード"
-            placeholder="8文字以上、大小文字・数字を含む"
+            placeholder="8文字以上、大小文字・数字・記号を含む"
             value={formData.password}
             onChange={handleInputChange('password')}
             error={formErrors.password}
-            helpText="8文字以上で、大文字・小文字・数字を含めてください"
+            helpText="8文字以上で、大文字・小文字・数字・記号(!@#$%^&*など)を含めてください"
             required
             disabled={loading || isSubmitting}
             autoComplete="new-password"
