@@ -66,7 +66,7 @@ export function SignInPageClient({
   }, [redirectTo]);
   
   /**
-   * 認証状態の監視（条件付き自動リダイレクト）
+   * 認証状態の監視（自動リダイレクト有効）
    */
   React.useEffect(() => {
     console.log('SignInPageClient - loading:', loading, 'isAuthenticated:', isAuthenticated);
@@ -78,24 +78,18 @@ export function SignInPageClient({
       return;
     }
     
-    // 認証済みの場合、少し遅延してからリダイレクト
+    // 認証済みの場合、即座に自動リダイレクト
     if (isAuthenticated) {
       const targetUrl = redirectTo === '/' ? '/dashboard' : redirectTo;
-      console.log('User authenticated, will redirect to:', targetUrl);
+      console.log('User authenticated, auto-redirecting to:', targetUrl);
       
-      // 3秒後に自動リダイレクト（手動ボタンも利用可能）
-      const redirectTimer = setTimeout(() => {
-        console.log('Auto-redirecting to:', targetUrl);
-        try {
-          router.push(targetUrl);
-        } catch (error) {
-          console.warn('Router push failed, using window.location:', error);
-          window.location.href = targetUrl;
-        }
-      }, 3000);
-      
-      // クリーンアップ
-      return () => clearTimeout(redirectTimer);
+      // 即座に自動リダイレクト実行
+      try {
+        router.push(targetUrl);
+      } catch (error) {
+        console.warn('Auto-redirect failed, will show manual button:', error);
+        // 自動リダイレクトが失敗した場合は手動ボタンを表示
+      }
     }
   }, [isAuthenticated, loading, redirectTo, router]);
   
@@ -122,8 +116,8 @@ export function SignInPageClient({
           <p>認証状態: ✅ 認証済み</p>
           <p>リダイレクト先: {redirectTo}</p>
           <p>ローディング: {loading ? '⏳ 確認中' : '✅ 完了'}</p>
-          <p className="text-blue-600">ℹ️ 手動でダッシュボードに移動してください</p>
-          <p className="text-gray-500">開発環境: 認証トークンはLocalStorageに保存されています</p>
+          <p className="text-green-600">🔄 自動的にダッシュボードにリダイレクトしています...</p>
+          <p className="text-gray-500">リダイレクトされない場合は下のボタンをクリックしてください</p>
         </div>
         {/* 手動リダイレクトボタン */}
         <button
@@ -150,7 +144,7 @@ export function SignInPageClient({
           }}
           className="mt-4 px-6 py-3 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium"
         >
-          ダッシュボードに移動
+          手動でダッシュボードに移動
         </button>
       </div>
     );
