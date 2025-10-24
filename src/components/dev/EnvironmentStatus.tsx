@@ -43,10 +43,11 @@ import {
   getCurrentEnvironmentMode, 
   validateAmplifyConfig, 
   getEnvironmentSetupGuide,
+  getAmplifyConfig,
   type EnvironmentMode,
   type ConfigValidationResult
 } from '@/lib/amplify/config';
-import { testAmplifyConnection } from '@/lib/amplify/client';
+import { testAmplifyConnectionDetailed } from '@/lib/amplify/resource-test';
 
 /**
  * コンポーネントのプロパティ型定義
@@ -88,6 +89,47 @@ export function EnvironmentStatus({
   const [connectionTest, setConnectionTest] = useState<ConnectionTestResult | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [resourceInfo, setResourceInfo] = useState<any>(null);
+
+  /**
+   * リソース情報の取得
+   */
+  const getResourceInfo = () => {
+    const config = getAmplifyConfig();
+    const currentMode = mode;
+    
+    return {
+      auth: {
+        type: currentMode === 'MOCK' ? 'Mock' : 'AWS Cognito',
+        userPoolId: config.Auth?.Cognito?.userPoolId || 'N/A',
+        userPoolClientId: config.Auth?.Cognito?.userPoolClientId || 'N/A',
+        identityPoolId: process.env.NEXT_PUBLIC_IDENTITY_POOL_ID || 'N/A',
+        region: config.Auth?.Cognito?.userPoolId?.split('_')[0] || 'N/A',
+        isMock: currentMode === 'MOCK'
+      },
+      api: {
+        type: currentMode === 'MOCK' ? 'Mock' : 'AWS AppSync',
+        endpoint: config.API?.GraphQL?.endpoint || 'N/A',
+        region: config.API?.GraphQL?.region || 'N/A',
+        authMode: config.API?.GraphQL?.defaultAuthMode || 'N/A',
+        apiKey: config.API?.GraphQL?.apiKey || process.env.NEXT_PUBLIC_API_KEY || 'N/A',
+        isMock: currentMode === 'MOCK'
+      },
+      storage: {
+        type: currentMode === 'MOCK' ? 'Mock/LocalStorage' : 'AWS DynamoDB',
+        tables: ['User', 'Conversation', 'Message', 'TraceStep', 'AgentPreset'],
+        isMock: currentMode === 'MOCK'
+      },
+      deployment: {
+        backend: 'AWS Amplify',
+        frontend: 'Local Development',
+        agents: 'Not Implemented',
+        mode: currentMode,
+        phase: 'Phase 3 - Authentication & Data'
+      },
+      mode: currentMode
+    };
+  };
 
   /**
    * 環境情報の取得と検証
@@ -103,10 +145,14 @@ export function EnvironmentStatus({
       const validationResult = validateAmplifyConfig();
       setValidation(validationResult);
       
+      // リソース情報の取得
+      const resources = getResourceInfo();
+      setResourceInfo(resources);
+      
       // 接続テスト（実環境のみ）
       if (currentMode !== 'MOCK') {
         try {
-          const testResult = await testAmplifyConnection();
+          const testResult = await testAmplifyConnectionDetailed();
           setConnectionTest({
             ...testResult,
             timestamp: new Date()
@@ -216,19 +262,75 @@ export function EnvironmentStatus({
    */
   if (compact) {
     return (
-      <div 
-        className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm ${styles.bg} ${styles.border} ${styles.text} border ${className}`}
-        onClick={interactive ? () => setShowDetails(!showDetails) : undefined}
-        role={interactive ? 'button' : undefined}
-        tabIndex={interactive ? 0 : undefined}
-      >
-        <span>{styles.icon}</span>
-        <span className="font-medium">{styles.label}</span>
-        {connectionTest && (
-          <>
-            <span className="text-gray-400">•</span>
-            <span className={connectionStyles.color}>{connectionStyles.icon}</span>
-          </>
+      <div className="relative">
+        <div 
+          className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm ${styles.bg} ${styles.border} ${styles.text} border ${className}`}
+          onClick={interactive ? () => setShowDetails(!showDetails) : undefined}
+          role={interactive ? 'button' : undefined}
+          tabIndex={interactive ? 0 : undefined}
+        >
+          <span>{styles.icon}</span>
+          <span className="font-medium">{styles.label}</span>
+          {connectionTest && (
+            <>
+              <span className="text-gray-400">•</span>
+              <span className={connectionStyles.color}>{connectionStyles.icon}</span>
+            </>
+          )}
+        </div>
+        
+        {/* ホバー時の詳細情報 */}
+        {showDetails && resourceInfo && (
+          <div className="absolute top-full right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-xs z-50">
+            <div className="space-y-3">
+              <div className="font-semibold text-gray-900 border-b pb-2">
+                リソース参照先 ({resourceInfo.mode} Mode)
+              </div>
+              
+              {/* 認証 */}
+              <div>
+                <div className="font-medium text-gray-700 flex items-center">
+                  🔐 認証 (Auth)
+                  <span className={`ml-2 px-2 py-1 rounded text-xs ${resourceInfo.auth.isMock ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+                    {resourceInfo.auth.type}
+                  </span>
+                </div>
+                {!resourceInfo.auth.isMock && (
+                  <div className="ml-4 text-gray-600 mt-1">
+                    <div>User Pool: {resourceInfo.auth.userPoolId}</div>
+                    <div>Region: {resourceInfo.auth.region}</div>
+                  </div>
+                )}
+              </div>
+              
+              {/* API */}
+              <div>
+                <div className="font-medium text-gray-700 flex items-center">
+                  🌐 API (GraphQL)
+                  <span className={`ml-2 px-2 py-1 rounded text-xs ${resourceInfo.api.isMock ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+                    {resourceInfo.api.type}
+                  </span>
+                </div>
+                {!resourceInfo.api.isMock && (
+                  <div className="ml-4 text-gray-600 mt-1">
+                    <div>Endpoint: {resourceInfo.api.endpoint.substring(0, 40)}...</div>
+                    <div>Region: {resourceInfo.api.region}</div>
+                    <div>Auth Mode: {resourceInfo.api.authMode}</div>
+                  </div>
+                )}
+              </div>
+              
+              {/* ストレージ */}
+              <div>
+                <div className="font-medium text-gray-700 flex items-center">
+                  💾 ストレージ
+                  <span className={`ml-2 px-2 py-1 rounded text-xs ${resourceInfo.storage.isMock ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+                    {resourceInfo.storage.type}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     );
@@ -290,6 +392,127 @@ export function EnvironmentStatus({
               <span className="ml-2">{process.env.NODE_ENV}</span>
             </div>
           </div>
+
+          {/* リソース参照先情報 */}
+          {resourceInfo && (
+            <div>
+              <h4 className="font-medium mb-2">AWS リソース接続状況:</h4>
+              <div className="space-y-3 bg-gray-50 p-3 rounded">
+                {/* 認証 */}
+                <div className="border border-gray-200 rounded p-3 bg-white">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">🔐</span>
+                      <div>
+                        <div className="font-medium text-gray-700">Amazon Cognito</div>
+                        <div className="text-xs text-gray-500">認証・ユーザー管理</div>
+                      </div>
+                    </div>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${connectionTest?.resources?.cognito?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {connectionTest?.resources?.cognito?.success ? 'AWS ✅' : 'AWS ❌'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-600 space-y-1 pl-6">
+                    <div><span className="font-medium">User Pool ID:</span> {resourceInfo.auth.userPoolId}</div>
+                    <div><span className="font-medium">Client ID:</span> {resourceInfo.auth.userPoolId?.includes('_') ? resourceInfo.auth.userPoolId.split('_')[1] : 'N/A'}</div>
+                    <div><span className="font-medium">Region:</span> {resourceInfo.auth.region}</div>
+                    <div><span className="font-medium">Identity Pool:</span> {process.env.NEXT_PUBLIC_IDENTITY_POOL_ID?.split(':')[1] || 'N/A'}</div>
+                    {connectionTest?.resources?.cognito && (
+                      <div className={`mt-2 p-2 rounded ${connectionTest.resources.cognito.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                        <span className="font-medium">Status:</span> {connectionTest.resources.cognito.details?.message || 'Unknown'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* API */}
+                <div className="border border-gray-200 rounded p-3 bg-white">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">🌐</span>
+                      <div>
+                        <div className="font-medium text-gray-700">AWS AppSync</div>
+                        <div className="text-xs text-gray-500">GraphQL API</div>
+                      </div>
+                    </div>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${connectionTest?.resources?.appSync?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {connectionTest?.resources?.appSync?.success ? 'AWS ✅' : 'AWS ❌'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-600 space-y-1 pl-6">
+                    <div><span className="font-medium">Endpoint:</span> {resourceInfo.api.endpoint.substring(0, 60)}...</div>
+                    <div><span className="font-medium">Region:</span> {resourceInfo.api.region}</div>
+                    <div><span className="font-medium">Auth Mode:</span> {resourceInfo.api.authMode}</div>
+                    <div><span className="font-medium">API Key:</span> {process.env.NEXT_PUBLIC_API_KEY?.substring(0, 20)}...</div>
+                    {connectionTest?.resources?.appSync && (
+                      <div className={`mt-2 p-2 rounded ${connectionTest.resources.appSync.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                        <span className="font-medium">Status:</span> {connectionTest.resources.appSync.details?.message || 'Unknown'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* データモデル */}
+                <div className="border border-gray-200 rounded p-3 bg-white">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">💾</span>
+                      <div>
+                        <div className="font-medium text-gray-700">Amazon DynamoDB</div>
+                        <div className="text-xs text-gray-500">データストレージ</div>
+                      </div>
+                    </div>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${connectionTest?.resources?.dynamoDB?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {connectionTest?.resources?.dynamoDB?.success ? 'AWS ✅' : 'AWS ❌'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-600 space-y-1 pl-6">
+                    <div><span className="font-medium">Tables:</span> User, Conversation, Message, TraceStep, AgentPreset</div>
+                    <div><span className="font-medium">Access:</span> AppSync GraphQL API経由</div>
+                    <div><span className="font-medium">Auth:</span> Cognito User Pools + Owner-based</div>
+                    {connectionTest?.resources?.dynamoDB && (
+                      <div className={`mt-2 p-2 rounded ${connectionTest.resources.dynamoDB.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                        <span className="font-medium">Status:</span> {connectionTest.resources.dynamoDB.details?.message || 'Unknown'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* デプロイ状況 */}
+                <div className="border border-gray-200 rounded p-3 bg-white">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">🚀</span>
+                      <div>
+                        <div className="font-medium text-gray-700">デプロイ状況</div>
+                        <div className="text-xs text-gray-500">現在の環境</div>
+                      </div>
+                    </div>
+                    <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                      DEVELOPMENT
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-600 space-y-1 pl-6">
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-600">✅</span>
+                      <span><span className="font-medium">Backend:</span> AWS Amplify (認証・データ)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-yellow-600">⏳</span>
+                      <span><span className="font-medium">Frontend:</span> ローカル開発環境</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400">⭕</span>
+                      <span><span className="font-medium">Agents:</span> 未実装 (Phase 4)</span>
+                    </div>
+                    <div className="mt-2 p-2 rounded bg-blue-50 text-blue-700">
+                      <span className="font-medium">Next:</span> フロントエンドをAmplify Hostingにデプロイ
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 検証結果 */}
           {validation && (

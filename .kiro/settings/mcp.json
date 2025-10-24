@@ -76,7 +76,9 @@
         "click",
         "wait_for",
         "evaluate_script",
-        "list_network_requests"
+        "list_network_requests",
+        "close_page",
+        "new_page"
       ]
     }
   }

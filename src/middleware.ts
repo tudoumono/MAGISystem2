@@ -26,7 +26,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { isMockMode } from '@/lib/amplify/config';
+import { getCurrentEnvironmentMode } from '@/lib/amplify/config';
+
+// 実環境のみ対応（モック機能は削除）
 
 /**
  * 保護されたルートのパターン
@@ -100,25 +102,7 @@ function isExcludedPath(pathname: string): boolean {
   return EXCLUDED_PATHS.some(path => pathname.startsWith(path));
 }
 
-/**
- * モック認証の状態をチェック
- * 
- * 学習ポイント:
- * - Cookie からの認証情報取得
- * - モックモード固有の処理
- * - エラーハンドリング
- */
-function checkMockAuth(request: NextRequest): boolean {
-  try {
-    const mockUserCookie = request.cookies.get('mock-auth-user');
-    const mockSessionCookie = request.cookies.get('mock-session-token');
-    
-    return !!(mockUserCookie && mockSessionCookie);
-  } catch (error) {
-    console.error('Failed to check mock auth:', error);
-    return false;
-  }
-}
+
 
 /**
  * 実環境での認証状態をチェック
@@ -130,16 +114,29 @@ function checkMockAuth(request: NextRequest): boolean {
  */
 function checkRealAuth(request: NextRequest): boolean {
   try {
-    // Amplify関連のCookieをチェック
+    // まず、簡単な認証フラグCookieをチェック
+    const authCookie = request.cookies.get('amplify-auth');
+    if (authCookie && authCookie.value === 'true') {
+      console.log('Found amplify-auth cookie - user authenticated');
+      return true;
+    }
+    
+    // フォールバック: Amplify/Cognito関連のCookieをチェック
     const cognitoCookies: string[] = [];
-    for (const [name] of request.cookies) {
+    for (const [name, value] of request.cookies) {
       if (name.includes('CognitoIdentityServiceProvider')) {
         cognitoCookies.push(name);
+        // アクセストークンまたはIDトークンが存在するかチェック
+        if ((name.includes('.accessToken') || name.includes('.idToken')) && value.value) {
+          console.log('Found Cognito token in cookie:', name);
+          return true;
+        }
       }
     }
     
-    // 基本的な存在チェック（実際の検証はサーバーアクションで行う）
-    return cognitoCookies.length > 0;
+    // 認証Cookieが見つからない場合は未認証として扱う
+    console.log('No valid authentication cookies found - user not authenticated');
+    return false;
   } catch (error) {
     console.error('Failed to check real auth:', error);
     return false;
@@ -147,20 +144,16 @@ function checkRealAuth(request: NextRequest): boolean {
 }
 
 /**
- * 認証状態をチェック
+ * 認証状態をチェック（実環境のみ）
  * 
  * 学習ポイント:
- * - 環境に応じた認証チェックの切り替え
+ * - Amplify Cognitoの認証チェック
  * - パフォーマンスを考慮した軽量チェック
  * - エラー時のフォールバック
  */
 function isAuthenticated(request: NextRequest): boolean {
   try {
-    if (isMockMode()) {
-      return checkMockAuth(request);
-    } else {
-      return checkRealAuth(request);
-    }
+    return checkRealAuth(request);
   } catch (error) {
     console.error('Authentication check failed:', error);
     return false;

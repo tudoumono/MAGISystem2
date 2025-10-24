@@ -35,7 +35,7 @@
 
 import { generateClient } from 'aws-amplify/data';
 import { Amplify } from 'aws-amplify';
-import { getAmplifyConfig, getCurrentEnvironmentMode, isMockMode } from './config';
+import { getAmplifyConfig, getCurrentEnvironmentMode } from './config';
 
 /**
  * Amplify設定の初期化
@@ -82,7 +82,8 @@ function initializeAmplify() {
  */
 export function getRealAmplifyClient() {
   // モックモードの場合はエラー
-  if (isMockMode()) {
+  const currentMode = getCurrentEnvironmentMode();
+  if (currentMode === 'MOCK') {
     throw new Error('Cannot create real Amplify client in MOCK mode. Use generateMockClient() instead.');
   }
   
@@ -206,7 +207,8 @@ export async function testAmplifyConnection(): Promise<{
  * @param force - 既存データがある場合も強制実行
  */
 export async function seedInitialData(force: boolean = false): Promise<void> {
-  if (isMockMode()) {
+  const currentMode = getCurrentEnvironmentMode();
+  if (currentMode === 'MOCK') {
     console.log('📝 Mock mode: Seeding handled by mock client');
     return;
   }

@@ -37,7 +37,11 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getCurrentUser, signOut } from 'aws-amplify/auth';
 import { Amplify } from 'aws-amplify';
-import { getAmplifyConfig, isMockMode } from '@/lib/amplify/config';
+import { getAmplifyConfig, getCurrentEnvironmentMode } from '@/lib/amplify/config';
+
+// サーバーサイドでのモード判定を固定化
+const SERVER_MODE = getCurrentEnvironmentMode();
+const IS_SERVER_MOCK_MODE = SERVER_MODE === 'MOCK';
 import { getSecureCookieOptions } from './utils';
 
 /**
@@ -172,7 +176,7 @@ class MockServerAuthService {
  */
 export async function getCurrentUserServer(): Promise<ServerAuthUser | null> {
   try {
-    if (isMockMode()) {
+    if (IS_SERVER_MOCK_MODE) {
       const mockAuth = MockServerAuthService.getInstance();
       return await mockAuth.getCurrentUser();
     }
@@ -227,7 +231,7 @@ export async function getSessionInfo(): Promise<SessionInfo> {
       user,
       isAuthenticated: !!user,
       error: null,
-      isMockMode: isMockMode(),
+      isMockMode: IS_SERVER_MOCK_MODE,
     };
   } catch (error) {
     console.error('Failed to get session info:', error);
@@ -240,7 +244,7 @@ export async function getSessionInfo(): Promise<SessionInfo> {
         message: 'セッション情報の取得に失敗しました',
         timestamp: new Date().toISOString(),
       },
-      isMockMode: isMockMode(),
+      isMockMode: IS_SERVER_MOCK_MODE,
     };
   }
 }
@@ -273,7 +277,7 @@ export async function requireAuth(redirectTo: string = '/signin'): Promise<Serve
  */
 export async function signOutAction(): Promise<{ success: boolean; error?: string }> {
   try {
-    if (isMockMode()) {
+    if (IS_SERVER_MOCK_MODE) {
       const mockAuth = MockServerAuthService.getInstance();
       await mockAuth.signOut();
     } else {
@@ -321,7 +325,7 @@ export async function signOutAction(): Promise<{ success: boolean; error?: strin
  */
 export async function refreshSession(): Promise<{ success: boolean; user?: ServerAuthUser; error?: string }> {
   try {
-    if (isMockMode()) {
+    if (IS_SERVER_MOCK_MODE) {
       // モックモードでは現在のユーザーを返すだけ
       const user = await getCurrentUserServer();
       return user 
