@@ -98,10 +98,10 @@ export default function HomePage() {
     // 認証状態に応じてリダイレクト
     if (isAuthenticated) {
       console.log('User authenticated, redirecting to dashboard');
-      router.push('/dashboard');
+      router.replace('/dashboard');
     } else {
       console.log('User not authenticated, redirecting to signin');
-      router.push('/signin');
+      router.replace('/signin');
     }
   }, [isAuthenticated, loading, router]);
   

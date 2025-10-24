@@ -94,21 +94,30 @@ try {
 let hasLoggedMockMode = false;
 
 export function getCurrentEnvironmentMode(): EnvironmentMode {
-  // 🔄 Phase 2完了まではMOCKモードを強制
-  // Phase 3の先行実施を一時的に無効化し、正しい順序で実装
-  const FORCE_MOCK_UNTIL_PHASE2_COMPLETE = true;
+  // デバッグ情報を追加
+  console.log('getCurrentEnvironmentMode called');
+  console.log('NEXT_PUBLIC_AMPLIFY_MODE:', process.env.NEXT_PUBLIC_AMPLIFY_MODE);
+  console.log('AMPLIFY_MODE:', process.env.AMPLIFY_MODE);
+  console.log('amplifyOutputs exists:', !!amplifyOutputs);
+  console.log('NODE_ENV:', process.env.NODE_ENV);
+  
+  // 🔄 Phase 3準備完了 - Amplifyリソースデプロイ待ち
+  // Phase 3: 実際のAmplify Dataとの統合開始（リソースデプロイ後に有効化）
+  const FORCE_MOCK_UNTIL_PHASE2_COMPLETE = false; // 認証システム実装まで一時的にMOCK
   if (FORCE_MOCK_UNTIL_PHASE2_COMPLETE) {
     if (!hasLoggedMockMode) {
-      console.log('🔄 Phase 2完了まではMOCKモードで実装します（設計通りの順序）');
-      console.log('💡 Phase 2のUI実装完了後、この設定を無効化してPhase 3に進みます');
+      console.log('🔄 認証システム実装待ち - 一時的にMOCKモード');
+      console.log('💡 認証機能実装後、この設定を無効化してください');
+      console.log('🚀 現在: データ層のみPhase 3対応、認証は次のフェーズで実装');
       hasLoggedMockMode = true;
     }
     return 'MOCK';
   }
 
-  // 環境変数による強制指定
-  const forcedMode = process.env.AMPLIFY_MODE as EnvironmentMode;
+  // 環境変数による強制指定（クライアントサイド対応）
+  const forcedMode = (process.env.NEXT_PUBLIC_AMPLIFY_MODE || process.env.AMPLIFY_MODE) as EnvironmentMode;
   if (forcedMode && ['MOCK', 'DEVELOPMENT', 'PRODUCTION'].includes(forcedMode)) {
+    console.log('Using forced mode from env var:', forcedMode);
     return forcedMode;
   }
 
@@ -247,8 +256,8 @@ function createRealAmplifyConfig(): ResourcesConfig | null {
         GraphQL: {
           endpoint: amplifyOutputs.data.url,
           region: amplifyOutputs.data.aws_region,
-          defaultAuthMode: amplifyOutputs.data.default_authorization_type === 'AMAZON_COGNITO_USER_POOLS' 
-            ? 'userPool' 
+          defaultAuthMode: amplifyOutputs.data.default_authorization_type === 'AMAZON_COGNITO_USER_POOLS'
+            ? 'userPool'
             : 'apiKey',
           apiKey: amplifyOutputs.data.api_key,
         },
@@ -394,7 +403,7 @@ export function displayConfigInfo(): void {
   console.group('🔧 Amplify Configuration Info');
   console.log(`Mode: ${mode}`);
   console.log(`Valid: ${validation.isValid ? '✅' : '❌'}`);
-  
+
   if (validation.errors.length > 0) {
     console.group('❌ Errors:');
     validation.errors.forEach(error => console.log(`  - ${error}`));
@@ -427,7 +436,7 @@ export function displayConfigInfo(): void {
  */
 export function getEnvironmentSetupGuide(): string {
   const mode = getCurrentEnvironmentMode();
-  
+
   if (mode === 'MOCK') {
     return `
 🔧 Environment Setup Guide
@@ -467,10 +476,10 @@ To switch modes:
 if (typeof window === 'undefined' && process.env.NODE_ENV === 'development') {
   // サーバーサイドでのみ実行
   const validation = validateAmplifyConfig();
-  
+
   if (!validation.isValid || validation.warnings.length > 0) {
     console.log(getEnvironmentSetupGuide());
-    
+
     if (validation.errors.length > 0) {
       console.warn('⚠️ Amplify configuration errors detected. Some features may not work correctly.');
     }

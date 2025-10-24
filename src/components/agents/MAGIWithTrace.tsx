@@ -20,18 +20,20 @@
 
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { MAGISystemInterface } from './MAGISystemInterface';
 import { ReasoningTracePanel } from '@/components/trace';
 import { AskAgentResponse } from '@/types/api';
 import { TraceStep } from '@/types/domain';
 import { generateTraceId } from '@/lib/trace/mock-trace-data';
+import { useMessages } from '@/hooks/useMessages';
 import { Button } from '@/components/ui/Button';
 import { 
   Eye, 
   EyeOff,
   RotateCcw,
-  Info
+  Info,
+  History
 } from 'lucide-react';
 
 /**
@@ -43,6 +45,7 @@ type DisplayMode = 'both' | 'magi-only' | 'trace-only';
  * MAGIWithTraceコンポーネントのProps
  */
 interface MAGIWithTraceProps {
+  conversationId?: string;
   className?: string;
   defaultMode?: DisplayMode;
   showModeToggle?: boolean;
@@ -64,6 +67,7 @@ interface MAGIWithTraceProps {
  * - 4.6: トレース完了状態と進行状況表示
  */
 export default function MAGIWithTrace({
+  conversationId,
   className = '',
   defaultMode = 'both',
   showModeToggle = true
@@ -74,11 +78,125 @@ export default function MAGIWithTrace({
   const [isExecuting, setIsExecuting] = useState(false);
   const [magiResponse, setMagiResponse] = useState<AskAgentResponse | undefined>(undefined);
   const [executionError, setExecutionError] = useState<string | null>(null);
+  const [currentQuestion, setCurrentQuestion] = useState<string>('');
+  const [isHistoryRestored, setIsHistoryRestored] = useState(false);
+
+  // 会話履歴の管理
+  const { messages, sendMessage } = useMessages(conversationId || '');
+
+  /**
+   * conversationIdが変更された時の状態リセット
+   */
+  useEffect(() => {
+    // 新しい会話が選択された時、または会話がクリアされた時に状態をリセット
+    setMagiResponse(undefined);
+    setExecutionError(null);
+    setCurrentQuestion('');
+    setCurrentTraceId('');
+    setIsExecuting(false);
+    setIsHistoryRestored(false);
+    
+    console.log('Conversation changed to:', conversationId);
+  }, [conversationId]);
+
+  /**
+   * 会話履歴から最新のMAGI応答を復元
+   */
+  useEffect(() => {
+    if (messages.length > 0 && !isHistoryRestored) {
+      // 最新のアシスタントメッセージを取得
+      const latestAssistantMessage = messages
+        .filter(msg => msg.role === 'assistant')
+        .pop();
+      
+      if (latestAssistantMessage && latestAssistantMessage.agentResponses && latestAssistantMessage.judgeResponse) {
+        // MAGI応答を復元
+        const restoredResponse: AskAgentResponse = {
+          conversationId: conversationId || '',
+          messageId: latestAssistantMessage.id,
+          agentResponses: latestAssistantMessage.agentResponses,
+          judgeResponse: latestAssistantMessage.judgeResponse,
+          traceId: latestAssistantMessage.traceId || '',
+          executionTime: 0,
+          timestamp: new Date(latestAssistantMessage.createdAt)
+        };
+        
+        setMagiResponse(restoredResponse);
+        setCurrentTraceId(latestAssistantMessage.traceId || '');
+        setIsHistoryRestored(true); // 履歴復元完了フラグ
+        
+        console.log('Restored MAGI response from conversation history (no new trace execution)');
+      }
+    }
+  }, [messages, conversationId, isHistoryRestored]);
+
+  /**
+   * XPathセレクターでのMAGI実行トリガー
+   * 
+   * 指定されたXPathの要素がクリックされた時にMAGI実行を開始
+   */
+  useEffect(() => {
+    const handleGlobalClick = (event: MouseEvent) => {
+      const target = event.target as Element;
+      
+      // XPath: /html/body/div[2]/div/div[2]/div/div/div[2]/div[1]/div[2]/div/span
+      const xpath = '/html/body/div[2]/div/div[2]/div/div/div[2]/div[1]/div[2]/div/span';
+      
+      let shouldTrigger = false;
+      
+      try {
+        // XPathで要素を取得
+        const xpathResult = document.evaluate(
+          xpath,
+          document,
+          null,
+          XPathResult.FIRST_ORDERED_NODE_TYPE,
+          null
+        );
+        
+        const xpathElement = xpathResult.singleNodeValue as Element;
+        
+        // クリックされた要素がXPathの要素と一致するかチェック
+        if (xpathElement && (target === xpathElement || xpathElement.contains(target))) {
+          shouldTrigger = true;
+        }
+      } catch (error) {
+        console.warn('XPath evaluation failed:', error);
+      }
+      
+      // data-magi-trigger属性を持つ要素もチェック
+      if (
+        target.hasAttribute('data-magi-trigger') ||
+        target.closest('[data-magi-trigger]')
+      ) {
+        shouldTrigger = true;
+      }
+      
+      if (shouldTrigger && currentQuestion.trim() && !isExecuting) {
+        event.preventDefault();
+        event.stopPropagation();
+        console.log('MAGI execution triggered by XPath click:', xpath);
+        handleMAGIExecution(currentQuestion.trim());
+      }
+    };
+
+    // グローバルクリックイベントリスナーを追加
+    document.addEventListener('click', handleGlobalClick, true);
+
+    return () => {
+      document.removeEventListener('click', handleGlobalClick, true);
+    };
+  }, [isExecuting, currentQuestion]);
 
   /**
    * MAGI実行の開始
    */
   const handleMAGIExecution = useCallback(async (question: string) => {
+    if (!conversationId) {
+      setExecutionError('会話が選択されていません');
+      return;
+    }
+
     setIsExecuting(true);
     setExecutionError(null);
     setMagiResponse(undefined);
@@ -88,6 +206,9 @@ export default function MAGIWithTrace({
     setCurrentTraceId(traceId);
 
     try {
+      // 会話履歴にメッセージを保存（useMessagesフックを使用）
+      await sendMessage({ content: question });
+      
       // MAGIシステムの実行をシミュレート
       // Phase 3以降では実際のエージェント実行に置き換え
       const { mockMAGIExecution } = await import('@/lib/mock/data');
@@ -97,13 +218,16 @@ export default function MAGIWithTrace({
       response.traceId = traceId;
       
       setMagiResponse(response);
+      setIsHistoryRestored(false); // 新しい実行なのでフラグをリセット
+      
+      console.log('MAGI execution completed and saved to conversation:', conversationId);
     } catch (error) {
       console.error('MAGI execution failed:', error);
       setExecutionError(error instanceof Error ? error.message : 'MAGI実行中にエラーが発生しました');
     } finally {
       setIsExecuting(false);
     }
-  }, []);
+  }, [conversationId, sendMessage]);
 
   /**
    * トレース実行完了時の処理
@@ -231,6 +355,36 @@ export default function MAGIWithTrace({
         {/* MAGI意思決定システム */}
         {(displayMode === 'both' || displayMode === 'magi-only') && (
           <div className="space-y-6">
+            {/* 会話履歴表示 */}
+            {messages.length > 0 && !isExecuting && (
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-gray-900 flex items-center">
+                    <History className="w-4 h-4 mr-2" />
+                    会話履歴 ({messages.length}件のメッセージ)
+                  </h3>
+                </div>
+                <div className="max-h-40 overflow-y-auto space-y-2">
+                  {messages.slice(-4).map((message) => (
+                    <div key={message.id} className="text-sm">
+                      <div className={`p-2 rounded ${
+                        message.role === 'user' 
+                          ? 'bg-blue-50 text-blue-900' 
+                          : 'bg-gray-50 text-gray-700'
+                      }`}>
+                        <div className="font-medium text-xs mb-1">
+                          {message.role === 'user' ? '質問' : 'MAGI判断'}
+                        </div>
+                        <div className="truncate">
+                          {message.content}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* 質問入力フォーム */}
             {!magiResponse && !isExecuting && (
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
@@ -239,10 +393,8 @@ export default function MAGIWithTrace({
                 </h3>
                 <form onSubmit={(e) => {
                   e.preventDefault();
-                  const formData = new FormData(e.currentTarget);
-                  const question = formData.get('question') as string;
-                  if (question.trim()) {
-                    handleMAGIExecution(question.trim());
+                  if (currentQuestion.trim()) {
+                    handleMAGIExecution(currentQuestion.trim());
                   }
                 }}>
                   <div className="space-y-4">
@@ -254,12 +406,25 @@ export default function MAGIWithTrace({
                         id="question"
                         name="question"
                         rows={3}
+                        value={currentQuestion}
+                        onChange={(e) => setCurrentQuestion(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         placeholder="例: 新しいAIシステムを導入すべきでしょうか？"
                         required
                       />
                     </div>
-                    <div className="flex justify-end">
+                    <div className="flex justify-between items-center">
+                      {/* XPathテスト用要素 */}
+                      <div className="text-sm text-gray-500">
+                        <span 
+                          data-magi-trigger="true"
+                          className="cursor-pointer text-blue-600 hover:text-blue-800 underline"
+                          title="XPathトリガーテスト用要素"
+                        >
+                          XPathクリックテスト
+                        </span>
+                      </div>
+                      
                       <Button
                         type="submit"
                         className="bg-blue-600 hover:bg-blue-700 text-white"
@@ -284,11 +449,21 @@ export default function MAGIWithTrace({
         {/* リアルタイムトレース */}
         {(displayMode === 'both' || displayMode === 'trace-only') && currentTraceId && (
           <div className="space-y-6">
+            {/* 履歴復元インジケーター */}
+            {isHistoryRestored && (
+              <div className="flex items-center p-3 bg-amber-50 border border-amber-200 rounded-md">
+                <History className="h-4 w-4 text-amber-600 mr-2" />
+                <span className="text-sm text-amber-800">
+                  履歴から復元されたトレース情報です（新しい実行ではありません）
+                </span>
+              </div>
+            )}
+            
             <ReasoningTracePanel
               traceId={currentTraceId}
-              realTimeUpdates={true}
+              realTimeUpdates={!isHistoryRestored}
               orchestratorMode="solomon_orchestrated"
-              autoStart={true}
+              autoStart={!isHistoryRestored}
               onExecutionComplete={handleTraceComplete}
               className="h-fit"
             />

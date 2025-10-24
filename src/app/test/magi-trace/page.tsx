@@ -1,110 +1,102 @@
 /**
- * MAGI with Trace Test Page - MAGI統合トレースのテストページ
+ * MAGI Decision Interface - MAGI意思決定インターフェース
  * 
- * このページはMAGI意思決定システムとリアルタイムトレース可視化の
- * 統合コンポーネントをテストするためのページです。
+ * このページはMAGI意思決定システムのメインインターフェースです。
+ * 会話履歴管理とリアルタイムトレース可視化を統合し、
+ * 過去の判断履歴を参照しながら新しい意思決定を行えます。
  * 
  * 機能:
+ * - 会話履歴の管理と検索
  * - MAGI意思決定システムの実行
  * - リアルタイムトレース可視化
- * - 表示モードの切り替え
- * - 様々なシナリオでのテスト
+ * - 判断結果の保存と参照
  * 
- * 学習ポイント:
- * - 統合コンポーネントの使用方法
- * - リアルタイム更新の動作確認
- * - ユーザーインタラクションのテスト
+ * 画面構成:
+ * - 左側: 会話履歴サイドバー
+ * - 右側: MAGI判断インターフェース
  */
 
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+import { ConversationSidebar } from '@/components/sidebar/ConversationSidebar';
 import MAGIWithTrace from '@/components/agents/MAGIWithTrace';
+import { useConversations } from '@/hooks/useConversations';
 
 /**
- * MAGITraceTestPage - MAGI統合トレースのテストページ
+ * MAGIDecisionPage - MAGI意思決定メインページ
  */
-export default function MAGITraceTestPage() {
+export default function MAGIDecisionPage() {
+  const [activeConversationId, setActiveConversationId] = useState<string>();
+  
+  const {
+    conversations,
+    loading,
+    createConversation,
+    updateConversation,
+    deleteConversation
+  } = useConversations();
+
+  const handleCreateNew = async () => {
+    const newConversation = await createConversation({
+      title: `MAGI判断 ${new Date().toLocaleTimeString()}`
+    });
+    setActiveConversationId(newConversation.id);
+  };
+
+  const handleSearch = (query: string) => {
+    // 検索は useConversations フック内で処理される
+    console.log('Search query:', query);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* ページヘッダー */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            MAGI統合トレーステスト
-          </h1>
-          <p className="mt-2 text-gray-600">
-            MAGI意思決定システムとリアルタイムトレース可視化の統合テスト
-          </p>
-        </div>
-
-        {/* メインコンポーネント */}
-        <MAGIWithTrace
-          defaultMode="both"
-          showModeToggle={true}
-          className="mb-8"
+    <div className="h-screen flex bg-gray-100">
+      {/* 左側: 会話履歴サイドバー */}
+      <div className="w-80 flex-shrink-0">
+        <ConversationSidebar
+          conversations={conversations}
+          activeConversationId={activeConversationId}
+          loading={loading}
+          onSelect={setActiveConversationId}
+          onDelete={deleteConversation}
+          onSearch={handleSearch}
+          onCreateNew={handleCreateNew}
         />
+      </div>
 
-        {/* テスト用の質問例 */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            テスト用質問例
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-gray-700">ビジネス判断</h3>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>• 新しいAIシステムを導入すべきでしょうか？</li>
-                <li>• リモートワーク制度を拡充すべきですか？</li>
-                <li>• 新製品の開発プロジェクトを承認すべきか？</li>
-              </ul>
-            </div>
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-gray-700">技術判断</h3>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>• マイクロサービスアーキテクチャに移行すべきか？</li>
-                <li>• セキュリティ対策を強化する必要がありますか？</li>
-                <li>• クラウドネイティブ技術を採用すべきでしょうか？</li>
-              </ul>
+      {/* 右側: MAGI判断インターフェース */}
+      <div className="flex-1 flex flex-col">
+        {activeConversationId ? (
+          <div className="h-full">
+            <MAGIWithTrace
+              conversationId={activeConversationId}
+              defaultMode="both"
+              showModeToggle={true}
+              className="h-full"
+            />
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center max-w-md">
+              <h1 className="text-3xl font-bold text-gray-900 mb-4">
+                MAGI意思決定システム
+              </h1>
+              <p className="text-gray-600 mb-8">
+                3賢者（CASPAR、BALTHASAR、MELCHIOR）とSOLOMON Judgeによる
+                多角的な意思決定支援システムです。
+                <br />
+                左のサイドバーから過去の判断を確認するか、新しい判断を開始してください。
+              </p>
+              <button
+                onClick={handleCreateNew}
+                className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                新しい判断を開始
+              </button>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* 機能説明 */}
-        <div className="mt-8 bg-blue-50 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-blue-900 mb-4">
-            統合機能の特徴
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <h3 className="text-sm font-medium text-blue-800 mb-2">
-                リアルタイム可視化
-              </h3>
-              <p className="text-sm text-blue-700">
-                MAGI実行中の推論過程をリアルタイムで可視化し、
-                各エージェントの思考プロセスを段階的に表示します。
-              </p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-blue-800 mb-2">
-                統合インターフェース
-              </h3>
-              <p className="text-sm text-blue-700">
-                意思決定結果とトレース情報を統合表示し、
-                判断の根拠と過程を同時に確認できます。
-              </p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-blue-800 mb-2">
-                柔軟な表示モード
-              </h3>
-              <p className="text-sm text-blue-700">
-                MAGI結果のみ、トレースのみ、両方表示の
-                3つのモードを切り替えて最適な表示を選択できます。
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

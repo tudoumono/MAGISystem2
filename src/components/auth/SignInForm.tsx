@@ -80,6 +80,9 @@ export const SignInForm: React.FC<SignInFormProps> = ({
 }) => {
   const { signIn, loading, error, clearError, isMockMode, isAuthenticated } = useAuth();
   
+  // Hydrationエラー回避のためのクライアントサイド判定
+  const [isClient, setIsClient] = useState(false);
+  
   // フォーム状態管理
   const [formData, setFormData] = useState<FormData>({
     email: '',
@@ -90,21 +93,29 @@ export const SignInForm: React.FC<SignInFormProps> = ({
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // クライアントサイドマウント検出
+  React.useEffect(() => {
+    setIsClient(true);
+  }, []);
+  
   // 認証成功後の処理
   React.useEffect(() => {
     console.log('SignInForm useEffect - isAuthenticated:', isAuthenticated, 'isSubmitting:', isSubmitting, 'loading:', loading);
-    if (isAuthenticated && isSubmitting) {
+    if (isAuthenticated && !loading) {
       console.log('Authentication successful, calling onSuccess callback');
-      setIsSubmitting(false);
       
-      // 少し遅延してからコールバックを実行
-      setTimeout(() => {
-        if (onSuccess) {
-          onSuccess();
-        }
-      }, 100);
+      // isSubmittingをリセット
+      if (isSubmitting) {
+        setIsSubmitting(false);
+      }
+      
+      // 認証成功コールバックを実行
+      if (onSuccess) {
+        console.log('Calling onSuccess callback');
+        onSuccess();
+      }
     }
-  }, [isAuthenticated, isSubmitting, onSuccess, loading]);
+  }, [isAuthenticated, loading, onSuccess]);
   
   /**
    * バリデーション関数
@@ -209,9 +220,11 @@ export const SignInForm: React.FC<SignInFormProps> = ({
       <CardHeader className="space-y-1">
         <CardTitle className="text-2xl text-center">サインイン</CardTitle>
         <CardDescription className="text-center">
-          {isMockMode ? (
+          {!isClient ? (
+            'アカウントにログインしてください'
+          ) : isMockMode ? (
             <>
-              デモモード: <code className="text-xs bg-muted px-1 rounded">demo@example.com</code> / <code className="text-xs bg-muted px-1 rounded">password123</code>
+              デモモード: <code className="text-xs bg-muted px-1 rounded">demo@demo.com</code> / <code className="text-xs bg-muted px-1 rounded">P@ssw0rd</code>
             </>
           ) : (
             'アカウントにログインしてください'
@@ -306,8 +319,8 @@ export const SignInForm: React.FC<SignInFormProps> = ({
                 type="button"
                 className="text-primary hover:underline focus:outline-none focus:underline"
                 onClick={() => {
-                  // サインアップ機能は後のPhaseで実装
-                  alert('サインアップ機能は今後のPhaseで実装予定です');
+                  // サインアップページに遷移
+                  window.location.href = '/signup';
                 }}
               >
                 新規登録

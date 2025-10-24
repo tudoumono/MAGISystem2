@@ -146,7 +146,7 @@ class MockAuthService {
     // モック認証ロジック
     await new Promise(resolve => setTimeout(resolve, 1000)); // 1秒の遅延をシミュレート
     
-    if (credentials.email === 'demo@example.com' && credentials.password === 'password123') {
+    if (credentials.email === 'demo@demo.com' && credentials.password === 'P@ssw0rd') {
       this.currentUser = {
         userId: 'mock-user-id',
         username: credentials.email,
@@ -210,9 +210,11 @@ class MockAuthService {
       if (mockUserCookie) {
         try {
           const cookieValue = mockUserCookie.split('=')[1];
-          const userData = JSON.parse(decodeURIComponent(cookieValue));
-          this.currentUser = userData;
-          return this.currentUser;
+          if (cookieValue) {
+            const userData = JSON.parse(decodeURIComponent(cookieValue));
+            this.currentUser = userData;
+            return this.currentUser;
+          }
         } catch (error) {
           console.error('Failed to parse mock user cookie:', error);
         }
@@ -246,7 +248,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<AuthError | null>(null);
   const mockAuth = MockAuthService.getInstance();
-  const isInMockMode = isMockMode();
+  // isMockModeを初期化時に固定して、動的な変更を防ぐ
+  const [isInMockMode] = useState(() => isMockMode());
   
   /**
    * エラーハンドリング関数
@@ -306,6 +309,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * - 状態更新の適切なタイミング
    */
   const fetchUser = useCallback(async () => {
+    console.log('fetchUser called - isInMockMode:', isInMockMode);
     try {
       setLoading(true);
       setError(null);
@@ -313,19 +317,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let currentUser: AuthUser | null = null;
       
       if (isInMockMode) {
+        console.log('Using mock auth to get current user');
         currentUser = await mockAuth.getCurrentUser();
       } else {
+        console.log('Using real Amplify to get current user');
         currentUser = await getCurrentUser();
       }
       
+      console.log('fetchUser result:', currentUser ? 'User found' : 'No user');
       setUser(currentUser);
     } catch (err) {
+      console.log('fetchUser error:', err);
       console.log('No authenticated user found');
       setUser(null);
     } finally {
+      console.log('fetchUser finally - setting loading to false');
       setLoading(false);
     }
-  }, [isInMockMode, mockAuth]);
+  }, [isInMockMode]); // mockAuthを依存配列から削除
   
   /**
    * サインイン処理
@@ -377,15 +386,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await mockAuth.signUp(credentials);
       } else {
         // 実際のAmplify signUp実装
-        // await amplifySignUp({
-        //   username: credentials.email,
-        //   password: credentials.password,
-        //   attributes: {
-        //     email: credentials.email,
-        //     name: credentials.name,
-        //   },
-        // });
-        throw new Error('Sign up not implemented in this phase');
+        const { signUp: amplifySignUp } = await import('aws-amplify/auth');
+        await amplifySignUp({
+          username: credentials.email,
+          password: credentials.password,
+          options: {
+            userAttributes: {
+              email: credentials.email,
+              name: credentials.name || credentials.email,
+            },
+          },
+        });
       }
     } catch (err) {
       const authError = handleError(err);
@@ -503,7 +514,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     // モックモードの場合は何もしない
     return undefined;
-  }, [fetchUser, isInMockMode]);
+  }, [isInMockMode]); // fetchUserを依存配列から削除して初回のみ実行
   
   /**
    * コンテキスト値の構築
