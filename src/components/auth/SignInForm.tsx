@@ -227,7 +227,13 @@ export const SignInForm: React.FC<SignInFormProps> = ({
               デモモード: <code className="text-xs bg-muted px-1 rounded">demo@demo.com</code> / <code className="text-xs bg-muted px-1 rounded">P@ssw0rd</code>
             </>
           ) : (
-            'アカウントにログインしてください'
+            <>
+              AWS Cognito認証: 有効なアカウントでログインしてください
+              <br />
+              <span className="text-xs text-muted-foreground">
+                テスト用: <code className="bg-muted px-1 rounded">demo@demo.com</code> (要Cognito登録)
+              </span>
+            </>
           )}
         </CardDescription>
       </CardHeader>

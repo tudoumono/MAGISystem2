@@ -90,49 +90,55 @@ try {
  * 3. 本番環境（NODE_ENV=production）の場合は PRODUCTION
  * 4. それ以外は MOCK
  */
-// ログの重複を防ぐためのフラグ
-let hasLoggedMockMode = false;
+// 環境モードをキャッシュして重複呼び出しを防ぐ
+let cachedEnvironmentMode: EnvironmentMode | null = null;
+let hasLoggedEnvironmentMode = false;
 
 export function getCurrentEnvironmentMode(): EnvironmentMode {
-  // デバッグ情報を追加
-  console.log('getCurrentEnvironmentMode called');
-  console.log('NEXT_PUBLIC_AMPLIFY_MODE:', process.env.NEXT_PUBLIC_AMPLIFY_MODE);
-  console.log('AMPLIFY_MODE:', process.env.AMPLIFY_MODE);
-  console.log('amplifyOutputs exists:', !!amplifyOutputs);
-  console.log('NODE_ENV:', process.env.NODE_ENV);
-  
-  // 🔄 Phase 3準備完了 - Amplifyリソースデプロイ待ち
-  // Phase 3: 実際のAmplify Dataとの統合開始（リソースデプロイ後に有効化）
-  const FORCE_MOCK_UNTIL_PHASE2_COMPLETE = false; // 認証システム実装まで一時的にMOCK
-  if (FORCE_MOCK_UNTIL_PHASE2_COMPLETE) {
-    if (!hasLoggedMockMode) {
-      console.log('🔄 認証システム実装待ち - 一時的にMOCKモード');
-      console.log('💡 認証機能実装後、この設定を無効化してください');
-      console.log('🚀 現在: データ層のみPhase 3対応、認証は次のフェーズで実装');
-      hasLoggedMockMode = true;
-    }
-    return 'MOCK';
+  // キャッシュされた値があれば返す
+  if (cachedEnvironmentMode !== null) {
+    return cachedEnvironmentMode;
   }
+  
+  // デバッグ情報を一度だけ出力
+  if (!hasLoggedEnvironmentMode) {
+    console.log('getCurrentEnvironmentMode called');
+    console.log('NEXT_PUBLIC_AMPLIFY_MODE:', process.env.NEXT_PUBLIC_AMPLIFY_MODE);
+    console.log('AMPLIFY_MODE:', process.env.AMPLIFY_MODE, '(server-side only, undefined is normal)');
+    console.log('amplifyOutputs exists:', !!amplifyOutputs);
+    console.log('NODE_ENV:', process.env.NODE_ENV);
+    hasLoggedEnvironmentMode = true;
+  }
+  
+  // モック機能は完全に無効化
+  // Phase 3: 実際のAmplify Dataとの統合（モック機能停止）
 
-  // 環境変数による強制指定（クライアントサイド対応）
+  // 環境変数による強制指定
+  // 優先順位: NEXT_PUBLIC_AMPLIFY_MODE (client+server) > AMPLIFY_MODE (server only)
   const forcedMode = (process.env.NEXT_PUBLIC_AMPLIFY_MODE || process.env.AMPLIFY_MODE) as EnvironmentMode;
   if (forcedMode && ['MOCK', 'DEVELOPMENT', 'PRODUCTION'].includes(forcedMode)) {
-    console.log('Using forced mode from env var:', forcedMode);
-    return forcedMode;
+    if (!hasLoggedEnvironmentMode) {
+      console.log('Using forced mode from env var:', forcedMode);
+    }
+    cachedEnvironmentMode = forcedMode;
+    return cachedEnvironmentMode;
   }
 
   // 本番環境の判定
   if (process.env.NODE_ENV === 'production') {
-    return amplifyOutputs ? 'PRODUCTION' : 'MOCK';
+    cachedEnvironmentMode = amplifyOutputs ? 'PRODUCTION' : 'DEVELOPMENT';
+    return cachedEnvironmentMode;
   }
 
   // 開発環境の判定
   if (amplifyOutputs) {
-    return 'DEVELOPMENT';
+    cachedEnvironmentMode = 'DEVELOPMENT';
+    return cachedEnvironmentMode;
   }
 
-  // デフォルトはモック
-  return 'MOCK';
+  // デフォルトは開発モード（モック機能は削除済み）
+  cachedEnvironmentMode = 'DEVELOPMENT';
+  return cachedEnvironmentMode;
 }
 
 /**
@@ -282,17 +288,21 @@ function createRealAmplifyConfig(): ResourcesConfig | null {
  * @param options - 設定オプション
  * @returns Amplify設定オブジェクト
  */
+// 設定ログの重複を防ぐフラグ
+let hasLoggedAmplifyConfig = false;
+
 export function getAmplifyConfig(options: AmplifyConfigOptions = { mode: getCurrentEnvironmentMode() }): ResourcesConfig {
   const mode = options.mode || getCurrentEnvironmentMode();
 
-  // ログ出力（開発時のみ）
-  if (options.enableLogging !== false && process.env.NODE_ENV === 'development') {
+  // ログ出力（開発時のみ、一度だけ）
+  if (options.enableLogging !== false && process.env.NODE_ENV === 'development' && !hasLoggedAmplifyConfig) {
     console.log(`🔧 Amplify Config Mode: ${mode}`);
+    hasLoggedAmplifyConfig = true;
   }
 
   switch (mode) {
     case 'MOCK':
-      if (options.enableLogging !== false) {
+      if (options.enableLogging !== false && !hasLoggedAmplifyConfig) {
         console.log('📱 Using mock Amplify configuration (Phase 1-2)');
       }
       return mockAmplifyConfig;
@@ -301,20 +311,48 @@ export function getAmplifyConfig(options: AmplifyConfigOptions = { mode: getCurr
     case 'PRODUCTION':
       const realConfig = createRealAmplifyConfig();
       if (realConfig) {
-        if (options.enableLogging !== false) {
+        if (options.enableLogging !== false && !hasLoggedAmplifyConfig) {
           console.log(`🚀 Using real Amplify configuration (${mode})`);
           console.log(`📍 Region: ${realConfig.API?.GraphQL?.region}`);
           console.log(`🔐 Auth: ${realConfig.Auth?.Cognito?.userPoolId}`);
         }
         return realConfig;
       } else {
-        console.warn(`⚠️ Failed to load real config, falling back to mock (requested: ${mode})`);
-        return mockAmplifyConfig;
+        console.warn(`⚠️ Failed to load real config, falling back to development mode (requested: ${mode})`);
+        // モック設定ではなく、最小限の実設定を返す
+        return {
+          Auth: {
+            Cognito: {
+              userPoolId: process.env.NEXT_PUBLIC_USER_POOL_ID || 'missing-user-pool-id',
+              userPoolClientId: process.env.NEXT_PUBLIC_USER_POOL_CLIENT_ID || 'missing-client-id',
+              identityPoolId: process.env.NEXT_PUBLIC_IDENTITY_POOL_ID || 'missing-identity-pool-id',
+              loginWith: { email: true },
+              signUpVerificationMethod: 'code',
+              userAttributes: { email: { required: true } },
+              allowGuestAccess: false,
+              passwordFormat: {
+                minLength: 8,
+                requireLowercase: true,
+                requireUppercase: true,
+                requireNumbers: true,
+                requireSpecialCharacters: true,
+              },
+            },
+          },
+          API: {
+            GraphQL: {
+              endpoint: process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || 'missing-graphql-endpoint',
+              region: process.env.NEXT_PUBLIC_AWS_REGION || 'ap-northeast-1',
+              defaultAuthMode: 'userPool',
+              apiKey: process.env.NEXT_PUBLIC_API_KEY,
+            },
+          },
+        };
       }
 
     default:
-      console.warn(`⚠️ Unknown mode: ${mode}, using mock config`);
-      return mockAmplifyConfig;
+      console.warn(`⚠️ Unknown mode: ${mode}, using development config`);
+      return createRealAmplifyConfig() || mockAmplifyConfig;
   }
 }
 

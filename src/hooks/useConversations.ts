@@ -170,9 +170,10 @@ export function useConversations(): UseConversationsReturn {
    * - 一意IDの生成（crypto.randomUUID()）
    */
   const createConversation = useCallback(async (params: CreateConversationParams): Promise<Conversation> => {
-    const { isMockMode } = require('@/lib/amplify/config');
+    const { getCurrentEnvironmentMode } = require('@/lib/amplify/config');
+    const currentMode = getCurrentEnvironmentMode();
     
-    if (isMockMode()) {
+    if (currentMode === 'MOCK') {
       // モックモード: 従来の楽観的更新
       const optimisticConversation: Conversation = {
         id: crypto.randomUUID(),
@@ -433,9 +434,10 @@ export function useConversations(): UseConversationsReturn {
   useEffect(() => {
     // Phase 3以降: 実際のSubscriptionManagerを使用
     // Phase 1-2: モックモードでは従来の実装を維持
-    const { isMockMode } = require('@/lib/amplify/config');
+    const { getCurrentEnvironmentMode } = require('@/lib/amplify/config');
+    const currentMode = getCurrentEnvironmentMode();
     
-    if (isMockMode()) {
+    if (currentMode === 'MOCK') {
       // モックモード: 従来の実装
       const createSub = client.models.Conversation.onCreate().subscribe({
         next: (data: any) => {

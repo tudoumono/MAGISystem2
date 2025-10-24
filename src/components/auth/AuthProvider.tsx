@@ -36,7 +36,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { getCurrentUser, signIn as amplifySignIn, signOut as amplifySignOut, AuthUser } from 'aws-amplify/auth';
 import { Hub } from 'aws-amplify/utils';
 import { Amplify } from 'aws-amplify';
-import { getAmplifyConfig, isMockMode } from '@/lib/amplify/config';
+import { getAmplifyConfig } from '@/lib/amplify/config';
 
 /**
  * 認証エラーの型定義
@@ -110,7 +110,6 @@ export interface AuthContextType {
   
   // 状態チェック
   isAuthenticated: boolean;
-  isMockMode: boolean;
 }
 
 /**
@@ -123,112 +122,7 @@ export interface AuthContextType {
  */
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-/**
- * モック認証機能（Phase 1-2用）
- * 
- * 設計理由:
- * - AWS接続なしでの開発を可能にする
- * - 実際の認証フローをシミュレート
- * - 学習用の分かりやすい実装
- */
-class MockAuthService {
-  private static instance: MockAuthService;
-  private currentUser: AuthUser | null = null;
-  
-  static getInstance(): MockAuthService {
-    if (!MockAuthService.instance) {
-      MockAuthService.instance = new MockAuthService();
-    }
-    return MockAuthService.instance;
-  }
-  
-  async signIn(credentials: SignInCredentials): Promise<AuthUser> {
-    // モック認証ロジック
-    await new Promise(resolve => setTimeout(resolve, 1000)); // 1秒の遅延をシミュレート
-    
-    if (credentials.email === 'demo@demo.com' && credentials.password === 'P@ssw0rd') {
-      this.currentUser = {
-        userId: 'mock-user-id',
-        username: credentials.email,
-      } as AuthUser;
-      
-      // ローカルストレージに保存（セッション永続化のシミュレート）
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('mock-auth-user', JSON.stringify(this.currentUser));
-        
-        // middlewareで認証状態を確認できるようにCookieも設定
-        document.cookie = `mock-auth-user=${encodeURIComponent(JSON.stringify(this.currentUser))}; path=/; max-age=86400; SameSite=Strict`;
-        document.cookie = `mock-session-token=mock-session-${Date.now()}; path=/; max-age=86400; SameSite=Strict`;
-      }
-      
-      return this.currentUser;
-    } else {
-      throw new Error('Invalid credentials');
-    }
-  }
-  
-  async signUp(credentials: SignUpCredentials): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    if (credentials.password !== credentials.confirmPassword) {
-      throw new Error('Passwords do not match');
-    }
-    
-    // モックサインアップ成功
-    console.log('Mock sign up successful for:', credentials.email);
-  }
-  
-  async signOut(): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    this.currentUser = null;
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('mock-auth-user');
-      
-      // Cookieも削除
-      document.cookie = 'mock-auth-user=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      document.cookie = 'mock-session-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-    }
-  }
-  
-  async getCurrentUser(): Promise<AuthUser | null> {
-    if (this.currentUser) {
-      return this.currentUser;
-    }
-    
-    // ローカルストレージからセッション復元
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('mock-auth-user');
-      if (stored) {
-        this.currentUser = JSON.parse(stored);
-        return this.currentUser;
-      }
-      
-      // Cookieからも復元を試行
-      const cookies = document.cookie.split(';');
-      const mockUserCookie = cookies.find(cookie => cookie.trim().startsWith('mock-auth-user='));
-      if (mockUserCookie) {
-        try {
-          const cookieValue = mockUserCookie.split('=')[1];
-          if (cookieValue) {
-            const userData = JSON.parse(decodeURIComponent(cookieValue));
-            this.currentUser = userData;
-            return this.currentUser;
-          }
-        } catch (error) {
-          console.error('Failed to parse mock user cookie:', error);
-        }
-      }
-    }
-    
-    return null;
-  }
-  
-  async resetPassword(credentials: ResetPasswordCredentials): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log('Mock password reset sent to:', credentials.email);
-  }
-}
+
 
 /**
  * AuthProviderコンポーネント
@@ -247,9 +141,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<AuthError | null>(null);
-  const mockAuth = MockAuthService.getInstance();
-  // isMockModeを初期化時に固定して、動的な変更を防ぐ
-  const [isInMockMode] = useState(() => isMockMode());
   
   /**
    * エラーハンドリング関数
@@ -281,15 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
     
-    // モックエラーの処理
-    if (err.message === 'Invalid credentials') {
-      return {
-        code: 'INVALID_CREDENTIALS',
-        message: 'デモ用認証情報: demo@example.com / password123',
-        name: 'MockAuthError',
-        recoverySuggestion: 'デモ用のメールアドレスとパスワードを使用してください'
-      };
-    }
+
     
     // 一般的なエラー
     return {
@@ -309,32 +192,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * - 状態更新の適切なタイミング
    */
   const fetchUser = useCallback(async () => {
-    console.log('fetchUser called - isInMockMode:', isInMockMode);
+    console.log('fetchUser called - using real Amplify');
     try {
       setLoading(true);
       setError(null);
       
-      let currentUser: AuthUser | null = null;
-      
-      if (isInMockMode) {
-        console.log('Using mock auth to get current user');
-        currentUser = await mockAuth.getCurrentUser();
-      } else {
-        console.log('Using real Amplify to get current user');
-        currentUser = await getCurrentUser();
-      }
+      console.log('Using real Amplify to get current user');
+      const currentUser = await getCurrentUser();
       
       console.log('fetchUser result:', currentUser ? 'User found' : 'No user');
       setUser(currentUser);
+      
+      // ユーザーが見つかった場合、ミドルウェア用のCookieを設定
+      if (currentUser && typeof window !== 'undefined') {
+        document.cookie = `amplify-auth=true; path=/; max-age=86400; SameSite=Strict`;
+        console.log('Set authentication cookie for middleware (from fetchUser)');
+      }
     } catch (err) {
       console.log('fetchUser error:', err);
       console.log('No authenticated user found');
       setUser(null);
+      
+      // 認証エラーの場合、Cookieを削除
+      if (typeof window !== 'undefined') {
+        document.cookie = 'amplify-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      }
     } finally {
       console.log('fetchUser finally - setting loading to false');
       setLoading(false);
     }
-  }, [isInMockMode]); // mockAuthを依存配列から削除
+  }, []);
   
   /**
    * サインイン処理
@@ -346,23 +233,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const signIn = useCallback(async (credentials: SignInCredentials) => {
     try {
-      console.log('AuthProvider signIn started');
+      console.log('AuthProvider signIn started - using real Amplify');
       setLoading(true);
       setError(null);
       
-      if (isInMockMode) {
-        console.log('Using mock auth service');
-        const user = await mockAuth.signIn(credentials);
-        console.log('Mock auth successful, user:', user);
-        setUser(user);
-        console.log('User state updated');
-      } else {
-        await amplifySignIn({
-          username: credentials.email,
-          password: credentials.password,
-        });
-        // Amplify Hub が自動的にユーザー状態を更新
+      console.log('Using real Amplify auth service');
+      await amplifySignIn({
+        username: credentials.email,
+        password: credentials.password,
+      });
+      
+      // 認証成功後、ミドルウェア用のCookieを設定
+      if (typeof window !== 'undefined') {
+        // 簡単な認証フラグをCookieに設定
+        document.cookie = `amplify-auth=true; path=/; max-age=86400; SameSite=Strict`;
+        console.log('Set authentication cookie for middleware');
       }
+      
+      // Amplify Hub が自動的にユーザー状態を更新
+      console.log('Amplify signIn successful');
     } catch (err) {
       console.error('AuthProvider signIn error:', err);
       const authError = handleError(err);
@@ -372,7 +261,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('AuthProvider signIn finally block - setting loading to false');
       setLoading(false);
     }
-  }, [isInMockMode, mockAuth, handleError]);
+  }, [handleError]);
   
   /**
    * サインアップ処理
@@ -382,22 +271,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       setError(null);
       
-      if (isInMockMode) {
-        await mockAuth.signUp(credentials);
-      } else {
-        // 実際のAmplify signUp実装
-        const { signUp: amplifySignUp } = await import('aws-amplify/auth');
-        await amplifySignUp({
-          username: credentials.email,
-          password: credentials.password,
-          options: {
-            userAttributes: {
-              email: credentials.email,
-              name: credentials.name || credentials.email,
-            },
+      // 実際のAmplify signUp実装
+      const { signUp: amplifySignUp } = await import('aws-amplify/auth');
+      await amplifySignUp({
+        username: credentials.email,
+        password: credentials.password,
+        options: {
+          userAttributes: {
+            email: credentials.email,
+            name: credentials.name || credentials.email,
           },
-        });
-      }
+        },
+      });
     } catch (err) {
       const authError = handleError(err);
       setError(authError);
@@ -405,7 +290,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setLoading(false);
     }
-  }, [isInMockMode, mockAuth, handleError]);
+  }, [handleError]);
   
   /**
    * サインアウト処理
@@ -415,13 +300,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       setError(null);
       
-      if (isInMockMode) {
-        await mockAuth.signOut();
-        setUser(null);
-      } else {
-        await amplifySignOut();
-        // Amplify Hub が自動的にユーザー状態を更新
+      await amplifySignOut();
+      
+      // ミドルウェア用のCookieも削除
+      if (typeof window !== 'undefined') {
+        document.cookie = 'amplify-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        console.log('Removed authentication cookie');
       }
+      
+      // Amplify Hub が自動的にユーザー状態を更新
     } catch (err) {
       const authError = handleError(err);
       setError(authError);
@@ -429,7 +316,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setLoading(false);
     }
-  }, [isInMockMode, mockAuth, handleError]);
+  }, [handleError]);
   
   /**
    * パスワードリセット処理
@@ -439,13 +326,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       setError(null);
       
-      if (isInMockMode) {
-        await mockAuth.resetPassword(credentials);
-      } else {
-        // 実際のAmplify resetPassword実装
-        // await amplifyResetPassword({ username: credentials.email });
-        throw new Error('Password reset not implemented in this phase');
-      }
+      // 実際のAmplify resetPassword実装
+      // await amplifyResetPassword({ username: credentials.email });
+      throw new Error('Password reset not implemented in this phase');
     } catch (err) {
       const authError = handleError(err);
       setError(authError);
@@ -453,7 +336,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setLoading(false);
     }
-  }, [isInMockMode, mockAuth, handleError]);
+  }, [handleError]);
   
   /**
    * エラークリア
@@ -466,6 +349,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * ユーザー情報の更新
    */
   const refreshUser = useCallback(async () => {
+    console.log('refreshUser called');
     await fetchUser();
   }, [fetchUser]);
   
@@ -478,6 +362,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * - 初回ユーザー取得
    */
   useEffect(() => {
+    console.log('AuthProvider initialization - real Amplify mode only');
+    
     // Amplify設定の初期化
     const config = getAmplifyConfig();
     Amplify.configure(config);
@@ -485,36 +371,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // 初回ユーザー取得
     fetchUser();
     
-    // Amplify Hub による認証イベント監視（実環境のみ）
-    if (!isInMockMode) {
-      const hubListener = Hub.listen('auth', ({ payload }) => {
-        switch (payload.event) {
-          case 'signedIn':
-            console.log('User signed in');
-            fetchUser();
-            break;
-          case 'signedOut':
-            console.log('User signed out');
-            setUser(null);
-            break;
-          case 'tokenRefresh':
-            console.log('Token refreshed');
-            break;
-          case 'tokenRefresh_failure':
-            console.log('Token refresh failed');
-            setUser(null);
-            break;
-        }
-      });
-      
-      return () => {
-        hubListener();
-      };
-    }
+    // Amplify Hub による認証イベント監視
+    const hubListener = Hub.listen('auth', ({ payload }) => {
+      console.log('Auth Hub event:', payload.event);
+      switch (payload.event) {
+        case 'signedIn':
+          console.log('User signed in via Hub');
+          fetchUser();
+          break;
+        case 'signedOut':
+          console.log('User signed out via Hub');
+          setUser(null);
+          setLoading(false);
+          break;
+        case 'tokenRefresh':
+          console.log('Token refreshed via Hub');
+          break;
+        case 'tokenRefresh_failure':
+          console.log('Token refresh failed via Hub');
+          setUser(null);
+          setLoading(false);
+          break;
+      }
+    });
     
-    // モックモードの場合は何もしない
-    return undefined;
-  }, [isInMockMode]); // fetchUserを依存配列から削除して初回のみ実行
+    return () => {
+      console.log('Cleaning up Auth Hub listener');
+      hubListener();
+    };
+  }, [fetchUser]);
   
   /**
    * コンテキスト値の構築
@@ -535,7 +420,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearError,
     refreshUser,
     isAuthenticated: !!user,
-    isMockMode: isInMockMode,
   }), [
     user,
     loading,
@@ -546,7 +430,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     resetPassword,
     clearError,
     refreshUser,
-    isInMockMode,
   ]);
   
   return (
