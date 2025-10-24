@@ -24,7 +24,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { signOutAction } from '@/lib/auth/server-actions';
+// import { signOutAction } from '@/lib/auth/server-actions';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 
@@ -51,7 +51,7 @@ export default function DashboardPage() {
    * サインアウト処理
    * 
    * 学習ポイント:
-   * - サーバーアクションとクライアントサイドの連携
+   * - クライアントサイドでのサインアウト
    * - エラーハンドリング
    * - ローディング状態の管理
    */
@@ -59,32 +59,15 @@ export default function DashboardPage() {
     try {
       setIsSigningOut(true);
       
-      // サーバーサイドでのサインアウト
-      const result = await signOutAction();
+      // クライアントサイドでのサインアウト
+      await signOut();
       
-      if (result.success) {
-        // クライアントサイドでのサインアウト
-        await signOut();
-        
-        // サインインページにリダイレクト
-        router.push('/signin');
-      } else {
-        console.error('Server sign out failed:', result.error);
-        // クライアントサイドのサインアウトは実行
-        await signOut();
-        router.push('/signin');
-      }
+      // サインインページにリダイレクト
+      router.push('/signin');
     } catch (error) {
       console.error('Sign out error:', error);
-      // エラーが発生してもサインアウトを実行
-      try {
-        await signOut();
-        router.push('/signin');
-      } catch (fallbackError) {
-        console.error('Fallback sign out failed:', fallbackError);
-        // 最終手段: ページリロード
-        window.location.href = '/signin';
-      }
+      // 最終手段: ページリロード
+      window.location.href = '/signin';
     } finally {
       setIsSigningOut(false);
     }

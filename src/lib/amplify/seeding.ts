@@ -1,666 +1,860 @@
 /**
- * Amplify Data Seeding Utility - データシーディング機能（2025年新機能）
+ * Data Seeding Utilities - 初期データ投入機能
  * 
- * 目的: 開発・テスト環境での初期データ投入とサンプルデータ生成
- * 設計理由: 2025年にGAされたAmplify Data Seedingを活用した効率的な開発環境構築
+ * このファイルはAmplify Data環境への初期データ投入機能を提供します。
+ * 開発環境での便利機能として、サンプルデータやデフォルト設定を自動投入します。
  * 
- * 主要機能:
- * - デフォルトエージェントプリセットの作成
- * - サンプル会話データの生成
- * - 開発用ユーザーアカウントの準備
- * - テスト用トレースデータの投入
+ * 目的:
+ * - 開発環境での初期データ投入
+ * - デフォルトプリセットの作成
+ * - サンプル会話とメッセージの生成
+ * - テスト用データの準備
+ * 
+ * 設計理由:
+ * - 開発効率の向上
+ * - 一貫したテストデータの提供
+ * - 新規環境の迅速なセットアップ
+ * - データ構造の理解促進
  * 
  * 学習ポイント:
- * - Amplify Gen2 Data Seeding の活用方法
- * - 開発効率を向上させるデータ準備戦略
- * - 環境に応じたシーディング制御
- * - 型安全なデータ生成パターン
- * 
- * 2025年新機能:
- * - Amplify Data Seeding: 開発環境での自動データ投入
- * - Schema-based Data Generation: スキーマに基づく自動データ生成
- * - Environment-specific Seeding: 環境別のシーディング設定
+ * - Amplify Dataへのデータ投入パターン
+ * - リレーショナルデータの作成順序
+ * - エラーハンドリングとロールバック
+ * - 冪等性の確保（重複実行対応）
  * 
  * 使用例:
  * ```typescript
- * import { seedDevelopmentData, seedAgentPresets } from '@/lib/amplify/seeding';
+ * import { seedAllData, seedDefaultPresets } from '@/lib/amplify/seeding';
  * 
- * // 開発環境の初期化
- * await seedDevelopmentData();
+ * // 全データの投入
+ * await seedAllData();
  * 
- * // エージェントプリセットのみ投入
- * await seedAgentPresets();
+ * // プリセットのみ投入
+ * await seedDefaultPresets();
  * ```
  * 
- * 関連: amplify/data/resource.ts, src/types/amplify.ts
+ * 関連: src/lib/amplify/client.ts, amplify/data/resource.ts
  */
 
-import { createItem, getCurrentAuthUser, isAuthenticated, isMockMode } from './client';
+import { getAmplifyClient, getRealAmplifyClient } from './client';
+import { isMockMode, getCurrentEnvironmentMode } from './config';
 import type { 
   AgentPreset, 
   AgentConfig, 
   Conversation, 
-  Message, 
-  TraceStep,
-  CreateAgentPresetInput,
-  CreateConversationInput,
-  CreateMessageInput,
-  CreateTraceStepInput
-} from '../../types/amplify';
+  Message,
+  AgentResponse,
+  JudgeResponse,
+  AgentType,
+  DecisionType
+} from './types';
 
 /**
  * シーディング設定の型定義
- * 
- * 学習ポイント:
- * - 環境別のシーディング制御
- * - データ量の調整
- * - 機能別の有効/無効切り替え
  */
-export interface SeedingOptions {
-  environment: 'development' | 'staging' | 'production';
-  enablePresets?: boolean;
-  enableSampleConversations?: boolean;
-  enableTraceData?: boolean;
-  conversationCount?: number;
-  messagesPerConversation?: number;
+interface SeedingOptions {
+  /** 既存データがある場合も強制実行 */
+  force?: boolean;
+  /** 詳細ログの出力 */
   verbose?: boolean;
+  /** 特定のデータタイプのみ投入 */
+  only?: ('presets' | 'conversations' | 'messages')[];
+  /** サンプルデータの数 */
+  sampleCount?: {
+    conversations?: number;
+    messagesPerConversation?: number;
+  };
 }
 
 /**
- * デフォルトのエージェント設定
- * 
- * 設計理由:
- * - 3賢者の特性を反映した設定
- * - 学習用の分かりやすいパラメータ
- * - 実用的なプロンプト設計
+ * シーディング結果の型定義
  */
-const DEFAULT_AGENT_CONFIGS: AgentConfig[] = [
-  {
-    agentId: 'caspar',
-    modelId: 'claude-3-sonnet-20240229',
-    systemPrompt: `あなたはCASPAR（カスパー）です。保守的で現実的な視点から物事を分析します。
-
-特徴:
-- リスクを重視し、慎重な判断を行う
-- 過去の事例や実績を重要視する
-- 実現可能性と安全性を最優先に考える
-- 段階的で確実なアプローチを推奨する
-
-回答形式:
-1. 質問に対する可決/否決の判断
-2. 判断の根拠（リスク分析を中心に）
-3. 懸念点と対策案
-4. 推奨する実行方法（段階的アプローチ）
-
-常に「安全第一」の観点から、慎重で建設的な意見を提供してください。`,
-    temperature: 0.3,
-    maxTokens: 1000,
-  },
-  {
-    agentId: 'balthasar',
-    modelId: 'claude-3-sonnet-20240229',
-    systemPrompt: `あなたはBALTHASAR（バルタザール）です。革新的で創造的な視点から物事を分析します。
-
-特徴:
-- 新しい可能性と創造性を重視する
-- 倫理的・感情的な側面を考慮する
-- 変革と成長の機会を見出す
-- 人間的価値と社会的影響を重要視する
-
-回答形式:
-1. 質問に対する可決/否決の判断
-2. 判断の根拠（創造性と倫理性を中心に）
-3. 新しい価値創造の可能性
-4. 人間的・社会的な影響の考察
-
-常に「創造と成長」の観点から、前向きで革新的な意見を提供してください。`,
-    temperature: 0.8,
-    maxTokens: 1000,
-  },
-  {
-    agentId: 'melchior',
-    modelId: 'claude-3-sonnet-20240229',
-    systemPrompt: `あなたはMELCHIOR（メルキオール）です。科学的でバランスの取れた視点から物事を分析します。
-
-特徴:
-- データと論理に基づく客観的分析
-- 多角的な視点からの総合的判断
-- 科学的手法と合理性を重視する
-- バランスの取れた中立的な立場
-
-回答形式:
-1. 質問に対する可決/否決の判断
-2. 判断の根拠（データと論理を中心に）
-3. 科学的・客観的な分析結果
-4. 総合的な評価とバランスの取れた提案
-
-常に「科学と論理」の観点から、客観的で合理的な意見を提供してください。`,
-    temperature: 0.5,
-    maxTokens: 1000,
-  },
-];
+interface SeedingResult {
+  success: boolean;
+  mode: string;
+  created: {
+    presets: number;
+    conversations: number;
+    messages: number;
+  };
+  errors: string[];
+  duration: number;
+}
 
 /**
  * デフォルトエージェントプリセットの定義
  * 
  * 学習ポイント:
- * - 用途別のプリセット設計
- * - 学習効果を考慮した設定
- * - 実用的なシナリオ対応
+ * - 3賢者それぞれの特性を反映した設定
+ * - 温度パラメータによる創造性の調整
+ * - システムプロンプトによる人格設定
+ * - 実用的なトークン数制限
  */
-const DEFAULT_PRESETS: Omit<CreateAgentPresetInput, 'createdAt' | 'updatedAt'>[] = [
+const DEFAULT_PRESETS: Omit<AgentPreset, 'id' | 'createdAt' | 'updatedAt'>[] = [
   {
     name: 'デフォルト設定',
-    description: 'バランスの取れた標準的な設定。初心者におすすめです。',
-    configs: DEFAULT_AGENT_CONFIGS,
+    description: 'バランスの取れた標準設定。一般的な質問に適しています。',
+    configs: [
+      {
+        agentId: 'caspar' as AgentType,
+        modelId: 'claude-3-sonnet',
+        systemPrompt: `あなたはCASPAR（カスパー）です。
+
+【役割】
+保守的で現実的な視点から物事を分析する賢者です。
+
+【特徴】
+- 実用性と安全性を重視
+- 過去の事例や実績を基に判断
+- リスクを慎重に評価
+- 段階的で確実なアプローチを好む
+
+【回答スタイル】
+- 具体的で実行可能な提案
+- 潜在的なリスクの指摘
+- 実証済みの方法論の推奨
+- 慎重で建設的な意見
+
+質問に対して可決/否決の判断と、その理由を明確に示してください。`,
+        temperature: 0.3,
+        maxTokens: 1000
+      },
+      {
+        agentId: 'balthasar',
+        modelId: 'claude-3-sonnet',
+        systemPrompt: `あなたはBALTHASAR（バルタザール）です。
+
+【役割】
+革新的で創造的な視点から物事を分析する賢者です。
+
+【特徴】
+- 創造性と革新性を重視
+- 新しい可能性を積極的に探求
+- 人間の感情や価値観を考慮
+- 大胆で前向きなアプローチを好む
+
+【回答スタイル】
+- 創造的で斬新な提案
+- 新しい視点や可能性の提示
+- 人間中心の価値観重視
+- 情熱的で鼓舞する意見
+
+質問に対して可決/否決の判断と、その理由を明確に示してください。`,
+        temperature: 0.8,
+        maxTokens: 1000
+      },
+      {
+        agentId: 'melchior',
+        modelId: 'claude-3-sonnet',
+        systemPrompt: `あなたはMELCHIOR（メルキオール）です。
+
+【役割】
+科学的でバランスの取れた視点から物事を分析する賢者です。
+
+【特徴】
+- データと論理を重視
+- 客観的で中立的な分析
+- 多角的な視点から検討
+- 合理的で体系的なアプローチを好む
+
+【回答スタイル】
+- データに基づく客観的分析
+- 論理的で体系的な説明
+- 複数の視点からの検討
+- 冷静で公正な判断
+
+質問に対して可決/否決の判断と、その理由を明確に示してください。`,
+        temperature: 0.5,
+        maxTokens: 1000
+      }
+    ],
     isDefault: true,
     isPublic: true,
-    createdBy: 'system',
+    createdBy: 'system'
   },
   {
     name: '学術研究用',
-    description: '学術的な議論や研究に特化した設定。厳密性と論理性を重視します。',
-    configs: DEFAULT_AGENT_CONFIGS.map(config => ({
-      ...config,
-      temperature: Math.max(0.1, config.temperature - 0.2),
-      maxTokens: 2000,
-      systemPrompt: config.systemPrompt + '\n\n学術的な厳密性を保ち、引用や根拠を明確に示してください。',
-    })),
+    description: '学術的な議論や研究に適した厳密な設定。論理性と客観性を重視します。',
+    configs: [
+      {
+        agentId: 'caspar',
+        modelId: 'claude-3-opus',
+        systemPrompt: `あなたは学術研究におけるCASPARです。
+
+【研究アプローチ】
+- 実証主義的な方法論を重視
+- 既存研究との整合性を検証
+- 再現可能性を重要視
+- 段階的な仮説検証を推奨
+
+【評価基準】
+- 科学的妥当性
+- 実証可能性
+- 研究倫理への適合
+- 学術的貢献度
+
+厳密な学術基準で可決/否決を判断してください。`,
+        temperature: 0.1,
+        maxTokens: 2000
+      },
+      {
+        agentId: 'balthasar',
+        modelId: 'claude-3-sonnet',
+        systemPrompt: `あなたは学術研究におけるBALTHASARです。
+
+【研究アプローチ】
+- 学際的な視点を重視
+- 創造的な研究手法を探求
+- 社会的インパクトを考慮
+- パラダイムシフトの可能性を評価
+
+【評価基準】
+- 独創性と新規性
+- 学際的な価値
+- 社会的意義
+- 将来的な発展性
+
+革新的な学術価値で可決/否決を判断してください。`,
+        temperature: 0.4,
+        maxTokens: 2000
+      },
+      {
+        agentId: 'melchior',
+        modelId: 'claude-3-opus',
+        systemPrompt: `あなたは学術研究におけるMELCHIORです。
+
+【研究アプローチ】
+- 定量的・定性的分析の統合
+- メタ分析による総合評価
+- 統計的有意性の検証
+- 系統的レビューの実施
+
+【評価基準】
+- 統計的妥当性
+- 方法論の適切性
+- データの信頼性
+- 結論の論理性
+
+科学的厳密性で可決/否決を判断してください。`,
+        temperature: 0.2,
+        maxTokens: 2000
+      }
+    ],
     isDefault: false,
     isPublic: true,
-    createdBy: 'system',
+    createdBy: 'system'
   },
   {
     name: 'ビジネス分析用',
-    description: 'ビジネス判断や戦略立案に特化した設定。実用性と収益性を重視します。',
-    configs: DEFAULT_AGENT_CONFIGS.map(config => ({
-      ...config,
-      temperature: config.temperature + 0.1,
-      maxTokens: 1500,
-      systemPrompt: config.systemPrompt + '\n\nビジネス的な観点から、ROIや市場性を考慮した分析を行ってください。',
-    })),
+    description: 'ビジネス判断や戦略立案に適した実践的な設定。ROIと実行可能性を重視します。',
+    configs: [
+      {
+        agentId: 'caspar',
+        modelId: 'claude-3-sonnet',
+        systemPrompt: `あなたはビジネス分析におけるCASPARです。
+
+【ビジネス視点】
+- ROI（投資収益率）を重視
+- リスク管理を最優先
+- 既存ビジネスモデルとの整合性
+- 段階的な実装計画を推奨
+
+【評価基準】
+- 財務的実現可能性
+- 市場リスクの評価
+- 競合優位性
+- 実装コスト
+
+ビジネス的実現可能性で可決/否決を判断してください。`,
+        temperature: 0.2,
+        maxTokens: 1500
+      },
+      {
+        agentId: 'balthasar',
+        modelId: 'claude-3-sonnet',
+        systemPrompt: `あなたはビジネス分析におけるBALTHASARです。
+
+【ビジネス視点】
+- 市場機会の創出を重視
+- 顧客価値の最大化
+- ブランド価値の向上
+- 革新的なビジネスモデル
+
+【評価基準】
+- 市場ポテンシャル
+- 顧客満足度向上
+- ブランド差別化
+- 長期的成長性
+
+市場価値創造の観点で可決/否決を判断してください。`,
+        temperature: 0.6,
+        maxTokens: 1500
+      },
+      {
+        agentId: 'melchior',
+        modelId: 'claude-3-sonnet',
+        systemPrompt: `あなたはビジネス分析におけるMELCHIORです。
+
+【ビジネス視点】
+- データドリブンな意思決定
+- KPIによる定量評価
+- 市場分析と競合調査
+- 最適化とスケーラビリティ
+
+【評価基準】
+- データ裏付けの強さ
+- 測定可能な成果
+- 市場適合性
+- スケール可能性
+
+データと分析に基づいて可決/否決を判断してください。`,
+        temperature: 0.4,
+        maxTokens: 1500
+      }
+    ],
     isDefault: false,
     isPublic: true,
-    createdBy: 'system',
-  },
-  {
-    name: '創造的思考用',
-    description: 'アイデア発想や創造的な問題解決に特化した設定。自由な発想を促進します。',
-    configs: DEFAULT_AGENT_CONFIGS.map(config => ({
-      ...config,
-      temperature: Math.min(1.0, config.temperature + 0.3),
-      maxTokens: 1200,
-      systemPrompt: config.systemPrompt + '\n\n既存の枠にとらわれず、創造的で斬新なアイデアを積極的に提案してください。',
-    })),
-    isDefault: false,
-    isPublic: true,
-    createdBy: 'system',
-  },
+    createdBy: 'system'
+  }
 ];
 
 /**
  * サンプル会話データの生成
  * 
  * 学習ポイント:
- * - 実用的なサンプルデータ設計
- * - 様々なシナリオの網羅
- * - 学習効果を考慮した内容
+ * - 実際の使用例を想定したサンプル
+ * - 多様なシナリオ（全員一致、意見分裂、エラー）
+ * - エージェント応答の構造理解
+ * - MAGI投票システムの動作例
  */
-const SAMPLE_CONVERSATIONS = [
-  {
-    title: 'AIの倫理的な活用について',
-    userMessage: 'AIを業務に導入する際の倫理的な考慮事項について、3賢者の意見を聞かせてください。',
-    scenario: 'ethical_ai_usage',
-  },
-  {
-    title: 'リモートワーク制度の導入',
-    userMessage: '全社的なリモートワーク制度を導入すべきかどうか、メリット・デメリットを含めて判断してください。',
-    scenario: 'remote_work_policy',
-  },
-  {
-    title: '新技術への投資判断',
-    userMessage: '量子コンピューティング技術への研究投資を行うべきでしょうか？リスクと機会を評価してください。',
-    scenario: 'technology_investment',
-  },
-  {
-    title: 'サステナビリティ戦略',
-    userMessage: '企業のカーボンニュートラル達成に向けた戦略について、実現可能性と社会的責任の観点から検討してください。',
-    scenario: 'sustainability_strategy',
-  },
-];
-
-/**
- * エージェントプリセットのシーディング
- * 
- * 学習ポイント:
- * - システムデータの初期投入
- * - 重複チェックと更新処理
- * - エラーハンドリング
- * 
- * @param options - シーディングオプション
- * @returns 作成されたプリセット一覧
- */
-export async function seedAgentPresets(options: SeedingOptions = { environment: 'development' }): Promise<AgentPreset[]> {
-  if (isMockMode()) {
-    console.log('📱 Mock mode: Skipping agent preset seeding');
-    return [];
-  }
-
-  if (!options.enablePresets) {
-    console.log('⏭️ Agent preset seeding disabled');
-    return [];
-  }
-
-  const createdPresets: AgentPreset[] = [];
-
-  try {
-    if (options.verbose) {
-      console.log('🌱 Seeding agent presets...');
-    }
-
-    for (const presetData of DEFAULT_PRESETS) {
-      try {
-        const preset = await createItem<AgentPreset, CreateAgentPresetInput>('AgentPreset', {
-          ...presetData,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-
-        if (preset) {
-          createdPresets.push(preset);
-          if (options.verbose) {
-            console.log(`✅ Created preset: ${preset.name}`);
-          }
+function generateSampleConversations(presetId: string, count: number = 2): Array<{
+  conversation: Omit<Conversation, 'id' | 'user' | 'messages'>;
+  messages: Array<Omit<Message, 'id' | 'conversation' | 'traceSteps'>>;
+}> {
+  const samples = [
+    {
+      conversation: {
+        userId: 'demo-user',
+        title: 'AIの倫理ガイドライン策定について',
+        agentPresetId: presetId,
+        createdAt: new Date(Date.now() - 86400000).toISOString(), // 1日前
+        updatedAt: new Date(Date.now() - 86400000).toISOString()
+      },
+      messages: [
+        {
+          conversationId: '', // 後で設定
+          role: 'user' as const,
+          content: '我が社でAI開発の倫理ガイドラインを策定したいと考えています。どのような点に注意すべきでしょうか？',
+          createdAt: new Date(Date.now() - 86400000).toISOString()
+        },
+        {
+          conversationId: '', // 後で設定
+          role: 'assistant' as const,
+          content: '3賢者による分析結果をお示しします。',
+          agentResponses: [
+            {
+              agentId: 'caspar' as AgentType,
+              decision: 'APPROVED' as DecisionType,
+              content: '既存の法的フレームワークとの整合性を最優先に考えるべきです。GDPR、AI法案などの規制要件を満たし、段階的な導入計画を策定することを推奨します。',
+              reasoning: '法的リスクの回避と実装可能性を重視した判断',
+              confidence: 0.92,
+              executionTime: 1200
+            },
+            {
+              agentId: 'balthasar' as AgentType,
+              decision: 'APPROVED' as DecisionType,
+              content: '人間の尊厳と創造性を最大限に尊重するガイドラインを！AIは人間の能力を拡張し、より良い社会を創造するツールであるべきです。',
+              reasoning: '人間中心の価値観と社会的責任を重視',
+              confidence: 0.95,
+              executionTime: 980
+            },
+            {
+              agentId: 'melchior' as AgentType,
+              decision: 'APPROVED' as DecisionType,
+              content: 'データの公平性、アルゴリズムの透明性、バイアス除去の3つを科学的に検証できる仕組みが必要です。定量的な評価指標の設定を推奨します。',
+              reasoning: '科学的根拠に基づく客観的な評価システムの必要性',
+              confidence: 0.89,
+              executionTime: 1350
+            }
+          ],
+          judgeResponse: {
+            finalDecision: 'APPROVED' as DecisionType,
+            votingResult: { approved: 3, rejected: 0, abstained: 0 },
+            scores: [
+              { agentId: 'caspar' as AgentType, score: 92, reasoning: '実用的で法的に堅実なアプローチ' },
+              { agentId: 'balthasar' as AgentType, score: 95, reasoning: '人間中心の価値観を明確に提示' },
+              { agentId: 'melchior' as AgentType, score: 89, reasoning: '科学的で測定可能な基準を提案' }
+            ],
+            summary: '3賢者全員が倫理ガイドライン策定に賛成。法的整合性、人間の尊厳、科学的検証の3つの柱で構築することを推奨。',
+            finalRecommendation: '多角的なアプローチによる包括的な倫理ガイドラインの策定を強く推奨',
+            reasoning: '全員一致で可決。各視点が相互補完し、バランスの取れた倫理フレームワークを形成',
+            confidence: 0.92
+          },
+          traceId: `trace-${crypto.randomUUID()}`,
+          createdAt: new Date(Date.now() - 86300000).toISOString()
         }
-      } catch (error) {
-        console.warn(`⚠️ Failed to create preset "${presetData.name}":`, error);
-        // 重複エラーの場合は続行
-        if (error instanceof Error && error.message.includes('already exists')) {
-          console.log(`📋 Preset "${presetData.name}" already exists, skipping`);
+      ]
+    },
+    {
+      conversation: {
+        userId: 'demo-user',
+        title: '新製品の市場投入戦略',
+        agentPresetId: presetId,
+        createdAt: new Date(Date.now() - 3600000).toISOString(), // 1時間前
+        updatedAt: new Date(Date.now() - 3600000).toISOString()
+      },
+      messages: [
+        {
+          conversationId: '', // 後で設定
+          role: 'user' as const,
+          content: '革新的な新製品を開発しましたが、市場が未成熟です。今すぐ投入すべきか、市場の成熟を待つべきか判断に迷っています。',
+          createdAt: new Date(Date.now() - 3600000).toISOString()
+        },
+        {
+          conversationId: '', // 後で設定
+          role: 'assistant' as const,
+          content: '3賢者の意見が分かれました。慎重な検討が必要です。',
+          agentResponses: [
+            {
+              agentId: 'caspar' as AgentType,
+              decision: 'REJECTED' as DecisionType,
+              content: '市場が未成熟な状況での投入はリスクが高すぎます。競合他社の動向を見極め、市場教育が進んでから参入することを強く推奨します。',
+              reasoning: 'リスク分析の結果、失敗確率が高く投資回収が困難と判断',
+              confidence: 0.87,
+              executionTime: 1400
+            },
+            {
+              agentId: 'balthasar' as AgentType,
+              decision: 'APPROVED' as DecisionType,
+              content: 'ファーストムーバーアドバンテージを活かすチャンスです！市場を創造し、顧客を教育することで圧倒的な優位性を築けます。',
+              reasoning: '市場創造による先行者利益と競合優位性を重視',
+              confidence: 0.91,
+              executionTime: 1100
+            },
+            {
+              agentId: 'melchior' as AgentType,
+              decision: 'APPROVED' as DecisionType,
+              content: '段階的な市場投入戦略を推奨します。限定的なテスト市場から開始し、データを収集しながら徐々に拡大する方法が最適です。',
+              reasoning: 'データドリブンなアプローチによりリスクを管理しながら機会を活用',
+              confidence: 0.83,
+              executionTime: 1250
+            }
+          ],
+          judgeResponse: {
+            finalDecision: 'APPROVED' as DecisionType,
+            votingResult: { approved: 2, rejected: 1, abstained: 0 },
+            scores: [
+              { agentId: 'caspar' as AgentType, score: 78, reasoning: '慎重で現実的なリスク評価' },
+              { agentId: 'balthasar' as AgentType, score: 85, reasoning: '積極的で戦略的な市場アプローチ' },
+              { agentId: 'melchior' as AgentType, score: 88, reasoning: 'バランスの取れた段階的戦略' }
+            ],
+            summary: '2対1で可決。CASPARの慎重論も考慮し、MELCHIORの段階的アプローチを採用することを推奨。',
+            finalRecommendation: '限定的なテスト市場での段階的投入により、リスクを管理しながら市場機会を活用',
+            reasoning: '多数決により可決。ただし、CASPARの懸念を考慮した慎重な実行計画が必要',
+            confidence: 0.85
+          },
+          traceId: `trace-${crypto.randomUUID()}`,
+          createdAt: new Date(Date.now() - 3500000).toISOString()
         }
-      }
+      ]
     }
-
-    console.log(`🎯 Agent preset seeding completed: ${createdPresets.length} presets created`);
-    return createdPresets;
-
-  } catch (error) {
-    console.error('❌ Agent preset seeding failed:', error);
-    throw error;
-  }
-}
-
-/**
- * サンプル会話データのシーディング
- * 
- * 学習ポイント:
- * - ユーザー認証の確認
- * - 関連データの一括作成
- * - トランザクション的な処理
- * 
- * @param options - シーディングオプション
- * @returns 作成された会話一覧
- */
-export async function seedSampleConversations(options: SeedingOptions = { environment: 'development' }): Promise<Conversation[]> {
-  if (isMockMode()) {
-    console.log('📱 Mock mode: Skipping sample conversation seeding');
-    return [];
-  }
-
-  if (!options.enableSampleConversations) {
-    console.log('⏭️ Sample conversation seeding disabled');
-    return [];
-  }
-
-  // 認証確認
-  if (!(await isAuthenticated())) {
-    console.warn('⚠️ User not authenticated, skipping conversation seeding');
-    return [];
-  }
-
-  const user = await getCurrentAuthUser();
-  if (!user) {
-    console.warn('⚠️ Could not get current user, skipping conversation seeding');
-    return [];
-  }
-
-  const createdConversations: Conversation[] = [];
-  const conversationCount = Math.min(options.conversationCount || SAMPLE_CONVERSATIONS.length, SAMPLE_CONVERSATIONS.length);
-
-  try {
-    if (options.verbose) {
-      console.log(`🌱 Seeding ${conversationCount} sample conversations...`);
-    }
-
-    for (let i = 0; i < conversationCount; i++) {
-      const sampleData = SAMPLE_CONVERSATIONS[i];
-      
-      try {
-        // 会話の作成
-        const conversation = await createItem<Conversation, CreateConversationInput>('Conversation', {
-          userId: user.userId,
-          title: sampleData.title,
-          agentPresetId: 'default',
-          createdAt: new Date(Date.now() - (conversationCount - i) * 24 * 60 * 60 * 1000).toISOString(), // 過去の日付
-          updatedAt: new Date(Date.now() - (conversationCount - i) * 24 * 60 * 60 * 1000).toISOString(),
-        });
-
-        if (conversation) {
-          createdConversations.push(conversation);
-
-          // ユーザーメッセージの作成
-          await createItem<Message, CreateMessageInput>('Message', {
-            conversationId: conversation.id,
-            role: 'user' as any,
-            content: sampleData.userMessage,
-            createdAt: conversation.createdAt,
-          });
-
-          if (options.verbose) {
-            console.log(`✅ Created conversation: ${conversation.title}`);
-          }
-        }
-      } catch (error) {
-        console.warn(`⚠️ Failed to create conversation "${sampleData.title}":`, error);
-      }
-    }
-
-    console.log(`🎯 Sample conversation seeding completed: ${createdConversations.length} conversations created`);
-    return createdConversations;
-
-  } catch (error) {
-    console.error('❌ Sample conversation seeding failed:', error);
-    throw error;
-  }
-}
-
-/**
- * トレースデータのシーディング
- * 
- * 学習ポイント:
- * - 実行履歴の模擬データ生成
- * - パフォーマンスデータの投入
- * - 観測可能性データの準備
- * 
- * @param messageId - 対象メッセージID
- * @param options - シーディングオプション
- * @returns 作成されたトレースステップ一覧
- */
-export async function seedTraceData(messageId: string, options: SeedingOptions = { environment: 'development' }): Promise<TraceStep[]> {
-  if (isMockMode()) {
-    console.log('📱 Mock mode: Skipping trace data seeding');
-    return [];
-  }
-
-  if (!options.enableTraceData) {
-    console.log('⏭️ Trace data seeding disabled');
-    return [];
-  }
-
-  const traceId = `trace-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  const createdSteps: TraceStep[] = [];
-
-  const sampleSteps = [
-    {
-      stepNumber: 1,
-      agentId: 'solomon',
-      action: '質問の分析と3賢者への委託準備',
-      toolsUsed: ['question_analyzer', 'agent_orchestrator'],
-      citations: [],
-      duration: 150,
-    },
-    {
-      stepNumber: 2,
-      agentId: 'caspar',
-      action: '保守的視点からのリスク分析',
-      toolsUsed: ['risk_analyzer', 'historical_data'],
-      citations: ['https://example.com/risk-management', 'https://example.com/best-practices'],
-      duration: 1200,
-    },
-    {
-      stepNumber: 3,
-      agentId: 'balthasar',
-      action: '革新的視点からの機会分析',
-      toolsUsed: ['innovation_tracker', 'trend_analyzer'],
-      citations: ['https://example.com/innovation-trends', 'https://example.com/future-tech'],
-      duration: 980,
-    },
-    {
-      stepNumber: 4,
-      agentId: 'melchior',
-      action: '科学的データに基づく客観的分析',
-      toolsUsed: ['data_analyzer', 'statistical_model'],
-      citations: ['https://example.com/research-data', 'https://example.com/scientific-study'],
-      duration: 1450,
-    },
-    {
-      stepNumber: 5,
-      agentId: 'solomon',
-      action: '3賢者の回答統合と最終評価',
-      toolsUsed: ['response_aggregator', 'decision_engine'],
-      citations: [],
-      duration: 300,
-    },
   ];
 
-  try {
+  return samples.slice(0, count);
+}
+
+/**
+ * デフォルトプリセットの投入
+ * 
+ * 学習ポイント:
+ * - 冪等性の確保（重複チェック）
+ * - エラーハンドリングとロールバック
+ * - 作成順序の管理
+ */
+export async function seedDefaultPresets(options: SeedingOptions = {}): Promise<{
+  success: boolean;
+  created: number;
+  errors: string[];
+}> {
+  if (isMockMode()) {
     if (options.verbose) {
-      console.log(`🌱 Seeding trace data for message ${messageId}...`);
+      console.log('📝 Mock mode: Preset seeding handled by mock client');
     }
+    return { success: true, created: 0, errors: [] };
+  }
 
-    for (const stepData of sampleSteps) {
-      try {
-        const step = await createItem<TraceStep, CreateTraceStepInput>('TraceStep', {
-          messageId,
-          traceId,
-          stepNumber: stepData.stepNumber,
-          agentId: stepData.agentId,
-          action: stepData.action,
-          toolsUsed: stepData.toolsUsed,
-          citations: stepData.citations,
-          duration: stepData.duration,
-          errorCount: 0,
-          timestamp: new Date(Date.now() + stepData.stepNumber * 1000).toISOString(),
-        });
+  const client = getRealAmplifyClient() as any; // Type assertion for Phase 3 compatibility
+  const created: string[] = [];
+  const errors: string[] = [];
 
-        if (step) {
-          createdSteps.push(step);
-          if (options.verbose) {
-            console.log(`✅ Created trace step ${step.stepNumber}: ${step.action}`);
-          }
+  try {
+    // 既存プリセットの確認
+    if (!options.force) {
+      const existing = await client.models.AgentPreset.list({ limit: 1 });
+      if (existing.data && existing.data.length > 0) {
+        if (options.verbose) {
+          console.log('📊 Default presets already exist, skipping');
         }
-      } catch (error) {
-        console.warn(`⚠️ Failed to create trace step ${stepData.stepNumber}:`, error);
+        return { success: true, created: 0, errors: [] };
       }
     }
 
-    console.log(`🎯 Trace data seeding completed: ${createdSteps.length} steps created`);
-    return createdSteps;
+    if (options.verbose) {
+      console.log('🌱 Creating default presets...');
+    }
 
+    // プリセットの作成
+    for (const presetData of DEFAULT_PRESETS) {
+      try {
+        const result = await client.models.AgentPreset.create({
+          ...presetData,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+
+        if (result.data) {
+          created.push(result.data.id);
+          if (options.verbose) {
+            console.log(`✅ Created preset: ${result.data.name} (${result.data.id})`);
+          }
+        } else {
+          errors.push(`Failed to create preset: ${presetData.name}`);
+        }
+      } catch (error) {
+        const errorMsg = `Error creating preset ${presetData.name}: ${error}`;
+        errors.push(errorMsg);
+        console.error(errorMsg);
+      }
+    }
+
+    return {
+      success: errors.length === 0,
+      created: created.length,
+      errors
+    };
   } catch (error) {
-    console.error('❌ Trace data seeding failed:', error);
-    throw error;
+    const errorMsg = `Failed to seed presets: ${error}`;
+    errors.push(errorMsg);
+    console.error(errorMsg);
+    
+    return {
+      success: false,
+      created: created.length,
+      errors
+    };
   }
 }
 
 /**
- * 開発環境の完全データシーディング
+ * サンプル会話の投入
  * 
  * 学習ポイント:
- * - 包括的な開発環境準備
- * - 段階的なデータ投入
- * - エラー耐性のある処理
- * 
- * @param options - シーディングオプション
- * @returns シーディング結果
+ * - リレーショナルデータの作成順序
+ * - 外部キー制約の考慮
+ * - トランザクション的な処理
  */
-export async function seedDevelopmentData(options: Partial<SeedingOptions> = {}): Promise<{
-  presets: AgentPreset[];
-  conversations: Conversation[];
-  traceSteps: TraceStep[];
+export async function seedSampleConversations(options: SeedingOptions = {}): Promise<{
+  success: boolean;
+  created: { conversations: number; messages: number };
+  errors: string[];
 }> {
-  const fullOptions: SeedingOptions = {
-    environment: 'development',
-    enablePresets: true,
-    enableSampleConversations: true,
-    enableTraceData: true,
-    conversationCount: 3,
-    messagesPerConversation: 1,
-    verbose: true,
-    ...options,
-  };
+  if (isMockMode()) {
+    if (options.verbose) {
+      console.log('📝 Mock mode: Conversation seeding handled by mock client');
+    }
+    return { success: true, created: { conversations: 0, messages: 0 }, errors: [] };
+  }
 
-  console.log('🚀 Starting development data seeding...');
-  console.log(`📋 Options:`, fullOptions);
+  const client = getRealAmplifyClient() as any; // Type assertion for Phase 3 compatibility
+  const created = { conversations: 0, messages: 0 };
+  const errors: string[] = [];
 
-  const result = {
-    presets: [] as AgentPreset[],
-    conversations: [] as Conversation[],
-    traceSteps: [] as TraceStep[],
+  try {
+    // デフォルトプリセットの取得
+    const presets = await client.models.AgentPreset.list({
+      filter: { isDefault: { eq: true } }
+    });
+
+    if (!presets.data || presets.data.length === 0) {
+      errors.push('No default preset found. Please seed presets first.');
+      return { success: false, created, errors };
+    }
+
+    const defaultPreset = presets.data[0];
+    const sampleCount = options.sampleCount?.conversations || 2;
+
+    if (options.verbose) {
+      console.log(`🌱 Creating ${sampleCount} sample conversations...`);
+    }
+
+    // サンプルデータの生成
+    const samples = generateSampleConversations(defaultPreset.id, sampleCount);
+
+    // 会話とメッセージの作成
+    for (const sample of samples) {
+      try {
+        // 会話の作成
+        const conversationResult = await client.models.Conversation.create(sample.conversation);
+        
+        if (!conversationResult.data) {
+          errors.push(`Failed to create conversation: ${sample.conversation.title}`);
+          continue;
+        }
+
+        created.conversations++;
+        const conversationId = conversationResult.data.id;
+
+        if (options.verbose) {
+          console.log(`✅ Created conversation: ${sample.conversation.title} (${conversationId})`);
+        }
+
+        // メッセージの作成
+        for (const messageData of sample.messages) {
+          try {
+            const messageResult = await client.models.Message.create({
+              ...messageData,
+              conversationId
+            });
+
+            if (messageResult.data) {
+              created.messages++;
+              if (options.verbose) {
+                console.log(`  ✅ Created message: ${messageData.role} (${messageResult.data.id})`);
+              }
+            } else {
+              errors.push(`Failed to create message in conversation ${conversationId}`);
+            }
+          } catch (error) {
+            const errorMsg = `Error creating message: ${error}`;
+            errors.push(errorMsg);
+            console.error(errorMsg);
+          }
+        }
+      } catch (error) {
+        const errorMsg = `Error creating conversation ${sample.conversation.title}: ${error}`;
+        errors.push(errorMsg);
+        console.error(errorMsg);
+      }
+    }
+
+    return {
+      success: errors.length === 0,
+      created,
+      errors
+    };
+  } catch (error) {
+    const errorMsg = `Failed to seed conversations: ${error}`;
+    errors.push(errorMsg);
+    console.error(errorMsg);
+    
+    return {
+      success: false,
+      created,
+      errors
+    };
+  }
+}
+
+/**
+ * 全データの投入
+ * 
+ * 学習ポイント:
+ * - 依存関係を考慮した実行順序
+ * - 部分的な失敗への対応
+ * - 実行時間の測定
+ */
+export async function seedAllData(options: SeedingOptions = {}): Promise<SeedingResult> {
+  const startTime = Date.now();
+  const mode = getCurrentEnvironmentMode();
+  const result: SeedingResult = {
+    success: false,
+    mode,
+    created: {
+      presets: 0,
+      conversations: 0,
+      messages: 0
+    },
+    errors: [],
+    duration: 0
   };
 
   try {
-    // 1. エージェントプリセットの投入
-    if (fullOptions.enablePresets) {
-      result.presets = await seedAgentPresets(fullOptions);
+    if (options.verbose) {
+      console.log(`🌱 Starting data seeding in ${mode} mode...`);
+    }
+
+    // 1. プリセットの投入
+    if (!options.only || options.only.includes('presets')) {
+      const presetResult = await seedDefaultPresets(options);
+      result.created.presets = presetResult.created;
+      result.errors.push(...presetResult.errors);
+      
+      if (options.verbose) {
+        console.log(`📋 Presets: ${presetResult.created} created, ${presetResult.errors.length} errors`);
+      }
     }
 
     // 2. サンプル会話の投入
-    if (fullOptions.enableSampleConversations) {
-      result.conversations = await seedSampleConversations(fullOptions);
-    }
-
-    // 3. トレースデータの投入（各会話の最初のメッセージに対して）
-    if (fullOptions.enableTraceData && result.conversations.length > 0) {
-      for (const conversation of result.conversations) {
-        // 各会話の最初のメッセージを取得してトレースデータを追加
-        // 実際の実装では、メッセージIDを取得してからトレースを作成
-        const mockMessageId = `msg-${conversation.id}-1`;
-        const steps = await seedTraceData(mockMessageId, fullOptions);
-        result.traceSteps.push(...steps);
+    if (!options.only || options.only.includes('conversations')) {
+      const conversationResult = await seedSampleConversations(options);
+      result.created.conversations = conversationResult.created.conversations;
+      result.created.messages = conversationResult.created.messages;
+      result.errors.push(...conversationResult.errors);
+      
+      if (options.verbose) {
+        console.log(`💬 Conversations: ${conversationResult.created.conversations} created`);
+        console.log(`📝 Messages: ${conversationResult.created.messages} created`);
+        console.log(`❌ Errors: ${conversationResult.errors.length}`);
       }
     }
 
-    console.log('🎉 Development data seeding completed successfully!');
-    console.log(`📊 Summary:`);
-    console.log(`  - Presets: ${result.presets.length}`);
-    console.log(`  - Conversations: ${result.conversations.length}`);
-    console.log(`  - Trace Steps: ${result.traceSteps.length}`);
+    result.success = result.errors.length === 0;
+    result.duration = Date.now() - startTime;
+
+    if (options.verbose) {
+      console.log(`🌱 Data seeding completed in ${result.duration}ms`);
+      console.log(`📊 Summary: ${result.created.presets} presets, ${result.created.conversations} conversations, ${result.created.messages} messages`);
+      
+      if (result.errors.length > 0) {
+        console.log(`❌ Errors (${result.errors.length}):`);
+        result.errors.forEach(error => console.log(`  - ${error}`));
+      }
+    }
 
     return result;
-
   } catch (error) {
-    console.error('❌ Development data seeding failed:', error);
-    throw error;
+    result.errors.push(`Seeding failed: ${error}`);
+    result.duration = Date.now() - startTime;
+    console.error('❌ Data seeding failed:', error);
+    
+    return result;
   }
 }
 
 /**
- * シーディングデータのクリーンアップ
+ * データのクリア（開発用）
  * 
- * 学習ポイント:
- * - 開発データの削除
- * - 安全なクリーンアップ処理
- * - 本番環境での誤実行防止
- * 
- * @param options - クリーンアップオプション
+ * 注意: 本番環境では使用しないでください
  */
-export async function cleanupSeedingData(options: { 
-  environment: 'development' | 'staging';
-  confirmCleanup?: boolean;
-  verbose?: boolean;
-} = { environment: 'development' }): Promise<void> {
-  if (options.environment === 'production') {
-    throw new Error('❌ Cleanup is not allowed in production environment');
-  }
-
-  if (isMockMode()) {
-    console.log('📱 Mock mode: No cleanup needed');
-    return;
-  }
-
-  if (!options.confirmCleanup) {
-    console.warn('⚠️ Cleanup requires explicit confirmation. Set confirmCleanup: true');
-    return;
-  }
-
-  console.log(`🧹 Starting cleanup of seeding data in ${options.environment} environment...`);
-
-  try {
-    // 実際の実装では、システムが作成したデータを特定して削除
-    // createdBy: 'system' のプリセットや、特定の命名パターンの会話を削除
-
-    console.log('✅ Seeding data cleanup completed');
-
-  } catch (error) {
-    console.error('❌ Cleanup failed:', error);
-    throw error;
-  }
-}
-
-/**
- * シーディング状態の確認
- * 
- * 学習ポイント:
- * - データ投入状況の確認
- * - 開発環境の準備状況チェック
- * - 不足データの特定
- * 
- * @returns シーディング状態
- */
-export async function checkSeedingStatus(): Promise<{
-  hasPresets: boolean;
-  hasConversations: boolean;
-  hasTraceData: boolean;
-  recommendations: string[];
+export async function clearAllData(options: { confirm?: boolean } = {}): Promise<{
+  success: boolean;
+  cleared: { presets: number; conversations: number; messages: number };
+  errors: string[];
 }> {
-  if (isMockMode()) {
-    return {
-      hasPresets: false,
-      hasConversations: false,
-      hasTraceData: false,
-      recommendations: ['Switch to development mode to use real data seeding'],
-    };
+  if (!options.confirm) {
+    throw new Error('Data clearing requires explicit confirmation. Set confirm: true');
   }
 
-  const recommendations: string[] = [];
+  if (getCurrentEnvironmentMode() === 'PRODUCTION') {
+    throw new Error('Data clearing is not allowed in production mode');
+  }
+
+  if (isMockMode()) {
+    console.log('📝 Mock mode: Data clearing handled by mock client');
+    return { success: true, cleared: { presets: 0, conversations: 0, messages: 0 }, errors: [] };
+  }
+
+  const client = getRealAmplifyClient() as any; // Type assertion for Phase 3 compatibility
+  const cleared = { presets: 0, conversations: 0, messages: 0 };
+  const errors: string[] = [];
 
   try {
-    // 実際の実装では、各データの存在確認を行う
-    const hasPresets = false; // await checkPresetsExist();
-    const hasConversations = false; // await checkConversationsExist();
-    const hasTraceData = false; // await checkTraceDataExist();
+    console.log('🗑️ Clearing all data...');
 
-    if (!hasPresets) {
-      recommendations.push('Run seedAgentPresets() to create default agent configurations');
+    // メッセージの削除
+    const messages = await client.models.Message.list();
+    if (messages.data) {
+      for (const message of messages.data) {
+        try {
+          await client.models.Message.delete({ id: message.id });
+          cleared.messages++;
+        } catch (error) {
+          errors.push(`Failed to delete message ${message.id}: ${error}`);
+        }
+      }
     }
 
-    if (!hasConversations) {
-      recommendations.push('Run seedSampleConversations() to create sample conversations');
+    // 会話の削除
+    const conversations = await client.models.Conversation.list();
+    if (conversations.data) {
+      for (const conversation of conversations.data) {
+        try {
+          await client.models.Conversation.delete({ id: conversation.id });
+          cleared.conversations++;
+        } catch (error) {
+          errors.push(`Failed to delete conversation ${conversation.id}: ${error}`);
+        }
+      }
     }
 
-    if (!hasTraceData) {
-      recommendations.push('Run seedTraceData() to create sample trace data');
+    // プリセットの削除
+    const presets = await client.models.AgentPreset.list();
+    if (presets.data) {
+      for (const preset of presets.data) {
+        try {
+          await client.models.AgentPreset.delete({ id: preset.id });
+          cleared.presets++;
+        } catch (error) {
+          errors.push(`Failed to delete preset ${preset.id}: ${error}`);
+        }
+      }
     }
 
-    if (recommendations.length === 0) {
-      recommendations.push('Development environment is fully seeded and ready');
-    }
+    console.log(`🗑️ Cleared: ${cleared.messages} messages, ${cleared.conversations} conversations, ${cleared.presets} presets`);
 
     return {
-      hasPresets,
-      hasConversations,
-      hasTraceData,
-      recommendations,
+      success: errors.length === 0,
+      cleared,
+      errors
     };
-
   } catch (error) {
-    console.error('Failed to check seeding status:', error);
+    errors.push(`Failed to clear data: ${error}`);
+    console.error('❌ Data clearing failed:', error);
+    
     return {
-      hasPresets: false,
-      hasConversations: false,
-      hasTraceData: false,
-      recommendations: ['Error checking seeding status - please check your configuration'],
+      success: false,
+      cleared,
+      errors
     };
   }
 }
+
+/**
+ * 使用例とベストプラクティス
+ * 
+ * 1. 基本的なデータ投入:
+ * ```typescript
+ * import { seedAllData } from '@/lib/amplify/seeding';
+ * 
+ * // 全データの投入
+ * const result = await seedAllData({ verbose: true });
+ * console.log('Seeding result:', result);
+ * ```
+ * 
+ * 2. 特定データのみ投入:
+ * ```typescript
+ * // プリセットのみ
+ * await seedAllData({ only: ['presets'], verbose: true });
+ * 
+ * // 会話とメッセージのみ
+ * await seedAllData({ only: ['conversations'], verbose: true });
+ * ```
+ * 
+ * 3. 開発環境のリセット:
+ * ```typescript
+ * // データクリア後に再投入
+ * await clearAllData({ confirm: true });
+ * await seedAllData({ force: true, verbose: true });
+ * ```
+ * 
+ * 4. カスタムサンプル数:
+ * ```typescript
+ * await seedAllData({
+ *   sampleCount: {
+ *     conversations: 5,
+ *     messagesPerConversation: 3
+ *   },
+ *   verbose: true
+ * });
+ * ```
+ */

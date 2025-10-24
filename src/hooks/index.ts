@@ -23,6 +23,8 @@
 // データ管理フック
 export { useConversations } from './useConversations';
 export { useMessages } from './useMessages';
+export { useTraceUpdates, useMockTraceUpdates } from './useTraceUpdates';
+export { useVirtualizedConversations } from './useVirtualizedConversations';
 
 // 型定義の再エクスポート（必要に応じて）
 export type {

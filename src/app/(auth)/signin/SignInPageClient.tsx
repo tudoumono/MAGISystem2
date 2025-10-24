@@ -60,37 +60,57 @@ export function SignInPageClient({
   const router = useRouter();
   const { isAuthenticated, loading } = useAuth();
   
+  // デバッグ: redirectToの値を確認
+  React.useEffect(() => {
+    console.log('SignInPageClient initialized with redirectTo:', redirectTo);
+  }, [redirectTo]);
+  
   /**
-   * 認証状態の監視とリダイレクト
+   * 認証状態の監視（リダイレクトは一時的に無効化）
    */
   React.useEffect(() => {
     console.log('SignInPageClient - loading:', loading, 'isAuthenticated:', isAuthenticated);
+    console.log('SignInPageClient - redirectTo:', redirectTo);
     
-    // 認証済みかつローディング完了時にリダイレクト
-    if (isAuthenticated && !loading) {
-      console.log('User authenticated, redirecting to:', redirectTo);
-      
-      // 確実なリダイレクト処理
-      setTimeout(() => {
-        window.location.href = redirectTo;
-      }, 200);
-    }
-  }, [isAuthenticated, loading, redirectTo]);
+    // 一時的にリダイレクトを無効化してループを防ぐ
+    // if (isAuthenticated && !loading) {
+    //   const targetUrl = redirectTo === '/' ? '/dashboard' : redirectTo;
+    //   console.log('User authenticated, redirecting to:', targetUrl);
+    //   router.replace(targetUrl);
+    // }
+  }, [isAuthenticated, loading, redirectTo, router]);
   
   /**
    * サインイン成功時のハンドラー
    */
   const handleSignInSuccess = React.useCallback(() => {
-    console.log('Sign in successful - waiting for auth state update');
-    // 認証状態の更新を待つ（useEffectでリダイレクト処理）
-  }, []);
+    console.log('SignInPageClient: handleSignInSuccess called');
+    
+    const targetUrl = redirectTo === '/' ? '/dashboard' : redirectTo;
+    console.log('SignInPageClient: Executing redirect to:', targetUrl);
+    
+    // 確実なリダイレクト実行
+    if (typeof window !== 'undefined') {
+      window.location.href = targetUrl;
+    }
+  }, [redirectTo]);
   
-  // 認証済みの場合は何も表示しない（handleSignInSuccessでリダイレクト処理済み）
+  // 認証済み時のリダイレクト処理（Hooks順序を保つため、条件分岐の外で定義）
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      console.log('User is authenticated, redirecting to dashboard');
+      const targetUrl = redirectTo === '/' ? '/dashboard' : redirectTo;
+      console.log('Executing redirect to:', targetUrl);
+      window.location.href = targetUrl;
+    }
+  }, [isAuthenticated, redirectTo]);
+  
+  // 認証済みの場合はローディング画面を表示
   if (isAuthenticated) {
     return (
       <div className="text-center space-y-4">
         <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        <p className="text-sm text-muted-foreground">リダイレクト中...</p>
+        <p className="text-sm text-muted-foreground">ダッシュボードにリダイレクト中...</p>
       </div>
     );
   }

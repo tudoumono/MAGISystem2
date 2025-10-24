@@ -1,360 +1,420 @@
 /**
- * Environment Status Component - 開発環境状態表示コンポーネント
+ * Environment Status Component - 環境ステータス表示
  * 
- * 目的: 現在の環境モードと設定状況をリアルタイムで表示
- * 設計理由: 開発者が現在の状態を一目で確認できるようにする
+ * このコンポーネントは現在の環境モード（MOCK/DEVELOPMENT/PRODUCTION）と
+ * Amplify接続状態を視覚的に表示します。開発者向けのデバッグ情報も提供します。
  * 
- * 主要機能:
- * - 環境モード（MOCK/DEVELOPMENT/PRODUCTION）の表示
- * - AWS接続状況の確認
- * - 設定エラーの警告表示
- * - クイックアクションボタン
+ * 目的:
+ * - 現在の環境モードの明確な表示
+ * - Amplify接続状態の監視
+ * - 開発者向けデバッグ情報の提供
+ * - 環境切り替えの支援
+ * 
+ * 設計理由:
+ * - 開発時の環境確認を容易にする
+ * - Phase移行時の状態把握を支援
+ * - トラブルシューティングの効率化
+ * - 視覚的に分かりやすいステータス表示
  * 
  * 学習ポイント:
- * - React での環境状態管理
- * - リアルタイム状態更新
- * - 条件付きレンダリング
- * - ユーザーフレンドリーなUI設計
+ * - 環境変数の活用方法
+ * - Amplify設定の検証パターン
+ * - 開発者体験の向上手法
+ * - 条件付きレンダリングの実装
  * 
  * 使用例:
- * ```tsx
- * import { EnvironmentStatus } from '@/components/dev/EnvironmentStatus';
- * 
+ * ```typescript
  * // 開発環境でのみ表示
- * {process.env.NODE_ENV === 'development' && <EnvironmentStatus />}
+ * {process.env.NODE_ENV === 'development' && (
+ *   <EnvironmentStatus />
+ * )}
+ * 
+ * // 常時表示（管理者向け）
+ * <EnvironmentStatus showAlways />
  * ```
  * 
- * 関連: src/lib/amplify/config.ts, src/lib/amplify/setup.ts
+ * 関連: src/lib/amplify/config.ts, src/lib/amplify/client.ts
  */
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   getCurrentEnvironmentMode, 
-  isMockMode, 
-  isDevelopmentMode, 
-  isProductionMode,
-  type EnvironmentMode 
-} from '../../lib/amplify/config';
+  validateAmplifyConfig, 
+  getEnvironmentSetupGuide,
+  type EnvironmentMode,
+  type ConfigValidationResult
+} from '@/lib/amplify/config';
+import { testAmplifyConnection } from '@/lib/amplify/client';
 
 /**
- * 環境状態の型定義
- * 
- * 学習ポイント:
- * - コンポーネント状態の型安全性
- * - 非同期データの管理
- * - エラー状態の表現
+ * コンポーネントのプロパティ型定義
  */
-interface EnvironmentState {
-  mode: EnvironmentMode;
-  isLoading: boolean;
-  hasErrors: boolean;
-  lastChecked: Date | null;
-  connectionStatus: 'connected' | 'disconnected' | 'unknown';
+interface EnvironmentStatusProps {
+  /** 本番環境でも常に表示するかどうか */
+  showAlways?: boolean;
+  /** コンパクト表示モード */
+  compact?: boolean;
+  /** クリック可能（詳細表示切り替え） */
+  interactive?: boolean;
+  /** カスタムクラス名 */
+  className?: string;
 }
 
 /**
- * 環境モード別のスタイル設定
- * 
- * 学習ポイント:
- * - 視覚的な状態区別
- * - アクセシビリティ対応
- * - 一貫したデザインシステム
+ * 接続テスト結果の型定義
  */
-const MODE_STYLES = {
-  MOCK: {
-    bgColor: 'bg-blue-50',
-    borderColor: 'border-blue-200',
-    textColor: 'text-blue-800',
-    badgeColor: 'bg-blue-100 text-blue-800',
-    icon: '📱',
-    label: 'Mock Mode',
-    description: 'Using mock data (Phase 1-2)',
-  },
-  DEVELOPMENT: {
-    bgColor: 'bg-green-50',
-    borderColor: 'border-green-200',
-    textColor: 'text-green-800',
-    badgeColor: 'bg-green-100 text-green-800',
-    icon: '🔧',
-    label: 'Development Mode',
-    description: 'Connected to AWS resources',
-  },
-  PRODUCTION: {
-    bgColor: 'bg-red-50',
-    borderColor: 'border-red-200',
-    textColor: 'text-red-800',
-    badgeColor: 'bg-red-100 text-red-800',
-    icon: '🚀',
-    label: 'Production Mode',
-    description: 'Live AWS environment',
-  },
-} as const;
+interface ConnectionTestResult {
+  success: boolean;
+  mode: string;
+  error?: string;
+  details?: any;
+  timestamp: Date;
+}
 
 /**
- * 環境状態表示コンポーネント
- * 
- * 学習ポイント:
- * - 状態管理とライフサイクル
- * - 条件付きレンダリング
- * - ユーザーインタラクション
+ * Environment Status Component
  */
-export function EnvironmentStatus(): JSX.Element {
-  const [state, setState] = useState<EnvironmentState>({
-    mode: 'MOCK',
-    isLoading: true,
-    hasErrors: false,
-    lastChecked: null,
-    connectionStatus: 'unknown',
-  });
-
-  const [isExpanded, setIsExpanded] = useState(false);
+export function EnvironmentStatus({
+  showAlways = false,
+  compact = false,
+  interactive = true,
+  className = ''
+}: EnvironmentStatusProps) {
+  // 状態管理（モードを初期化時に固定）
+  const [mode, setMode] = useState<EnvironmentMode>(() => getCurrentEnvironmentMode());
+  const [validation, setValidation] = useState<ConfigValidationResult | null>(null);
+  const [connectionTest, setConnectionTest] = useState<ConnectionTestResult | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   /**
-   * 環境状態の更新
-   * 
-   * 学習ポイント:
-   * - 非同期状態更新
-   * - エラーハンドリング
-   * - 状態の一貫性保持
+   * 環境情報の取得と検証
    */
-  const updateEnvironmentState = async () => {
+  const checkEnvironmentStatus = async () => {
+    setIsLoading(true);
+    
     try {
-      setState(prev => ({ ...prev, isLoading: true }));
-
-      const mode = getCurrentEnvironmentMode();
+      // 環境モードは初期化時に固定済み
+      const currentMode = mode;
       
-      // 接続状況の確認（簡易版）
-      let connectionStatus: 'connected' | 'disconnected' | 'unknown' = 'unknown';
+      // Amplify設定の検証
+      const validationResult = validateAmplifyConfig();
+      setValidation(validationResult);
       
-      if (isMockMode()) {
-        connectionStatus = 'disconnected';
+      // 接続テスト（実環境のみ）
+      if (currentMode !== 'MOCK') {
+        try {
+          const testResult = await testAmplifyConnection();
+          setConnectionTest({
+            ...testResult,
+            timestamp: new Date()
+          });
+        } catch (error) {
+          console.error('Connection test error:', error);
+          setConnectionTest({
+            success: false,
+            mode: currentMode,
+            error: error instanceof Error ? error.message : 'Connection test failed',
+            details: {
+              suggestion: 'Run "npx ampx push" to deploy Amplify resources',
+              originalError: error
+            },
+            timestamp: new Date()
+          });
+        }
       } else {
-        // 実際の実装では、AWS接続テストを行う
-        connectionStatus = 'connected';
+        setConnectionTest({
+          success: true,
+          mode: 'MOCK',
+          details: 'Mock mode - no real connection needed',
+          timestamp: new Date()
+        });
       }
-
-      setState({
-        mode,
-        isLoading: false,
-        hasErrors: false,
-        lastChecked: new Date(),
-        connectionStatus,
-      });
-
     } catch (error) {
-      console.error('Failed to update environment state:', error);
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        hasErrors: true,
-        lastChecked: new Date(),
-      }));
+      console.error('Failed to check environment status:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   /**
-   * コンポーネントマウント時の初期化
-   * 
-   * 学習ポイント:
-   * - useEffect の適切な使用
-   * - 定期更新の実装
-   * - クリーンアップ処理
+   * 初期化とリフレッシュ
    */
   useEffect(() => {
-    updateEnvironmentState();
-
-    // 30秒ごとに状態を更新
-    const interval = setInterval(updateEnvironmentState, 30000);
-
-    return () => clearInterval(interval);
+    checkEnvironmentStatus();
   }, []);
 
-  const modeStyle = MODE_STYLES[state.mode];
+  /**
+   * 表示判定
+   */
+  const shouldShow = showAlways || process.env.NODE_ENV === 'development';
+  if (!shouldShow) return null;
 
   /**
-   * クイックアクション関数
-   * 
-   * 学習ポイント:
-   * - ユーザーアクションの処理
-   * - 外部スクリプトの実行
-   * - フィードバックの提供
+   * モード別のスタイル設定
    */
-  const handleQuickAction = (action: string) => {
-    switch (action) {
-      case 'refresh':
-        updateEnvironmentState();
-        break;
-      case 'setup':
-        console.log('🚀 Run: npm run setup:amplify');
-        alert('Please run "npm run setup:amplify" in your terminal to set up AWS resources.');
-        break;
-      case 'docs':
-        window.open('/.kiro/specs/magi-decision-ui/design.md', '_blank');
-        break;
+  const getModeStyles = (mode: EnvironmentMode) => {
+    switch (mode) {
+      case 'MOCK':
+        return {
+          bg: 'bg-blue-50',
+          border: 'border-blue-200',
+          text: 'text-blue-800',
+          icon: '🔧',
+          label: 'Mock Mode'
+        };
+      case 'DEVELOPMENT':
+        return {
+          bg: 'bg-green-50',
+          border: 'border-green-200',
+          text: 'text-green-800',
+          icon: '🚀',
+          label: 'Development'
+        };
+      case 'PRODUCTION':
+        return {
+          bg: 'bg-purple-50',
+          border: 'border-purple-200',
+          text: 'text-purple-800',
+          icon: '⚡',
+          label: 'Production'
+        };
       default:
-        console.log(`Unknown action: ${action}`);
+        return {
+          bg: 'bg-gray-50',
+          border: 'border-gray-200',
+          text: 'text-gray-800',
+          icon: '❓',
+          label: 'Unknown'
+        };
     }
   };
 
-  return (
-    <div className={`fixed bottom-4 right-4 z-50 max-w-sm transition-all duration-300 ${
-      isExpanded ? 'w-80' : 'w-auto'
-    }`}>
-      {/* メインステータスバッジ */}
+  const styles = getModeStyles(mode);
+
+  /**
+   * 接続状態のスタイル
+   */
+  const getConnectionStyles = () => {
+    if (!connectionTest) {
+      return { icon: '⏳', text: 'Testing...', color: 'text-yellow-600' };
+    }
+    
+    if (connectionTest.success) {
+      return { icon: '✅', text: 'Connected', color: 'text-green-600' };
+    } else {
+      return { icon: '❌', text: 'Disconnected', color: 'text-red-600' };
+    }
+  };
+
+  const connectionStyles = getConnectionStyles();
+
+  /**
+   * コンパクト表示
+   */
+  if (compact) {
+    return (
       <div 
-        className={`
-          ${modeStyle.bgColor} ${modeStyle.borderColor} ${modeStyle.textColor}
-          border rounded-lg shadow-lg cursor-pointer transition-all duration-200
-          hover:shadow-xl
-        `}
-        onClick={() => setIsExpanded(!isExpanded)}
+        className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm ${styles.bg} ${styles.border} ${styles.text} border ${className}`}
+        onClick={interactive ? () => setShowDetails(!showDetails) : undefined}
+        role={interactive ? 'button' : undefined}
+        tabIndex={interactive ? 0 : undefined}
       >
-        <div className="p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <span className="text-lg">{modeStyle.icon}</span>
-              <div>
-                <div className="font-medium text-sm">{modeStyle.label}</div>
-                {!isExpanded && (
-                  <div className="text-xs opacity-75">{modeStyle.description}</div>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              {/* 接続状況インジケーター */}
-              <div className={`w-2 h-2 rounded-full ${
-                state.connectionStatus === 'connected' ? 'bg-green-400' :
-                state.connectionStatus === 'disconnected' ? 'bg-gray-400' :
-                'bg-yellow-400'
-              }`} />
-              
-              {/* 展開/折りたたみアイコン */}
-              <svg 
-                className={`w-4 h-4 transition-transform duration-200 ${
-                  isExpanded ? 'rotate-180' : ''
-                }`}
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+        <span>{styles.icon}</span>
+        <span className="font-medium">{styles.label}</span>
+        {connectionTest && (
+          <>
+            <span className="text-gray-400">•</span>
+            <span className={connectionStyles.color}>{connectionStyles.icon}</span>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  /**
+   * 詳細表示
+   */
+  return (
+    <div className={`rounded-lg border ${styles.border} ${styles.bg} p-4 ${className}`}>
+      {/* ヘッダー */}
+      <div 
+        className={`flex items-center justify-between ${interactive ? 'cursor-pointer' : ''}`}
+        onClick={interactive ? () => setShowDetails(!showDetails) : undefined}
+      >
+        <div className="flex items-center space-x-3">
+          <span className="text-2xl">{styles.icon}</span>
+          <div>
+            <h3 className={`font-semibold ${styles.text}`}>
+              Environment: {styles.label}
+            </h3>
+            <div className="flex items-center space-x-2 text-sm">
+              <span className={connectionStyles.color}>
+                {connectionStyles.icon} {connectionStyles.text}
+              </span>
+              {validation && !validation.isValid && (
+                <>
+                  <span className="text-gray-400">•</span>
+                  <span className="text-red-600">
+                    ⚠️ {validation.errors.length} error(s)
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
-
-        {/* 展開時の詳細情報 */}
-        {isExpanded && (
-          <div className="border-t border-current border-opacity-20 p-3 space-y-3">
-            {/* 詳細情報 */}
-            <div className="text-xs space-y-1">
-              <div className="flex justify-between">
-                <span className="opacity-75">Mode:</span>
-                <span className="font-mono">{state.mode}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="opacity-75">Connection:</span>
-                <span className="font-mono capitalize">{state.connectionStatus}</span>
-              </div>
-              {state.lastChecked && (
-                <div className="flex justify-between">
-                  <span className="opacity-75">Last Check:</span>
-                  <span className="font-mono">{state.lastChecked.toLocaleTimeString()}</span>
-                </div>
-              )}
-            </div>
-
-            {/* エラー表示 */}
-            {state.hasErrors && (
-              <div className="text-xs bg-red-100 text-red-700 p-2 rounded border">
-                ⚠️ Configuration errors detected
-              </div>
-            )}
-
-            {/* クイックアクション */}
-            <div className="flex flex-wrap gap-1">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleQuickAction('refresh');
-                }}
-                className="text-xs px-2 py-1 bg-white bg-opacity-50 rounded hover:bg-opacity-75 transition-colors"
-                disabled={state.isLoading}
-              >
-                {state.isLoading ? '⟳' : '🔄'} Refresh
-              </button>
-
-              {isMockMode() && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleQuickAction('setup');
-                  }}
-                  className="text-xs px-2 py-1 bg-white bg-opacity-50 rounded hover:bg-opacity-75 transition-colors"
-                >
-                  🚀 Setup AWS
-                </button>
-              )}
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleQuickAction('docs');
-                }}
-                className="text-xs px-2 py-1 bg-white bg-opacity-50 rounded hover:bg-opacity-75 transition-colors"
-              >
-                📚 Docs
-              </button>
-            </div>
-
-            {/* モード別のヒント */}
-            <div className="text-xs opacity-75 border-t border-current border-opacity-20 pt-2">
-              {isMockMode() && (
-                <div>
-                  💡 <strong>Mock Mode:</strong> Perfect for UI development without AWS setup.
-                  Run <code className="bg-black bg-opacity-10 px-1 rounded">npm run setup:amplify</code> to deploy real resources.
-                </div>
-              )}
-              
-              {isDevelopmentMode() && (
-                <div>
-                  💡 <strong>Development Mode:</strong> Connected to AWS resources.
-                  Great for testing real data flows and authentication.
-                </div>
-              )}
-              
-              {isProductionMode() && (
-                <div>
-                  💡 <strong>Production Mode:</strong> Using live AWS environment.
-                  Be careful with data modifications.
-                </div>
-              )}
-            </div>
-          </div>
+        
+        {interactive && (
+          <button
+            className={`p-1 rounded hover:bg-white/50 ${styles.text}`}
+            aria-label={showDetails ? 'Hide details' : 'Show details'}
+          >
+            {showDetails ? '▼' : '▶'}
+          </button>
         )}
       </div>
+
+      {/* 詳細情報 */}
+      {showDetails && (
+        <div className="mt-4 space-y-3 text-sm">
+          {/* 基本情報 */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <span className="font-medium">Mode:</span>
+              <span className="ml-2">{mode}</span>
+            </div>
+            <div>
+              <span className="font-medium">Node Env:</span>
+              <span className="ml-2">{process.env.NODE_ENV}</span>
+            </div>
+          </div>
+
+          {/* 検証結果 */}
+          {validation && (
+            <div>
+              <h4 className="font-medium mb-2">Configuration Validation:</h4>
+              <div className="space-y-1">
+                <div className={validation.isValid ? 'text-green-600' : 'text-red-600'}>
+                  {validation.isValid ? '✅ Valid' : '❌ Invalid'}
+                </div>
+                
+                {validation.errors.length > 0 && (
+                  <div>
+                    <span className="font-medium text-red-600">Errors:</span>
+                    <ul className="ml-4 list-disc text-red-600">
+                      {validation.errors.map((error, index) => (
+                        <li key={index}>{error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {validation.warnings.length > 0 && (
+                  <div>
+                    <span className="font-medium text-yellow-600">Warnings:</span>
+                    <ul className="ml-4 list-disc text-yellow-600">
+                      {validation.warnings.map((warning, index) => (
+                        <li key={index}>{warning}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 接続テスト結果 */}
+          {connectionTest && (
+            <div>
+              <h4 className="font-medium mb-2">Connection Test:</h4>
+              <div className="space-y-1">
+                <div className={connectionTest.success ? 'text-green-600' : 'text-red-600'}>
+                  {connectionTest.success ? '✅ Success' : '❌ Failed'}
+                </div>
+                
+                {connectionTest.error && (
+                  <div className="text-red-600">
+                    <span className="font-medium">Error:</span> {connectionTest.error}
+                  </div>
+                )}
+                
+                {connectionTest.details && (
+                  <div className="text-gray-600">
+                    <span className="font-medium">Details:</span>
+                    <pre className="mt-1 text-xs bg-white/50 p-2 rounded overflow-auto">
+                      {typeof connectionTest.details === 'string' 
+                        ? connectionTest.details 
+                        : JSON.stringify(connectionTest.details, null, 2)
+                      }
+                    </pre>
+                  </div>
+                )}
+                
+                <div className="text-gray-500 text-xs">
+                  Last tested: {connectionTest.timestamp.toLocaleTimeString()}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* アクション */}
+          <div className="flex space-x-2 pt-2 border-t border-white/50">
+            <button
+              onClick={checkEnvironmentStatus}
+              disabled={isLoading}
+              className={`px-3 py-1 rounded text-xs font-medium ${styles.text} bg-white/50 hover:bg-white/70 disabled:opacity-50`}
+            >
+              {isLoading ? '🔄 Refreshing...' : '🔄 Refresh'}
+            </button>
+            
+            {mode === 'MOCK' && (
+              <button
+                onClick={() => {
+                  console.log(getEnvironmentSetupGuide());
+                  alert('Setup guide logged to console');
+                }}
+                className={`px-3 py-1 rounded text-xs font-medium ${styles.text} bg-white/50 hover:bg-white/70`}
+              >
+                📋 Setup Guide
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 /**
- * 開発環境でのみ表示するラッパーコンポーネント
+ * 使用例とベストプラクティス
  * 
- * 学習ポイント:
- * - 条件付きレンダリング
- * - 環境別の機能制御
- * - 本番環境での不要な機能の除外
+ * 1. 開発環境での基本使用:
+ * ```typescript
+ * // 自動的に開発環境でのみ表示
+ * <EnvironmentStatus />
+ * ```
+ * 
+ * 2. 管理者ダッシュボードでの使用:
+ * ```typescript
+ * // 常時表示、コンパクトモード
+ * <EnvironmentStatus showAlways compact />
+ * ```
+ * 
+ * 3. デバッグパネルでの使用:
+ * ```typescript
+ * // 詳細情報を常時表示
+ * <EnvironmentStatus showAlways interactive={false} />
+ * ```
+ * 
+ * 4. カスタムスタイリング:
+ * ```typescript
+ * <EnvironmentStatus 
+ *   className="fixed top-4 right-4 z-50" 
+ *   compact 
+ * />
+ * ```
  */
-export function DevEnvironmentStatus(): JSX.Element | null {
-  // 本番環境では表示しない
-  if (process.env.NODE_ENV === 'production') {
-    return null;
-  }
-
-  return <EnvironmentStatus />;
-}
 
 export default EnvironmentStatus;

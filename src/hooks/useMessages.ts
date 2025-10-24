@@ -65,9 +65,10 @@ import type {
  * 学習ポイント:
  * - Phase 1-2: モッククライアントを使用
  * - Phase 3: 実際のAmplify clientに切り替え
+ * - 環境変数による自動切り替え
  */
-import { generateMockClient } from '@/lib/amplify/mock-client';
-const client = generateMockClient<Schema>();
+import { getAmplifyClient } from '@/lib/amplify/client';
+const client = getAmplifyClient();
 
 /**
  * メッセージ送信パラメータの型定義
@@ -327,55 +328,86 @@ export function useMessages(conversationId: string): UseMessagesReturn {
    * リアルタイム更新の設定
    * 
    * 学習ポイント:
-   * - 特定の会話のメッセージのみ監視
-   * - 新規メッセージと更新の両方を処理
+   * - SubscriptionManager による一元管理
    * - エージェント実行中の段階的更新をサポート
+   * - エラーハンドリングと自動再接続
+   * - オフライン対応との統合
    */
   useEffect(() => {
     if (!conversationId) return;
 
-    // 新規メッセージの監視
-    const createSub = client.models.Message.onCreate({
-      filter: {
-        conversationId: { eq: conversationId }
-      }
-    }).subscribe({
-      next: (data: any) => {
-        if (data) {
+    const { isMockMode } = require('@/lib/amplify/config');
+    
+    if (isMockMode()) {
+      // モックモード: 従来の実装
+      const createSub = client.models.Message.onCreate({
+        filter: {
+          conversationId: { eq: conversationId }
+        }
+      }).subscribe({
+        next: (data: any) => {
+          if (data) {
+            setMessages(prev => {
+              const exists = prev.some(msg => msg.id === data.id);
+              if (exists) return prev;
+              return [...prev, data];
+            });
+          }
+        },
+        error: (err: any) => console.error('Message create subscription error:', err)
+      });
+
+      const updateSub = client.models.Message.onUpdate({
+        filter: {
+          conversationId: { eq: conversationId }
+        }
+      }).subscribe({
+        next: (data: any) => {
+          if (data) {
+            setMessages(prev => 
+              prev.map(msg => msg.id === data.id ? data : msg)
+            );
+          }
+        },
+        error: (err: any) => console.error('Message update subscription error:', err)
+      });
+
+      return () => {
+        createSub.unsubscribe();
+        updateSub.unsubscribe();
+      };
+    } else {
+      // 実環境: SubscriptionManagerを使用
+      const { subscriptionManager } = require('@/lib/realtime/subscription-manager');
+      
+      const subscriptionId = subscriptionManager.subscribeToMessages(conversationId, {
+        onCreate: (message: Message) => {
           setMessages(prev => {
-            // 重複チェック
-            const exists = prev.some(msg => msg.id === data.id);
+            const exists = prev.some(msg => msg.id === message.id);
             if (exists) return prev;
-            
-            // 新しいメッセージを末尾に追加
-            return [...prev, data];
+            return [...prev, message];
           });
-        }
-      },
-      error: (err: any) => console.error('Message create subscription error:', err)
-    });
-
-    // メッセージ更新の監視
-    const updateSub = client.models.Message.onUpdate({
-      filter: {
-        conversationId: { eq: conversationId }
-      }
-    }).subscribe({
-      next: (data: any) => {
-        if (data) {
+        },
+        onUpdate: (message: Message) => {
           setMessages(prev => 
-            prev.map(msg => msg.id === data.id ? data : msg)
+            prev.map(msg => msg.id === message.id ? message : msg)
           );
+        },
+        onDelete: (message: Message) => {
+          setMessages(prev => 
+            prev.filter(msg => msg.id !== message.id)
+          );
+        },
+        onError: (error: Error) => {
+          console.error('Message subscription error:', error);
+          setError(error);
         }
-      },
-      error: (err: any) => console.error('Message update subscription error:', err)
-    });
+      });
 
-    // クリーンアップ関数
-    return () => {
-      createSub.unsubscribe();
-      updateSub.unsubscribe();
-    };
+      return () => {
+        subscriptionManager.unsubscribe(subscriptionId);
+      };
+    }
   }, [conversationId]);
 
   /**

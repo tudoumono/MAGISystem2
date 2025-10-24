@@ -77,16 +77,17 @@ export default function ConversationTestPage() {
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-                MAGIシステム会話管理
+                MAGI対話モード
               </h2>
               <p className="text-gray-600 mb-6">
-                左のサイドバーから会話を選択するか、新しい会話を作成してください。
+                チャット形式でMAGIシステムと対話できます。
+                左のサイドバーから過去の対話を選択するか、新しい対話を開始してください。
               </p>
               <button
                 onClick={handleCreateNew}
                 className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
               >
-                新しい会話を始める
+                新しい対話を始める
               </button>
             </div>
           </div>

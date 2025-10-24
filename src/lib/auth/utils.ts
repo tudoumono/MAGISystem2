@@ -1,201 +1,348 @@
 /**
  * Authentication Utilities - 認証関連のユーティリティ関数
  * 
- * 目的: 認証処理で使用する共通ユーティリティ関数を提供
- * 設計理由: サーバーアクションとクライアントサイドで共有可能な関数の分離
+ * 目的: 認証処理で共通して使用される関数の提供
+ * 設計理由: コードの再利用性とセキュリティの統一
  * 
  * 主要機能:
- * - Cookie設定のユーティリティ
- * - セッション検証のヘルパー関数
- * - 認証状態の判定ロジック
+ * - セキュアなCookie設定の生成
+ * - トークン検証ユーティリティ
+ * - セッション管理ヘルパー
+ * - セキュリティ関連の定数
  * 
  * 学習ポイント:
- * - サーバーアクションとユーティリティの分離
- * - 型安全なユーティリティ関数の実装
- * - セキュリティを考慮した設定管理
+ * - Cookie のセキュリティ設定
+ * - Next.js でのセッション管理
+ * - TypeScript での型安全なユーティリティ
+ * - セキュリティベストプラクティス
  * 
- * 関連: src/lib/auth/server-actions.ts
+ * 関連: src/lib/auth/server-actions.ts, src/components/auth/AuthProvider.tsx
  */
 
+import { cookies } from 'next/headers';
+
 /**
- * Cookie設定のユーティリティ
+ * Cookie設定オプションの型定義
+ */
+export interface CookieOptions {
+  httpOnly?: boolean;
+  secure?: boolean;
+  sameSite?: 'strict' | 'lax' | 'none';
+  maxAge?: number;
+  path?: string;
+  domain?: string;
+}
+
+/**
+ * セキュアなCookie設定を取得
  * 
  * 学習ポイント:
- * - セキュアなCookie設定
- * - 環境に応じた設定の調整
- * - セキュリティベストプラクティス
+ * - 本番環境でのセキュリティ設定
+ * - 開発環境での利便性の確保
+ * - Cookie のセキュリティベストプラクティス
+ * 
+ * @param options - 追加のCookie設定
+ * @returns セキュアなCookie設定オブジェクト
  */
-export function getSecureCookieOptions() {
+export function getSecureCookieOptions(options: Partial<CookieOptions> = {}): CookieOptions {
+  const isProduction = process.env.NODE_ENV === 'production';
+
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict' as const,
+    secure: isProduction, // 本番環境でのみHTTPS必須
+    sameSite: 'strict',
+    maxAge: 24 * 60 * 60, // 24時間（秒単位）
     path: '/',
-    maxAge: 24 * 60 * 60, // 24時間
+    ...options,
   };
 }
 
 /**
- * セッション有効性チェックのヘルパー
+ * セッション用Cookie設定を取得
  * 
  * 学習ポイント:
- * - セッション情報の検証ロジック
- * - タイムスタンプによる有効期限チェック
- * - 型安全な検証処理
+ * - セッション管理に特化した設定
+ * - 適切な有効期限の設定
+ * - セキュリティとUXのバランス
+ * 
+ * @param rememberMe - ログイン状態を保持するかどうか
+ * @returns セッション用Cookie設定
  */
-export function isSessionExpired(sessionExpiry?: string): boolean {
-  if (!sessionExpiry) {
-    return false; // 有効期限が設定されていない場合は期限切れではない
+export function getSessionCookieOptions(rememberMe: boolean = false): CookieOptions {
+  const baseOptions = getSecureCookieOptions();
+
+  return {
+    ...baseOptions,
+    maxAge: rememberMe
+      ? 30 * 24 * 60 * 60 // 30日間（Remember Me）
+      : 24 * 60 * 60,     // 24時間（通常）
+  };
+}
+
+/**
+ * Cookie名の定数
+ * 
+ * 学習ポイント:
+ * - 一貫したCookie命名規則
+ * - タイポの防止
+ * - 設定の一元管理
+ */
+export const COOKIE_NAMES = {
+  // 認証関連
+  AUTH_TOKEN: 'auth-token',
+  REFRESH_TOKEN: 'refresh-token',
+  SESSION_ID: 'session-id',
+
+  // モック認証関連
+  MOCK_AUTH_USER: 'mock-auth-user',
+  MOCK_SESSION_TOKEN: 'mock-session-token',
+  MOCK_REFRESH_TOKEN: 'mock-refresh-token',
+
+  // 設定関連
+  REMEMBER_ME: 'remember-me',
+  LAST_SIGNIN: 'last-signin',
+} as const;
+
+/**
+ * トークンの有効性を検証
+ * 
+ * 学習ポイント:
+ * - JWT トークンの基本的な検証
+ * - エラーハンドリング
+ * - セキュリティを考慮した実装
+ * 
+ * @param token - 検証するトークン
+ * @returns トークンが有効かどうか
+ */
+export function isValidToken(token: string | undefined): boolean {
+  if (!token) {
+    return false;
   }
-  
+
   try {
-    const expiryTime = new Date(sessionExpiry);
-    const now = new Date();
-    return now > expiryTime;
+    // 基本的なJWTフォーマットチェック
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return false;
+    }
+
+    // Base64デコードテスト
+    const payload = JSON.parse(atob(parts[1]));
+
+    // 有効期限チェック
+    if (payload.exp && payload.exp < Date.now() / 1000) {
+      return false;
+    }
+
+    return true;
   } catch (error) {
-    console.error('Invalid session expiry format:', sessionExpiry);
-    return true; // 無効な形式の場合は期限切れとして扱う
+    console.warn('Token validation failed:', error);
+    return false;
   }
 }
 
 /**
- * 認証エラーメッセージの正規化
+ * セッション有効期限を計算
  * 
  * 学習ポイント:
- * - エラーメッセージの統一
- * - ユーザーフレンドリーなメッセージ変換
- * - セキュリティを考慮したエラー情報の制限
+ * - 日時計算の実装
+ * - タイムゾーンの考慮
+ * - 設定可能な有効期限
+ * 
+ * @param hours - 有効期限（時間）
+ * @returns 有効期限のDate オブジェクト
  */
-export function normalizeAuthError(error: any): {
-  code: string;
-  message: string;
-  recoverySuggestion?: string;
-} {
-  // Amplify エラーの処理
-  if (error.name === 'NotAuthorizedException') {
-    return {
-      code: 'INVALID_CREDENTIALS',
-      message: 'メールアドレスまたはパスワードが正しくありません',
-      recoverySuggestion: 'メールアドレスとパスワードを確認してください'
-    };
-  }
-  
-  if (error.name === 'UserNotConfirmedException') {
-    return {
-      code: 'USER_NOT_CONFIRMED',
-      message: 'アカウントの確認が完了していません',
-      recoverySuggestion: 'メールに送信された確認コードを入力してください'
-    };
-  }
-  
-  // モックエラーの処理
-  if (error.message === 'Invalid credentials') {
-    return {
-      code: 'INVALID_CREDENTIALS',
-      message: 'デモ用認証情報: demo@example.com / password123',
-      recoverySuggestion: 'デモ用のメールアドレスとパスワードを使用してください'
-    };
-  }
-  
-  // 一般的なエラー
-  return {
-    code: 'UNKNOWN_ERROR',
-    message: error.message || '認証エラーが発生しました',
-    recoverySuggestion: 'しばらく時間をおいて再試行してください'
-  };
+export function calculateSessionExpiry(hours: number = 24): Date {
+  return new Date(Date.now() + hours * 60 * 60 * 1000);
 }
 
 /**
- * パスワード強度の検証
+ * セッションが期限切れかどうかを判定
  * 
  * 学習ポイント:
- * - 正規表現によるパスワード要件チェック
- * - セキュリティベストプラクティス
- * - 段階的な検証ロジック
+ * - 日時比較の実装
+ * - エラーハンドリング
+ * - 型安全な実装
+ * 
+ * @param expiryDate - 有効期限
+ * @returns 期限切れかどうか
  */
-export function validatePasswordStrength(password: string): {
-  isValid: boolean;
-  errors: string[];
-  score: number; // 0-100
-} {
-  const errors: string[] = [];
-  let score = 0;
-  
-  if (password.length < 8) {
-    errors.push('パスワードは8文字以上で入力してください');
-  } else {
-    score += 20;
+export function isSessionExpired(expiryDate: string | Date | undefined): boolean {
+  if (!expiryDate) {
+    return true;
   }
-  
-  if (!/(?=.*[a-z])/.test(password)) {
-    errors.push('パスワードには小文字を含めてください');
-  } else {
-    score += 20;
+
+  try {
+    const expiry = typeof expiryDate === 'string' ? new Date(expiryDate) : expiryDate;
+    return expiry < new Date();
+  } catch (error) {
+    console.warn('Session expiry check failed:', error);
+    return true;
   }
-  
-  if (!/(?=.*[A-Z])/.test(password)) {
-    errors.push('パスワードには大文字を含めてください');
-  } else {
-    score += 20;
-  }
-  
-  if (!/(?=.*\d)/.test(password)) {
-    errors.push('パスワードには数字を含めてください');
-  } else {
-    score += 20;
-  }
-  
-  if (!/(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/.test(password)) {
-    errors.push('パスワードには特殊文字を含めてください');
-  } else {
-    score += 20;
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors,
-    score
-  };
 }
 
 /**
- * メールアドレスの検証
+ * セキュアなランダム文字列を生成
  * 
  * 学習ポイント:
- * - 正規表現によるメールアドレス検証
- * - RFC準拠の検証パターン
- * - エラーメッセージの提供
+ * - セッションIDの生成
+ * - セキュアな乱数生成
+ * - 文字列操作
+ * 
+ * @param length - 生成する文字列の長さ
+ * @returns ランダム文字列
  */
-export function validateEmail(email: string): {
-  isValid: boolean;
-  error?: string;
-} {
-  if (!email) {
-    return {
-      isValid: false,
-      error: 'メールアドレスを入力してください'
-    };
+export function generateSecureRandomString(length: number = 32): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-  
-  // 基本的なメールアドレス形式の検証
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  
-  if (!emailRegex.test(email)) {
-    return {
-      isValid: false,
-      error: '有効なメールアドレスを入力してください'
-    };
+
+  return result;
+}
+
+/**
+ * Cookie値を安全に取得
+ * 
+ * 学習ポイント:
+ * - Next.js cookies() APIの使用
+ * - エラーハンドリング
+ * - 型安全な実装
+ * 
+ * @param name - Cookie名
+ * @returns Cookie値（存在しない場合はundefined）
+ */
+export async function getCookieValue(name: string): Promise<string | undefined> {
+  try {
+    const cookieStore = await cookies();
+    const cookie = cookieStore.get(name);
+    return cookie?.value;
+  } catch (error) {
+    console.warn(`Failed to get cookie ${name}:`, error);
+    return undefined;
   }
-  
-  // 長さの検証
-  if (email.length > 254) {
-    return {
-      isValid: false,
-      error: 'メールアドレスが長すぎます'
-    };
+}
+
+/**
+ * Cookie値を安全に設定
+ * 
+ * 学習ポイント:
+ * - Next.js cookies() APIの使用
+ * - セキュアな設定の適用
+ * - エラーハンドリング
+ * 
+ * @param name - Cookie名
+ * @param value - Cookie値
+ * @param options - Cookie設定オプション
+ */
+export async function setCookieValue(
+  name: string,
+  value: string,
+  options?: Partial<CookieOptions>
+): Promise<void> {
+  try {
+    const cookieStore = await cookies();
+    const cookieOptions = getSecureCookieOptions(options);
+    cookieStore.set(name, value, cookieOptions);
+  } catch (error) {
+    console.error(`Failed to set cookie ${name}:`, error);
+    throw error;
   }
-  
-  return {
-    isValid: true
-  };
+}
+
+/**
+ * Cookie値を安全に削除
+ * 
+ * 学習ポイント:
+ * - Cookie削除の実装
+ * - エラーハンドリング
+ * - セキュリティを考慮した削除
+ * 
+ * @param name - Cookie名
+ */
+export async function deleteCookieValue(name: string): Promise<void> {
+  try {
+    const cookieStore = await cookies();
+    cookieStore.delete(name);
+  } catch (error) {
+    console.warn(`Failed to delete cookie ${name}:`, error);
+    // Cookie削除の失敗は警告レベル（存在しない場合など）
+  }
+}
+
+/**
+ * 複数のCookieを一括削除
+ * 
+ * 学習ポイント:
+ * - 配列操作
+ * - 非同期処理の並列実行
+ * - エラーハンドリング
+ * 
+ * @param names - 削除するCookie名の配列
+ */
+export async function deleteCookies(names: string[]): Promise<void> {
+  const deletePromises = names.map(name => deleteCookieValue(name));
+
+  try {
+    await Promise.allSettled(deletePromises);
+  } catch (error) {
+    console.warn('Some cookies failed to delete:', error);
+  }
+}
+
+/**
+ * 認証関連のCookieをすべてクリア
+ * 
+ * 学習ポイント:
+ * - セキュアなサインアウト処理
+ * - 包括的なクリーンアップ
+ * - 設定の一元管理
+ */
+export async function clearAuthCookies(): Promise<void> {
+  const authCookieNames = [
+    COOKIE_NAMES.AUTH_TOKEN,
+    COOKIE_NAMES.REFRESH_TOKEN,
+    COOKIE_NAMES.SESSION_ID,
+    COOKIE_NAMES.MOCK_AUTH_USER,
+    COOKIE_NAMES.MOCK_SESSION_TOKEN,
+    COOKIE_NAMES.MOCK_REFRESH_TOKEN,
+    COOKIE_NAMES.REMEMBER_ME,
+    COOKIE_NAMES.LAST_SIGNIN,
+  ];
+
+  await deleteCookies(authCookieNames);
+}
+
+/**
+ * デバッグ用: 現在のCookie情報を表示
+ * 
+ * 学習ポイント:
+ * - デバッグ機能の実装
+ * - 開発環境での利便性
+ * - セキュリティ情報の保護
+ */
+export async function debugCookies(): Promise<void> {
+  if (process.env.NODE_ENV !== 'development') {
+    return;
+  }
+
+  try {
+    const cookieStore = await cookies();
+    const allCookies = cookieStore.getAll();
+
+    console.group('🍪 Current Cookies (Debug)');
+    allCookies.forEach(cookie => {
+      // セキュリティ情報は一部のみ表示
+      const displayValue = cookie.value.length > 20
+        ? cookie.value.substring(0, 20) + '...'
+        : cookie.value;
+
+      console.log(`${cookie.name}: ${displayValue}`);
+    });
+    console.groupEnd();
+  } catch (error) {
+    console.warn('Failed to debug cookies:', error);
+  }
 }
