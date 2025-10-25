@@ -322,6 +322,94 @@ export class SubscriptionManager {
   }
 
   /**
+   * メッセージの変更を監視するサブスクリプション
+   */
+  public subscribeToMessages(
+    conversationId: string,
+    handlers: SubscriptionHandlers<Message>
+  ): string {
+    const subscriptionId = `messages-${conversationId}-${Date.now()}`;
+
+    try {
+      // 作成イベントのサブスクリプション
+      const createSub = this.client.models.Message.onCreate().subscribe({
+        next: (data: any) => {
+          if (data && data.conversationId === conversationId && handlers.onCreate) {
+            if (this.config.enableLogging) {
+              console.log('🔄 Message created:', data.id);
+            }
+            handlers.onCreate(data);
+          }
+        },
+        error: (error: any) => {
+          console.error('❌ Message create subscription error:', error);
+          if (handlers.onError) {
+            handlers.onError(error);
+          }
+          this.handleSubscriptionError(subscriptionId, error);
+        }
+      });
+
+      // 更新イベントのサブスクリプション
+      const updateSub = this.client.models.Message.onUpdate().subscribe({
+        next: (data: any) => {
+          if (data && data.conversationId === conversationId && handlers.onUpdate) {
+            if (this.config.enableLogging) {
+              console.log('🔄 Message updated:', data.id);
+            }
+            handlers.onUpdate(data);
+          }
+        },
+        error: (error: any) => {
+          console.error('❌ Message update subscription error:', error);
+          if (handlers.onError) {
+            handlers.onError(error);
+          }
+          this.handleSubscriptionError(subscriptionId, error);
+        }
+      });
+
+      // 削除イベントのサブスクリプション
+      const deleteSub = this.client.models.Message.onDelete().subscribe({
+        next: (data: any) => {
+          if (data && data.conversationId === conversationId && handlers.onDelete) {
+            if (this.config.enableLogging) {
+              console.log('🔄 Message deleted:', data.id);
+            }
+            handlers.onDelete(data);
+          }
+        },
+        error: (error: any) => {
+          console.error('❌ Message delete subscription error:', error);
+          if (handlers.onError) {
+            handlers.onError(error);
+          }
+          this.handleSubscriptionError(subscriptionId, error);
+        }
+      });
+
+      // アクティブなサブスクリプションとして登録
+      this.activeSubscriptions.set(subscriptionId, {
+        id: subscriptionId,
+        type: 'message',
+        subscription: { createSub, updateSub, deleteSub },
+        handlers,
+        status: 'connected',
+        reconnectAttempts: 0,
+      });
+
+      if (this.config.enableLogging) {
+        console.log(`✅ Message subscription created: ${subscriptionId}`);
+      }
+
+      return subscriptionId;
+    } catch (error) {
+      console.error('❌ Failed to create message subscription:', error);
+      throw error;
+    }
+  }
+
+  /**
    * アクティブなサブスクリプションの状態を取得
    */
   public getSubscriptionStatus(subscriptionId: string): SubscriptionStatus | null {
