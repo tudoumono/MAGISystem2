@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * ConversationExample Component - 会話管理の使用例
  * 

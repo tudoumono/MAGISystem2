@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * ConversationSidebar - 会話管理サイドバーコンポーネント
  * 

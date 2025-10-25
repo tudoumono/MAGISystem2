@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Trace Test Page - トレースコンポーネントのテストページ
  * 

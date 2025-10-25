@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Amplify Integration Index - MAGI Decision UI
  * 
