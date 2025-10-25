@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * MAGI Decision Interface - MAGI意思決定インターフェース
  * 

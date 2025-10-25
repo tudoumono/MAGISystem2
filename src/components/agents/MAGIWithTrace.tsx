@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * MAGIWithTrace Component - MAGI意思決定システムとトレース可視化の統合
  * 

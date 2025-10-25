@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * useConversations Hook - 会話データ管理
  * 
@@ -58,16 +60,21 @@ import type { Schema } from '@/lib/amplify/types';
 import type { Conversation, User } from '@/lib/amplify/types';
 
 /**
- * Amplify Data クライアントの初期化
+ * Amplify Data クライアントの初期化（クライアントサイド専用）
  * 
  * 学習ポイント:
- * - Phase 1-2: モッククライアントを使用
- * - Phase 3: 実際のAmplify clientに切り替え
+ * - クライアントサイドでのみ初期化
+ * - SSR対応: サーバーサイドでは null
  * - Schema型により完全な型安全性を確保
  * - 環境変数による自動切り替え
  */
 import { getAmplifyClient } from '@/lib/amplify/client';
-const client = getAmplifyClient();
+
+// クライアントサイドでのみ初期化
+let client: any = null;
+if (typeof window !== 'undefined') {
+  client = getAmplifyClient();
+}
 
 /**
  * 会話作成パラメータの型定義
@@ -131,11 +138,34 @@ export function useConversations(): UseConversationsReturn {
    * - client.models.Conversation.list(): 自動生成されたGraphQL Query
    * - オーナーベースアクセス制御により、自動的に現在のユーザーの会話のみ取得
    * - createdAt降順でソート（最新の会話が上に表示）
+   * - エラーハンドリングとフォールバック処理
    */
   const fetchConversations = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
+
+      console.log('🔄 Fetching conversations...');
+
+      // クライアントの存在確認
+      if (!client) {
+        throw new Error('Amplify client is not initialized');
+      }
+
+      // modelsの存在確認
+      if (!client.models) {
+        throw new Error('Amplify client models are not available');
+      }
+
+      // Conversationモデルの存在確認
+      if (!client.models.Conversation) {
+        throw new Error('Conversation model is not available');
+      }
+
+      // listメソッドの存在確認
+      if (!client.models.Conversation.list) {
+        throw new Error('Conversation.list method is not available');
+      }
 
       const result = await client.models.Conversation.list({
         // 最新の会話から順に取得
@@ -144,16 +174,38 @@ export function useConversations(): UseConversationsReturn {
         // selectionSet: ['id', 'title', 'agentPresetId', 'createdAt', 'updatedAt', 'messages.*']
       });
 
-      if (result.data) {
+      if (result && result.data) {
+        console.log(`✅ Fetched ${result.data.length} conversations`);
         setConversations(result.data);
+      } else {
+        console.warn('⚠️ No data returned from conversation list');
+        setConversations([]);
       }
     } catch (err) {
-      console.error('Failed to fetch conversations:', err);
-      setError(err instanceof Error ? err : new Error('Failed to fetch conversations'));
+      console.error('❌ Failed to fetch conversations:', err);
+      
+      // 詳細なエラー情報をログ出力
+      if (err instanceof Error) {
+        console.error('Error details:', {
+          message: err.message,
+          stack: err.stack,
+          name: err.name
+        });
+      }
+      
+      // ユーザーフレンドリーなエラーメッセージ
+      const errorMessage = err instanceof Error 
+        ? `会話の取得に失敗しました: ${err.message}`
+        : '会話の取得に失敗しました';
+      
+      setError(new Error(errorMessage));
+      
+      // フォールバック: 空の配列を設定
+      setConversations([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [client]);
 
   /**
    * 新規会話の作成
@@ -428,64 +480,19 @@ export function useConversations(): UseConversationsReturn {
    * 学習ポイント:
    * - SubscriptionManager による一元管理
    * - エラーハンドリングと自動再接続
-   * - オフライン対応との統合
+   * - 環境に応じた適切な実装選択
    * - パフォーマンス最適化
    */
   useEffect(() => {
-    // Phase 3以降: 実際のSubscriptionManagerを使用
-    // Phase 1-2: モックモードでは従来の実装を維持
-    const { getCurrentEnvironmentMode } = require('@/lib/amplify/config');
-    const currentMode = getCurrentEnvironmentMode();
+    console.log('🔄 Setting up real-time subscriptions (mock mode disabled)');
     
-    if (currentMode === 'MOCK') {
-      // モックモード: 従来の実装
-      const createSub = client.models.Conversation.onCreate().subscribe({
-        next: (data: any) => {
-          if (data) {
-            setConversations(prev => {
-              const exists = prev.some(conv => conv.id === data.id);
-              if (exists) return prev;
-              return [data, ...prev];
-            });
-          }
-        },
-        error: (err: any) => console.error('Conversation create subscription error:', err)
-      });
-
-      const updateSub = client.models.Conversation.onUpdate().subscribe({
-        next: (data: any) => {
-          if (data) {
-            setConversations(prev => 
-              prev.map(conv => conv.id === data.id ? data : conv)
-            );
-          }
-        },
-        error: (err: any) => console.error('Conversation update subscription error:', err)
-      });
-
-      const deleteSub = client.models.Conversation.onDelete().subscribe({
-        next: (data: any) => {
-          if (data) {
-            setConversations(prev => 
-              prev.filter(conv => conv.id !== data.id)
-            );
-          }
-        },
-        error: (err: any) => console.error('Conversation delete subscription error:', err)
-      });
-
-      return () => {
-        createSub.unsubscribe();
-        updateSub.unsubscribe();
-        deleteSub.unsubscribe();
-      };
-    } else {
-      // 実環境: SubscriptionManagerを使用
+    // 実環境のみ: SubscriptionManagerを使用
+    try {
       const { subscriptionManager } = require('@/lib/realtime/subscription-manager');
-      const { offlineManager } = require('@/lib/realtime/offline-support');
       
       const subscriptionId = subscriptionManager.subscribeToConversations('current-user', {
         onCreate: (conversation: Conversation) => {
+          console.log('🔄 Real-time: Conversation created', conversation.id);
           setConversations(prev => {
             const exists = prev.some(conv => conv.id === conversation.id);
             if (exists) return prev;
@@ -493,24 +500,33 @@ export function useConversations(): UseConversationsReturn {
           });
         },
         onUpdate: (conversation: Conversation) => {
+          console.log('🔄 Real-time: Conversation updated', conversation.id);
           setConversations(prev => 
             prev.map(conv => conv.id === conversation.id ? conversation : conv)
           );
         },
         onDelete: (conversation: Conversation) => {
+          console.log('🔄 Real-time: Conversation deleted', conversation.id);
           setConversations(prev => 
             prev.filter(conv => conv.id !== conversation.id)
           );
         },
         onError: (error: Error) => {
-          console.error('Conversation subscription error:', error);
+          console.error('❌ Real-time subscription error:', error);
           setError(error);
         }
       });
 
+      console.log(`✅ Real-time subscription created: ${subscriptionId}`);
+
       return () => {
+        console.log(`🔄 Cleaning up subscription: ${subscriptionId}`);
         subscriptionManager.unsubscribe(subscriptionId);
       };
+    } catch (error) {
+      console.error('❌ Failed to setup real-time subscriptions:', error);
+      setError(error instanceof Error ? error : new Error('Subscription setup failed'));
+      return () => {};
     }
   }, []);
 

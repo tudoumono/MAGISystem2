@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Conversation Management Test Page
  * 

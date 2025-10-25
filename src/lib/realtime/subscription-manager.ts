@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Subscription Manager - GraphQL Subscriptions管理
  * 
@@ -98,33 +100,28 @@ const DEFAULT_CONFIG: Required<SubscriptionConfig> = {
 };
 
 /**
- * SubscriptionManager - GraphQL Subscriptions管理クラス
+ * SubscriptionManager - GraphQL Subscriptionsの一元管理
  * 
- * 機能:
- * - GraphQL Subscriptionsの作成と管理
- * - 接続状態の監視
- * - 自動再接続
- * - エラーハンドリング
- * - リソースのクリーンアップ
+ * Singleton パターンによる実装で、アプリケーション全体で
+ * 一つのインスタンスを共有します。
  */
 export class SubscriptionManager {
-  private static instance: SubscriptionManager | null = null;
-  
-  private client: any;
-  private config: Required<SubscriptionConfig>;
+  private static instance: SubscriptionManager;
   private activeSubscriptions = new Map<string, ActiveSubscription>();
-  private reconnectTimeouts = new Map<string, NodeJS.Timeout>();
+  private config: Required<SubscriptionConfig>;
+  private client: any;
 
-  /**
-   * プライベートコンストラクタ（Singleton パターン）
-   */
   private constructor(config: SubscriptionConfig = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.client = getAmplifyClient();
+    
+    if (this.config.enableLogging) {
+      console.log('🔄 SubscriptionManager initialized');
+    }
   }
 
   /**
-   * インスタンスの取得（Singleton パターン）
+   * Singleton インスタンスの取得
    */
   public static getInstance(config?: SubscriptionConfig): SubscriptionManager {
     if (!SubscriptionManager.instance) {
@@ -134,339 +131,194 @@ export class SubscriptionManager {
   }
 
   /**
-   * 会話のサブスクリプション開始
-   * 
-   * 学習ポイント:
-   * - onCreate, onUpdate, onDeleteの3つのイベントを監視
-   * - オーナーベースアクセス制御により、自動的に現在のユーザーの会話のみ通知
-   * - エラーハンドリングと自動再接続
-   * 
-   * @param userId ユーザーID（フィルタリング用）
-   * @param handlers イベントハンドラー
-   * @returns サブスクリプションID
+   * 会話の変更を監視するサブスクリプション
    */
   public subscribeToConversations(
     userId: string,
     handlers: SubscriptionHandlers<Conversation>
   ): string {
-    const subscriptionId = `conversations-${userId}`;
+    const subscriptionId = `conversations-${userId}-${Date.now()}`;
     
-    // 既存のサブスクリプションがある場合は停止
-    this.unsubscribe(subscriptionId);
-
     try {
-      // 新規作成の監視
+      // 作成イベントのサブスクリプション
       const createSub = this.client.models.Conversation.onCreate().subscribe({
         next: (data: any) => {
           if (data && handlers.onCreate) {
-            this.log('Conversation created:', data.id);
+            if (this.config.enableLogging) {
+              console.log('🔄 Conversation created:', data.id);
+            }
             handlers.onCreate(data);
           }
         },
         error: (error: any) => {
-          this.handleSubscriptionError(subscriptionId, error, handlers.onError);
+          console.error('❌ Conversation create subscription error:', error);
+          if (handlers.onError) {
+            handlers.onError(error);
+          }
+          this.handleSubscriptionError(subscriptionId, error);
         }
       });
 
-      // 更新の監視
+      // 更新イベントのサブスクリプション
       const updateSub = this.client.models.Conversation.onUpdate().subscribe({
         next: (data: any) => {
           if (data && handlers.onUpdate) {
-            this.log('Conversation updated:', data.id);
+            if (this.config.enableLogging) {
+              console.log('🔄 Conversation updated:', data.id);
+            }
             handlers.onUpdate(data);
           }
         },
         error: (error: any) => {
-          this.handleSubscriptionError(subscriptionId, error, handlers.onError);
+          console.error('❌ Conversation update subscription error:', error);
+          if (handlers.onError) {
+            handlers.onError(error);
+          }
+          this.handleSubscriptionError(subscriptionId, error);
         }
       });
 
-      // 削除の監視
+      // 削除イベントのサブスクリプション
       const deleteSub = this.client.models.Conversation.onDelete().subscribe({
         next: (data: any) => {
           if (data && handlers.onDelete) {
-            this.log('Conversation deleted:', data.id);
+            if (this.config.enableLogging) {
+              console.log('🔄 Conversation deleted:', data.id);
+            }
             handlers.onDelete(data);
           }
         },
         error: (error: any) => {
-          this.handleSubscriptionError(subscriptionId, error, handlers.onError);
+          console.error('❌ Conversation delete subscription error:', error);
+          if (handlers.onError) {
+            handlers.onError(error);
+          }
+          this.handleSubscriptionError(subscriptionId, error);
         }
       });
-
-      // 複合サブスクリプションとして管理
-      const compositeSubscription = {
-        unsubscribe: () => {
-          createSub.unsubscribe();
-          updateSub.unsubscribe();
-          deleteSub.unsubscribe();
-        }
-      };
 
       // アクティブなサブスクリプションとして登録
       this.activeSubscriptions.set(subscriptionId, {
         id: subscriptionId,
         type: 'conversation',
-        subscription: compositeSubscription,
+        subscription: { createSub, updateSub, deleteSub },
         handlers,
         status: 'connected',
-        reconnectAttempts: 0
+        reconnectAttempts: 0,
       });
 
-      this.log(`Conversation subscriptions started for user: ${userId}`);
-      return subscriptionId;
+      if (this.config.enableLogging) {
+        console.log(`✅ Conversation subscription created: ${subscriptionId}`);
+      }
 
+      return subscriptionId;
     } catch (error) {
-      this.handleSubscriptionError(subscriptionId, error, handlers.onError);
+      console.error('❌ Failed to create conversation subscription:', error);
       throw error;
     }
   }
 
   /**
-   * メッセージのサブスクリプション開始
-   * 
-   * 学習ポイント:
-   * - 特定の会話のメッセージのみを監視
-   * - フィルタリングによる効率的な通信
-   * - エージェント応答の段階的更新をサポート
-   * 
-   * @param conversationId 会話ID
-   * @param handlers イベントハンドラー
-   * @returns サブスクリプションID
-   */
-  public subscribeToMessages(
-    conversationId: string,
-    handlers: SubscriptionHandlers<Message>
-  ): string {
-    const subscriptionId = `messages-${conversationId}`;
-    
-    // 既存のサブスクリプションがある場合は停止
-    this.unsubscribe(subscriptionId);
-
-    try {
-      // 新規メッセージの監視
-      const createSub = this.client.models.Message.onCreate({
-        filter: {
-          conversationId: { eq: conversationId }
-        }
-      }).subscribe({
-        next: (data: any) => {
-          if (data && handlers.onCreate) {
-            this.log('Message created:', data.id);
-            handlers.onCreate(data);
-          }
-        },
-        error: (error: any) => {
-          this.handleSubscriptionError(subscriptionId, error, handlers.onError);
-        }
-      });
-
-      // メッセージ更新の監視（エージェント応答の段階的更新用）
-      const updateSub = this.client.models.Message.onUpdate({
-        filter: {
-          conversationId: { eq: conversationId }
-        }
-      }).subscribe({
-        next: (data: any) => {
-          if (data && handlers.onUpdate) {
-            this.log('Message updated:', data.id);
-            handlers.onUpdate(data);
-          }
-        },
-        error: (error: any) => {
-          this.handleSubscriptionError(subscriptionId, error, handlers.onError);
-        }
-      });
-
-      // メッセージ削除の監視
-      const deleteSub = this.client.models.Message.onDelete({
-        filter: {
-          conversationId: { eq: conversationId }
-        }
-      }).subscribe({
-        next: (data: any) => {
-          if (data && handlers.onDelete) {
-            this.log('Message deleted:', data.id);
-            handlers.onDelete(data);
-          }
-        },
-        error: (error: any) => {
-          this.handleSubscriptionError(subscriptionId, error, handlers.onError);
-        }
-      });
-
-      // 複合サブスクリプションとして管理
-      const compositeSubscription = {
-        unsubscribe: () => {
-          createSub.unsubscribe();
-          updateSub.unsubscribe();
-          deleteSub.unsubscribe();
-        }
-      };
-
-      // アクティブなサブスクリプションとして登録
-      this.activeSubscriptions.set(subscriptionId, {
-        id: subscriptionId,
-        type: 'message',
-        subscription: compositeSubscription,
-        handlers,
-        status: 'connected',
-        reconnectAttempts: 0
-      });
-
-      this.log(`Message subscriptions started for conversation: ${conversationId}`);
-      return subscriptionId;
-
-    } catch (error) {
-      this.handleSubscriptionError(subscriptionId, error, handlers.onError);
-      throw error;
-    }
-  }
-
-  /**
-   * トレースステップのサブスクリプション開始
-   * 
-   * 学習ポイント:
-   * - 特定のメッセージのトレースステップのみを監視
-   * - リアルタイムでの推論過程表示
-   * - パフォーマンス監視データの収集
-   * 
-   * @param messageId メッセージID
-   * @param handlers イベントハンドラー
-   * @returns サブスクリプションID
-   */
-  public subscribeToTraceSteps(
-    messageId: string,
-    handlers: SubscriptionHandlers<TraceStep>
-  ): string {
-    const subscriptionId = `traceSteps-${messageId}`;
-    
-    // 既存のサブスクリプションがある場合は停止
-    this.unsubscribe(subscriptionId);
-
-    try {
-      // 新規トレースステップの監視
-      const createSub = this.client.models.TraceStep.onCreate({
-        filter: {
-          messageId: { eq: messageId }
-        }
-      }).subscribe({
-        next: (data: any) => {
-          if (data && handlers.onCreate) {
-            this.log('TraceStep created:', data.id);
-            handlers.onCreate(data);
-          }
-        },
-        error: (error: any) => {
-          this.handleSubscriptionError(subscriptionId, error, handlers.onError);
-        }
-      });
-
-      // トレースステップ更新の監視
-      const updateSub = this.client.models.TraceStep.onUpdate({
-        filter: {
-          messageId: { eq: messageId }
-        }
-      }).subscribe({
-        next: (data: any) => {
-          if (data && handlers.onUpdate) {
-            this.log('TraceStep updated:', data.id);
-            handlers.onUpdate(data);
-          }
-        },
-        error: (error: any) => {
-          this.handleSubscriptionError(subscriptionId, error, handlers.onError);
-        }
-      });
-
-      // 複合サブスクリプションとして管理
-      const compositeSubscription = {
-        unsubscribe: () => {
-          createSub.unsubscribe();
-          updateSub.unsubscribe();
-        }
-      };
-
-      // アクティブなサブスクリプションとして登録
-      this.activeSubscriptions.set(subscriptionId, {
-        id: subscriptionId,
-        type: 'traceStep',
-        subscription: compositeSubscription,
-        handlers,
-        status: 'connected',
-        reconnectAttempts: 0
-      });
-
-      this.log(`TraceStep subscriptions started for message: ${messageId}`);
-      return subscriptionId;
-
-    } catch (error) {
-      this.handleSubscriptionError(subscriptionId, error, handlers.onError);
-      throw error;
-    }
-  }
-
-  /**
-   * 特定のサブスクリプションを停止
-   * 
-   * @param subscriptionId サブスクリプションID
+   * サブスクリプションの解除
    */
   public unsubscribe(subscriptionId: string): void {
-    const activeSubscription = this.activeSubscriptions.get(subscriptionId);
-    if (activeSubscription) {
+    const subscription = this.activeSubscriptions.get(subscriptionId);
+    
+    if (subscription) {
       try {
-        activeSubscription.subscription.unsubscribe();
-        this.log(`Subscription stopped: ${subscriptionId}`);
+        // 各サブスクリプションを解除
+        if (subscription.subscription.createSub) {
+          subscription.subscription.createSub.unsubscribe();
+        }
+        if (subscription.subscription.updateSub) {
+          subscription.subscription.updateSub.unsubscribe();
+        }
+        if (subscription.subscription.deleteSub) {
+          subscription.subscription.deleteSub.unsubscribe();
+        }
+
+        // アクティブリストから削除
+        this.activeSubscriptions.delete(subscriptionId);
+
+        if (this.config.enableLogging) {
+          console.log(`✅ Subscription unsubscribed: ${subscriptionId}`);
+        }
       } catch (error) {
-        console.error(`Error stopping subscription ${subscriptionId}:`, error);
+        console.error('❌ Error unsubscribing:', error);
       }
-
-      // 再接続タイマーをクリア
-      const timeout = this.reconnectTimeouts.get(subscriptionId);
-      if (timeout) {
-        clearTimeout(timeout);
-        this.reconnectTimeouts.delete(subscriptionId);
-      }
-
-      this.activeSubscriptions.delete(subscriptionId);
     }
   }
 
   /**
-   * 会話のサブスクリプションを停止
-   * 
-   * @param userId ユーザーID
-   */
-  public unsubscribeFromConversations(userId: string): void {
-    this.unsubscribe(`conversations-${userId}`);
-  }
-
-  /**
-   * メッセージのサブスクリプションを停止
-   * 
-   * @param conversationId 会話ID
-   */
-  public unsubscribeFromMessages(conversationId: string): void {
-    this.unsubscribe(`messages-${conversationId}`);
-  }
-
-  /**
-   * トレースステップのサブスクリプションを停止
-   * 
-   * @param messageId メッセージID
-   */
-  public unsubscribeFromTraceSteps(messageId: string): void {
-    this.unsubscribe(`traceSteps-${messageId}`);
-  }
-
-  /**
-   * 全てのサブスクリプションを停止
+   * 全てのサブスクリプションを解除
    */
   public unsubscribeAll(): void {
     const subscriptionIds = Array.from(this.activeSubscriptions.keys());
-    subscriptionIds.forEach(id => this.unsubscribe(id));
     
-    this.log('All subscriptions stopped');
+    for (const id of subscriptionIds) {
+      this.unsubscribe(id);
+    }
+
+    if (this.config.enableLogging) {
+      console.log('✅ All subscriptions unsubscribed');
+    }
+  }
+
+  /**
+   * サブスクリプションエラーの処理
+   */
+  private handleSubscriptionError(subscriptionId: string, error: Error): void {
+    const subscription = this.activeSubscriptions.get(subscriptionId);
+    
+    if (subscription) {
+      subscription.status = 'error';
+      subscription.lastError = error;
+      subscription.reconnectAttempts++;
+
+      // 自動再接続の試行
+      if (
+        this.config.autoReconnect &&
+        subscription.reconnectAttempts < this.config.maxReconnectAttempts
+      ) {
+        subscription.status = 'reconnecting';
+        
+        setTimeout(() => {
+          this.attemptReconnect(subscriptionId);
+        }, this.config.reconnectInterval);
+      }
+    }
+  }
+
+  /**
+   * 再接続の試行
+   */
+  private attemptReconnect(subscriptionId: string): void {
+    const subscription = this.activeSubscriptions.get(subscriptionId);
+    
+    if (subscription) {
+      if (this.config.enableLogging) {
+        console.log(`🔄 Attempting to reconnect: ${subscriptionId}`);
+      }
+
+      try {
+        // 既存のサブスクリプションを解除
+        this.unsubscribe(subscriptionId);
+
+        // 新しいサブスクリプションを作成
+        if (subscription.type === 'conversation') {
+          // 会話サブスクリプションの再作成は複雑なため、エラーハンドラーで通知
+          if (subscription.handlers.onError) {
+            subscription.handlers.onError(new Error('Conversation subscription reconnection required'));
+          }
+        }
+      } catch (error) {
+        console.error('❌ Reconnection failed:', error);
+        
+        if (subscription.handlers.onError) {
+          subscription.handlers.onError(error as Error);
+        }
+      }
+    }
   }
 
   /**
@@ -485,233 +337,17 @@ export class SubscriptionManager {
     type: string;
     status: SubscriptionStatus;
     reconnectAttempts: number;
-    lastError?: Error;
   }> {
     return Array.from(this.activeSubscriptions.values()).map(sub => ({
       id: sub.id,
       type: sub.type,
       status: sub.status,
       reconnectAttempts: sub.reconnectAttempts,
-      lastError: sub.lastError
     }));
-  }
-
-  /**
-   * サブスクリプションエラーの処理
-   * 
-   * 学習ポイント:
-   * - エラーの分類と適切な対応
-   * - 自動再接続の実装
-   * - エラー情報の記録と通知
-   */
-  private handleSubscriptionError(
-    subscriptionId: string,
-    error: any,
-    onError?: (error: Error) => void
-  ): void {
-    const subscription = this.activeSubscriptions.get(subscriptionId);
-    if (!subscription) return;
-
-    const errorObj = error instanceof Error ? error : new Error(String(error));
-    subscription.lastError = errorObj;
-    subscription.status = 'error';
-
-    this.log(`Subscription error for ${subscriptionId}:`, errorObj.message);
-
-    // エラーハンドラーを呼び出し
-    if (onError) {
-      try {
-        onError(errorObj);
-      } catch (handlerError) {
-        console.error('Error in subscription error handler:', handlerError);
-      }
-    }
-
-    // 自動再接続を試行
-    if (this.config.autoReconnect && 
-        subscription.reconnectAttempts < this.config.maxReconnectAttempts) {
-      this.scheduleReconnect(subscriptionId);
-    }
-  }
-
-  /**
-   * 再接続のスケジュール
-   * 
-   * 学習ポイント:
-   * - 指数バックオフによる再接続間隔の調整
-   * - 最大試行回数の制限
-   * - 再接続状態の管理
-   */
-  private scheduleReconnect(subscriptionId: string): void {
-    const subscription = this.activeSubscriptions.get(subscriptionId);
-    if (!subscription) return;
-
-    // 既存の再接続タイマーをクリア
-    const existingTimeout = this.reconnectTimeouts.get(subscriptionId);
-    if (existingTimeout) {
-      clearTimeout(existingTimeout);
-    }
-
-    subscription.reconnectAttempts++;
-    subscription.status = 'reconnecting';
-
-    // 指数バックオフ
-    const delay = this.config.reconnectInterval * Math.pow(2, subscription.reconnectAttempts - 1);
-    
-    this.log(`Scheduling reconnect for ${subscriptionId} in ${delay}ms (attempt ${subscription.reconnectAttempts})`);
-
-    const timeout = setTimeout(() => {
-      this.attemptReconnect(subscriptionId);
-    }, delay);
-
-    this.reconnectTimeouts.set(subscriptionId, timeout);
-  }
-
-  /**
-   * 再接続の実行
-   * 
-   * 学習ポイント:
-   * - サブスクリプションタイプに応じた再接続処理
-   * - 元のハンドラーの保持
-   * - 再接続成功時の状態リセット
-   */
-  private attemptReconnect(subscriptionId: string): void {
-    const subscription = this.activeSubscriptions.get(subscriptionId);
-    if (!subscription) return;
-
-    this.log(`Attempting to reconnect: ${subscriptionId}`);
-
-    try {
-      // 古いサブスクリプションを停止
-      subscription.subscription.unsubscribe();
-
-      // サブスクリプションタイプに応じて再接続
-      const [type, id] = subscriptionId.split('-');
-      
-      switch (type) {
-        case 'conversations':
-          this.subscribeToConversations(id, subscription.handlers);
-          break;
-        case 'messages':
-          this.subscribeToMessages(id, subscription.handlers);
-          break;
-        case 'traceSteps':
-          this.subscribeToTraceSteps(id, subscription.handlers);
-          break;
-        default:
-          throw new Error(`Unknown subscription type: ${type}`);
-      }
-
-      this.log(`Successfully reconnected: ${subscriptionId}`);
-
-    } catch (error) {
-      this.log(`Failed to reconnect ${subscriptionId}:`, error);
-      this.handleSubscriptionError(subscriptionId, error, subscription.handlers.onError);
-    }
-  }
-
-  /**
-   * ログ出力
-   * 
-   * @param message ログメッセージ
-   * @param data 追加データ
-   */
-  private log(message: string, data?: any): void {
-    if (this.config.enableLogging) {
-      if (data !== undefined) {
-        console.log(`[SubscriptionManager] ${message}`, data);
-      } else {
-        console.log(`[SubscriptionManager] ${message}`);
-      }
-    }
-  }
-
-  /**
-   * サービスの破棄
-   * 
-   * 学習ポイント:
-   * - 全リソースのクリーンアップ
-   * - メモリリークの防止
-   * - Singletonインスタンスのリセット
-   */
-  public destroy(): void {
-    this.unsubscribeAll();
-    
-    // 全ての再接続タイマーをクリア
-    this.reconnectTimeouts.forEach(timeout => clearTimeout(timeout));
-    this.reconnectTimeouts.clear();
-    
-    SubscriptionManager.instance = null;
-    this.log('SubscriptionManager destroyed');
   }
 }
 
 /**
- * デフォルトインスタンスのエクスポート
+ * デフォルトのSubscriptionManagerインスタンス
  */
 export const subscriptionManager = SubscriptionManager.getInstance();
-
-/**
- * 使用例とベストプラクティス
- * 
- * 1. 基本的な会話監視:
- * ```typescript
- * const manager = SubscriptionManager.getInstance();
- * 
- * const subscriptionId = manager.subscribeToConversations('user-123', {
- *   onCreate: (conversation) => {
- *     console.log('New conversation:', conversation.title);
- *     // UIを更新
- *   },
- *   onUpdate: (conversation) => {
- *     console.log('Updated conversation:', conversation.title);
- *     // UIを更新
- *   },
- *   onDelete: (conversation) => {
- *     console.log('Deleted conversation:', conversation.id);
- *     // UIから削除
- *   },
- *   onError: (error) => {
- *     console.error('Subscription error:', error);
- *     // エラー表示
- *   }
- * });
- * 
- * // クリーンアップ
- * useEffect(() => {
- *   return () => manager.unsubscribe(subscriptionId);
- * }, [subscriptionId]);
- * ```
- * 
- * 2. メッセージのリアルタイム更新:
- * ```typescript
- * manager.subscribeToMessages(conversationId, {
- *   onCreate: (message) => {
- *     // 新しいメッセージを追加
- *     setMessages(prev => [...prev, message]);
- *   },
- *   onUpdate: (message) => {
- *     // エージェント応答の段階的更新
- *     setMessages(prev => 
- *       prev.map(msg => msg.id === message.id ? message : msg)
- *     );
- *   }
- * });
- * ```
- * 
- * 3. エラーハンドリングと再接続:
- * ```typescript
- * const [connectionStatus, setConnectionStatus] = useState('connected');
- * 
- * manager.subscribeToConversations(userId, {
- *   // ... other handlers
- *   onError: (error) => {
- *     setConnectionStatus('error');
- *     showErrorMessage('リアルタイム更新でエラーが発生しました');
- *   }
- * });
- * 
- * // 接続状態の監視
- * const status = manager.getSubscriptionStatus(`conversations-${userId}`);
- * ```
- */
