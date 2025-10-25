@@ -249,7 +249,11 @@ function createRealAmplifyConfig(): ResourcesConfig | null {
             ? 'userPool'
             : 'apiKey',
           apiKey: amplifyOutputs.data.api_key,
-        },
+          // model_introspectionを追加してgenerateClient()がモデルを認識できるようにする
+          ...(amplifyOutputs.data.model_introspection && {
+            model_introspection: amplifyOutputs.data.model_introspection
+          }),
+        } as any, // 型安全性のためにanyでキャスト
       },
     };
 
@@ -292,17 +296,18 @@ export function getAmplifyConfig(options: AmplifyConfigOptions = { mode: getCurr
 
     case 'DEVELOPMENT':
     case 'PRODUCTION':
-      const realConfig = createRealAmplifyConfig();
-      if (realConfig) {
+      // amplify_outputs.jsonを直接使用（model_introspectionが含まれている）
+      if (amplifyOutputs) {
         if (options.enableLogging !== false && !hasLoggedAmplifyConfig) {
-          console.log(`🚀 Using real Amplify configuration (${mode})`);
-          console.log(`📍 Region: ${realConfig.API?.GraphQL?.region}`);
-          console.log(`🔐 Auth: ${realConfig.Auth?.Cognito?.userPoolId}`);
+          console.log(`🚀 Using direct amplify_outputs.json configuration (${mode})`);
+          console.log(`📍 Region: ${amplifyOutputs.data?.aws_region}`);
+          console.log(`🔐 Auth: ${amplifyOutputs.auth?.user_pool_id}`);
+          console.log(`📊 Models: ${Object.keys(amplifyOutputs.data?.model_introspection?.models || {}).length} available`);
         }
-        return realConfig;
+        return amplifyOutputs as ResourcesConfig;
       } else {
-        console.warn(`⚠️ Failed to load real config, falling back to development mode (requested: ${mode})`);
-        // モック設定ではなく、最小限の実設定を返す
+        console.warn(`⚠️ amplify_outputs.json not found, falling back to environment variables (requested: ${mode})`);
+        // 環境変数からの最小限の設定
         return {
           Auth: {
             Cognito: {
@@ -327,7 +332,7 @@ export function getAmplifyConfig(options: AmplifyConfigOptions = { mode: getCurr
               endpoint: process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || 'missing-graphql-endpoint',
               region: process.env.NEXT_PUBLIC_AWS_REGION || 'ap-northeast-1',
               defaultAuthMode: 'userPool',
-              apiKey: process.env.NEXT_PUBLIC_API_KEY,
+              ...(process.env.NEXT_PUBLIC_API_KEY && { apiKey: process.env.NEXT_PUBLIC_API_KEY }),
             },
           },
         };
@@ -335,7 +340,7 @@ export function getAmplifyConfig(options: AmplifyConfigOptions = { mode: getCurr
 
     default:
       console.warn(`⚠️ Unknown mode: ${mode}, using development config`);
-      return createRealAmplifyConfig() || mockAmplifyConfig;
+      return amplifyOutputs ? (amplifyOutputs as ResourcesConfig) : mockAmplifyConfig;
   }
 }
 

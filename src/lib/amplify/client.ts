@@ -38,7 +38,6 @@
 import { generateClient } from 'aws-amplify/data';
 import { Amplify } from 'aws-amplify';
 import { getAmplifyConfig, getCurrentEnvironmentMode } from './config';
-import type { Schema } from '@/amplify/data/resource';
 
 /**
  * Amplify設定の初期化
@@ -64,7 +63,7 @@ function initializeAmplify() {
     if (mode === 'DEVELOPMENT') {
       console.log('🔧 Development mode: Using real AWS resources with dev settings');
     } else if (mode === 'PRODUCTION') {
-      console.log('�  Production mode: Using real AWS resources with prod settings');
+      console.log('🚀 Production mode: Using real AWS resources with prod settings');
     }
   } catch (error) {
     console.error('❌ Failed to configure Amplify:', error);

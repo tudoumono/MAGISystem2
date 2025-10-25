@@ -17,6 +17,7 @@ import './globals.css';
 import ClientEnvironmentStatus from '../components/dev/ClientEnvironmentStatus';
 import { ServerAuthProvider } from '../components/auth/ServerAuthProvider';
 import { AuthProvider } from '../components/auth/AuthProvider';
+import { AmplifyProvider } from '../components/amplify/AmplifyProvider';
 
 /**
  * フォント設定
@@ -155,20 +156,22 @@ export default function RootLayout({
         `}
         suppressHydrationWarning
       >
-        <ServerAuthProvider>
-          <AuthProvider>
-            {/* メインコンテンツエリア */}
-            <div id="root" className="relative min-h-screen">
-              {children}
-            </div>
-            
-            {/* ポータル用のコンテナ（モーダル、トースト等） */}
-            <div id="portal-root" />
-            
-            {/* 開発環境での環境ステータス表示 */}
-            <ClientEnvironmentStatus />
-          </AuthProvider>
-        </ServerAuthProvider>
+        <AmplifyProvider>
+          <ServerAuthProvider>
+            <AuthProvider>
+              {/* メインコンテンツエリア */}
+              <div id="root" className="relative min-h-screen">
+                {children}
+              </div>
+              
+              {/* ポータル用のコンテナ（モーダル、トースト等） */}
+              <div id="portal-root" />
+              
+              {/* 開発環境での環境ステータス表示 */}
+              <ClientEnvironmentStatus />
+            </AuthProvider>
+          </ServerAuthProvider>
+        </AmplifyProvider>
       </body>
     </html>
   );
