@@ -110,33 +110,16 @@ export function getCurrentEnvironmentMode(): EnvironmentMode {
     hasLoggedEnvironmentMode = true;
   }
   
-  // モック機能は完全に無効化
-  // Phase 3: 実際のAmplify Dataとの統合（モック機能停止）
-
-  // 環境変数による強制指定
-  // 優先順位: NEXT_PUBLIC_AMPLIFY_MODE (client+server) > AMPLIFY_MODE (server only)
-  const forcedMode = (process.env.NEXT_PUBLIC_AMPLIFY_MODE || process.env.AMPLIFY_MODE) as EnvironmentMode;
-  if (forcedMode && ['MOCK', 'DEVELOPMENT', 'PRODUCTION'].includes(forcedMode)) {
-    if (!hasLoggedEnvironmentMode) {
-      console.log('Using forced mode from env var:', forcedMode);
-    }
-    cachedEnvironmentMode = forcedMode;
-    return cachedEnvironmentMode;
-  }
+  // モック機能は完全に削除 - 常に実環境を使用
+  console.log('🚫 Mock mode completely disabled - using real Amplify only');
 
   // 本番環境の判定
   if (process.env.NODE_ENV === 'production') {
-    cachedEnvironmentMode = amplifyOutputs ? 'PRODUCTION' : 'DEVELOPMENT';
+    cachedEnvironmentMode = 'PRODUCTION';
     return cachedEnvironmentMode;
   }
 
-  // 開発環境の判定
-  if (amplifyOutputs) {
-    cachedEnvironmentMode = 'DEVELOPMENT';
-    return cachedEnvironmentMode;
-  }
-
-  // デフォルトは開発モード（モック機能は削除済み）
+  // 開発環境（デフォルト）
   cachedEnvironmentMode = 'DEVELOPMENT';
   return cachedEnvironmentMode;
 }

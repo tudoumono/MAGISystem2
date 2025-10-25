@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Agent Response Panel Test Page
  * 

@@ -1,9 +1,14 @@
+'use client';
+
 /**
- * Test Page - MAGI Decision UI テストページ
+ * Test Page - MAGI Decision UI テストページ（クライアントコンポーネント）
  * 
  * このページはMAGI Decision UIの基本機能をテストするためのページです。
  * 実装したuseConversationsフックとConversationExampleコンポーネントの
  * 動作を確認できます。
+ * 
+ * 重要: Amplify Dataクライアントはクライアントサイドでのみ動作するため、
+ * 'use client' ディレクティブを使用してクライアントコンポーネント化しています。
  * 
  * アクセス方法: http://localhost:3000/test
  * 
@@ -16,6 +21,8 @@
  * - ローディング状態
  * - デバッグ情報
  */
+
+'use client';
 
 import { ConversationExample } from '@/components/examples/ConversationExample';
 
@@ -162,10 +169,6 @@ export default function TestPage() {
   );
 }
 
-/**
- * メタデータ設定
- */
-export const metadata = {
-  title: 'MAGI Decision UI - テスト環境',
-  description: 'MAGI Decision UIの基本機能をテストするためのページです。Phase 1-2のモックデータ環境で動作します。',
-};
+// メタデータはクライアントコンポーネントではエクスポートできないため削除
+// title: 'MAGI Decision UI - テスト環境'
+// description: 'MAGI Decision UIの基本機能をテストするためのページです。Phase 1-2のモックデータ環境で動作します。'

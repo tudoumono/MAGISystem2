@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * useMessages Hook - メッセージデータ管理
  * 
