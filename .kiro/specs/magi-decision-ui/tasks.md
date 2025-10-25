@@ -182,7 +182,10 @@
 ## Phase 3: コア機能実装（エージェント連携）
 
 - [ ] 10. 実際のAmplify Data統合とリアルタイム機能 **[🤖 Kiro + 👤 Human]** *(Phase 2完了後に実施)*
-  - [x] 10.1 Amplify Data実環境への切り替え **[🤖 Kiro + 👤 Human]** *(準備完了・Phase 2後に有効化)*
+
+
+
+  - [x] 10.1   Amplify Data実環境への切り替え **[🤖 Kiro + 👤 Human]** *(準備完了・Phase 2後に有効化)*
 
 
 
