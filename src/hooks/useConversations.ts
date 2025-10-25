@@ -268,10 +268,7 @@ export function useConversations(): UseConversationsReturn {
         throw error;
       }
     } else {
-      // 実環境: オフライン対応統合
-      const { offlineManager } = require('@/lib/realtime/offline-support');
-      const { optimisticHelpers } = require('@/lib/optimistic-updates');
-      
+      // 実環境: 基本的な楽観的更新（オフライン対応は後で実装）
       const optimisticConversation: Conversation = {
         id: crypto.randomUUID(),
         userId: 'current-user',
@@ -282,46 +279,27 @@ export function useConversations(): UseConversationsReturn {
       };
 
       // 楽観的更新
-      setConversations(prev => optimisticHelpers.addToArray(prev, optimisticConversation, 'start'));
+      setConversations(prev => [optimisticConversation, ...prev]);
 
       try {
-        if (offlineManager.isOnline()) {
-          // オンライン: 直接実行
-          const result = await client.models.Conversation.create({
-            title: params.title,
-            agentPresetId: params.agentPresetId || null,
-            userId: 'current-user',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          });
+        // 直接実行
+        const result = await client.models.Conversation.create({
+          title: params.title,
+          agentPresetId: params.agentPresetId || null,
+          userId: 'current-user',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
 
-          if (result.data) {
-            setConversations(prev => 
-              prev.map(conv => 
-                conv.id === optimisticConversation.id ? result.data! : conv
-              )
-            );
-            return result.data;
-          } else {
-            throw new Error('Failed to create conversation');
-          }
+        if (result.data) {
+          setConversations(prev => 
+            prev.map(conv => 
+              conv.id === optimisticConversation.id ? result.data! : conv
+            )
+          );
+          return result.data;
         } else {
-          // オフライン: キューに追加
-          await offlineManager.queueOperation({
-            type: 'CREATE_CONVERSATION',
-            data: {
-              title: params.title,
-              agentPresetId: params.agentPresetId || null,
-              userId: 'current-user',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            },
-            retry: true,
-            priority: 'normal'
-          });
-
-          // オフライン時は楽観的データをそのまま返す
-          return optimisticConversation;
+          throw new Error('Failed to create conversation');
         }
       } catch (err) {
         // エラー時: ロールバック
