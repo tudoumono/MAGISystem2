@@ -28,8 +28,8 @@ import {
 import { trace, context, SpanStatusCode } from '@opentelemetry/api';
 
 // 型定義のインポート
-import { AskAgentRequest, AskAgentResponse } from '../../types/api';
-import { AgentResponse, JudgeResponse, AgentType, DecisionType } from '../../types/domain';
+import type { AskAgentRequest, AskAgentResponse } from '../../types/api';
+import type { AgentResponse, JudgeResponse, AgentType, DecisionType } from '../../types/domain';
 
 /**
  * Bedrock Agent Runtime Clientの初期化

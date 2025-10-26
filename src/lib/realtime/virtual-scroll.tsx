@@ -63,7 +63,7 @@
  * 関連: src/hooks/useConversations.ts, src/hooks/useMessages.ts
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 /**
  * 仮想アイテムの情報
@@ -148,7 +148,7 @@ export function useVirtualScroll(config: VirtualScrollConfig): VirtualScrollResu
   
   // サイズキャッシュ
   const sizeCache = useRef<SizeCache>({});
-  const scrollTimeoutRef = useRef<NodeJS.Timeout>();
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const measurementsRef = useRef<Map<number, number>>(new Map());
 
   /**
@@ -542,93 +542,3 @@ export function useInfiniteScroll(
     }
   }, [virtualItems, hasNextPage, isFetchingNextPage, fetchNextPage, threshold]);
 }
-
-/**
- * 使用例とベストプラクティス
- * 
- * 1. 基本的な仮想スクロール:
- * ```typescript
- * const VirtualConversationList = ({ conversations }: { conversations: Conversation[] }) => {
- *   const scrollElementRef = useRef<HTMLDivElement>(null);
- *   
- *   const { virtualItems, totalSize, scrollToIndex } = useVirtualScroll({
- *     count: conversations.length,
- *     getScrollElement: () => scrollElementRef.current,
- *     estimateSize: () => 80, // 推定高さ
- *     overscan: 5
- *   });
- * 
- *   return (
- *     <VirtualScrollContainer ref={scrollElementRef} height={400}>
- *       <div style={{ height: totalSize, position: 'relative' }}>
- *         {virtualItems.map(virtualItem => (
- *           <VirtualScrollItem key={virtualItem.index} virtualItem={virtualItem}>
- *             <ConversationItem conversation={conversations[virtualItem.index]} />
- *           </VirtualScrollItem>
- *         ))}
- *       </div>
- *     </VirtualScrollContainer>
- *   );
- * };
- * ```
- * 
- * 2. 無限スクロールとの組み合わせ:
- * ```typescript
- * const InfiniteConversationList = () => {
- *   const { conversations, hasNextPage, isFetchingNextPage, fetchNextPage } = useInfiniteConversations();
- *   const scrollElementRef = useRef<HTMLDivElement>(null);
- *   
- *   const virtualScrollResult = useVirtualScroll({
- *     count: conversations.length,
- *     getScrollElement: () => scrollElementRef.current,
- *     estimateSize: () => 80
- *   });
- * 
- *   useInfiniteScroll(virtualScrollResult, {
- *     hasNextPage,
- *     isFetchingNextPage,
- *     fetchNextPage,
- *     threshold: 10
- *   });
- * 
- *   return (
- *     <VirtualScrollContainer ref={scrollElementRef} height="100vh">
- *       <div style={{ height: virtualScrollResult.totalSize, position: 'relative' }}>
- *         {virtualScrollResult.virtualItems.map(virtualItem => (
- *           <VirtualScrollItem key={virtualItem.index} virtualItem={virtualItem}>
- *             <ConversationItem conversation={conversations[virtualItem.index]} />
- *           </VirtualScrollItem>
- *         ))}
- *         {isFetchingNextPage && (
- *           <div className="loading-indicator">読み込み中...</div>
- *         )}
- *       </div>
- *     </VirtualScrollContainer>
- *   );
- * };
- * ```
- * 
- * 3. 動的サイズ対応:
- * ```typescript
- * const DynamicVirtualList = () => {
- *   const { virtualItems, measure } = useVirtualScroll({
- *     count: items.length,
- *     getScrollElement: () => scrollElementRef.current,
- *     estimateSize: (index) => {
- *       // アイテムの内容に基づいて推定サイズを計算
- *       const item = items[index];
- *       return item.content.length > 100 ? 120 : 80;
- *     }
- *   });
- * 
- *   // アイテムのレンダリング後にサイズを再測定
- *   useEffect(() => {
- *     measure();
- *   }, [items, measure]);
- * 
- *   return (
- *     // ... レンダリング
- *   );
- * };
- * ```
- */
