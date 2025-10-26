@@ -169,7 +169,8 @@ export function useConversations(): UseConversationsReturn {
 
       const result = await client.models.Conversation.list({
         // 最新の会話から順に取得
-        sortDirection: 'DESC'
+        sortDirection: 'DESC',
+        authMode: 'apiKey' // テスト用にAPIキー認証を使用
         // Phase 3で追加: 関連するメッセージも同時に取得（N+1問題を回避）
         // selectionSet: ['id', 'title', 'agentPresetId', 'createdAt', 'updatedAt', 'messages.*']
       });
@@ -245,6 +246,8 @@ export function useConversations(): UseConversationsReturn {
           userId: 'current-user',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
+        }, {
+          authMode: 'apiKey' // テスト用にAPIキー認証を使用
         });
 
         if (result.data) {
@@ -289,6 +292,8 @@ export function useConversations(): UseConversationsReturn {
           userId: 'current-user',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
+        }, {
+          authMode: 'apiKey' // テスト用にAPIキー認証を使用
         });
 
         if (result.data) {
@@ -349,6 +354,8 @@ export function useConversations(): UseConversationsReturn {
         title: params.title,
         agentPresetId: params.agentPresetId || null,
         updatedAt: new Date().toISOString()
+      }, {
+        authMode: 'apiKey' // テスト用にAPIキー認証を使用
       });
 
       if (result.data) {
@@ -392,7 +399,9 @@ export function useConversations(): UseConversationsReturn {
 
     try {
       // サーバーに削除リクエスト
-      const result = await client.models.Conversation.delete({ id });
+      const result = await client.models.Conversation.delete({ id }, {
+        authMode: 'apiKey' // テスト用にAPIキー認証を使用
+      });
 
       if (!result.data) {
         throw new Error('Failed to delete conversation');
