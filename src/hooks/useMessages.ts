@@ -73,6 +73,38 @@ import { getAmplifyClient } from '@/lib/amplify/client';
 const client = getAmplifyClient();
 
 /**
+ * メッセージのJSON文字列フィールドをパースする
+ * 
+ * データベースにはJSON文字列として保存されているagentResponsesとjudgeResponseを
+ * JavaScriptオブジェクトに変換します。
+ * 
+ * @param message - パース対象のメッセージ
+ * @returns パースされたメッセージ
+ */
+function parseMessageData(message: any): any {
+  if (!message) return message;
+  
+  try {
+    return {
+      ...message,
+      agentResponses: message.agentResponses
+        ? (typeof message.agentResponses === 'string' 
+            ? JSON.parse(message.agentResponses) 
+            : message.agentResponses)
+        : null,
+      judgeResponse: message.judgeResponse
+        ? (typeof message.judgeResponse === 'string'
+            ? JSON.parse(message.judgeResponse)
+            : message.judgeResponse)
+        : null,
+    };
+  } catch (error) {
+    console.error('Failed to parse message data:', error, message);
+    return message; // パースエラー時は元のデータを返す
+  }
+}
+
+/**
  * メッセージ送信パラメータの型定義
  */
 interface SendMessageParams {
@@ -149,7 +181,8 @@ export function useMessages(conversationId: string): UseMessagesReturn {
         filter: {
           conversationId: { eq: conversationId }
         },
-        sortDirection: 'ASC' // 古いメッセージから順に表示
+        sortDirection: 'ASC', // 古いメッセージから順に表示
+        authMode: 'apiKey' // テスト用にAPIキー認証を使用
         // Phase 3で追加: 関連データも同時に取得
         // selectionSet: [
         //   'id', 'conversationId', 'role', 'content', 
@@ -158,7 +191,8 @@ export function useMessages(conversationId: string): UseMessagesReturn {
       });
 
       if (result.data) {
-        setMessages(result.data);
+        const parsedMessages = result.data.map(parseMessageData);
+        setMessages(parsedMessages);
       }
     } catch (err) {
       console.error('Failed to fetch messages:', err);
@@ -204,6 +238,8 @@ export function useMessages(conversationId: string): UseMessagesReturn {
         role: 'user',
         content: params.content,
         createdAt: new Date().toISOString()
+      }, {
+        authMode: 'apiKey' // テスト用にAPIキー認証を使用
       });
 
       if (!userMessageResult.data) {
@@ -234,27 +270,45 @@ export function useMessages(conversationId: string): UseMessagesReturn {
       const mockAgentResponse = await simulateAgentExecution(params.content);
 
       // 4. エージェント応答でアシスタントメッセージを更新
-      const finalAssistantMessage = await client.models.Message.create({
+      console.log('Creating assistant message with data:', {
         conversationId,
         role: 'assistant',
         content: mockAgentResponse.judgeResponse.summary,
         agentResponses: mockAgentResponse.agentResponses,
         judgeResponse: mockAgentResponse.judgeResponse,
-        traceId: mockAgentResponse.traceId,
-        createdAt: new Date().toISOString()
+        traceId: mockAgentResponse.traceId
       });
 
+      const finalAssistantMessage = await client.models.Message.create({
+        conversationId: conversationId!,
+        role: 'assistant',
+        content: mockAgentResponse.judgeResponse.summary,
+        agentResponses: JSON.stringify(mockAgentResponse.agentResponses),  // ← JSON文字列化
+        judgeResponse: JSON.stringify(mockAgentResponse.judgeResponse),    // ← JSON文字列化
+        traceId: mockAgentResponse.traceId,
+        createdAt: new Date().toISOString()
+      }, {
+        authMode: 'apiKey'
+      });
+
+      console.log('Assistant message creation result:', finalAssistantMessage);
+
       if (finalAssistantMessage.data) {
+        // パース処理を追加
+        const parsedMessage = parseMessageData(finalAssistantMessage.data);
+        
         // 楽観的更新を実際のデータで置換
         setMessages(prev => 
           prev.map(msg => 
-            msg.id === assistantMessage.id ? finalAssistantMessage.data! : msg
+            msg.id === assistantMessage.id ? parsedMessage : msg
           )
         );
         
-        return finalAssistantMessage.data;
+        return parsedMessage;
       } else {
-        throw new Error('Failed to save assistant message');
+        console.error('Failed to save assistant message. Full response:', finalAssistantMessage);
+        console.error('Response errors:', finalAssistantMessage.errors);
+        throw new Error(`Failed to save assistant message: ${JSON.stringify(finalAssistantMessage.errors || 'No error details')}`);
       }
 
     } catch (err) {
@@ -292,6 +346,8 @@ export function useMessages(conversationId: string): UseMessagesReturn {
         agentResponses: params.agentResponses || null,
         judgeResponse: params.judgeResponse || null,
         traceId: params.traceId || null
+      }, {
+        authMode: 'apiKey' // テスト用にAPIキー認証を使用
       });
 
       if (result.data) {

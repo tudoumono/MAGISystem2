@@ -455,8 +455,14 @@ const SystemStatus: React.FC<{
   onNewQuestion?: (() => void) | undefined;
 }> = ({ response, onRetry, onNewQuestion }) => {
   const totalExecutionTime = response.executionTime;
-  const agentCount = response.agentResponses.length;
-  const approvedCount = response.agentResponses.filter(r => r.decision === 'APPROVED').length;
+  const parsedAgentResponses = typeof response.agentResponses === 'string' 
+    ? JSON.parse(response.agentResponses) 
+    : response.agentResponses;
+  const agentCount = Array.isArray(parsedAgentResponses) ? parsedAgentResponses.length : Object.keys(parsedAgentResponses).length;
+  const approvedCount = Array.isArray(parsedAgentResponses)
+    ? parsedAgentResponses.filter(r => r.decision === 'APPROVED').length
+    : Object.values(parsedAgentResponses).filter((r: any) => r.decision === 'APPROVED').length;
+
   
   return (
     <Card className="p-4 bg-gray-50 border-gray-200">
