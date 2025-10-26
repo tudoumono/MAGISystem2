@@ -1,0 +1,42 @@
+{
+  "status": "success",
+  "request_id": "magi_1761490879",
+  "trace_id": "7be62244-f56a-44b2-a304-8fba65dd19ff",
+  "result": {
+    "final_decision": "APPROVED",
+    "voting_result": {
+      "approved": 3,
+      "rejected": 0,
+      "abstained": 0
+    },
+    "summary": "3賢者のうち2名が新プロジェクトの開始を承認し、1名が反対している。メリットの分析が中心だが、リスクや具体的な実施方法については更なる検討が必要。",
+    "recommendation": "新プロジェクトの開始を条件付きで承認する。ただし、詳細な実行計画の策定、リスク評価、必要リソースの確保を行った上で、段階的に進めることを強く推奨する。",
+    "confidence": 0.75,
+    "execution_time": 212175,
+    "agent_responses": [
+      {
+        "agent_id": "caspar",
+        "decision": "APPROVED",
+        "reasoning": "テキスト解析による判断",
+        "confidence": 0.6,
+        "execution_time": 16671
+      },
+      {
+        "agent_id": "balthasar",
+        "decision": "APPROVED",
+        "reasoning": "1. 創造性: 新プロジェクトは革新的アイデアと解決策を生み出す場となります。\n2. 人間性: チームの協力と個人の成長を促進し、意義ある成果を生み出します。\n3. 倫理性: 社会に貢献し、組織の価値観を体現する機会となります。\n4. 変革性: 組織文化と業界に新たな風を吹き込み、進歩をもたらします。\n5. インスピレーション: チームメンバーの情熱を喚起し、挑戦する勇気を与えます。",
+        "confidence": 0.95,
+        "execution_time": 61408
+      },
+      {
+        "agent_id": "melchior",
+        "decision": "APPROVED",
+        "reasoning": "テキスト解析による判断",
+        "confidence": 0.6,
+        "execution_time": 70749
+      }
+    ]
+  },
+  "timestamp": "2025-10-27T00:01:19.616488",
+  "version": "1.0-agentcore"
+}
