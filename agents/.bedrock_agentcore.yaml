@@ -1,0 +1,70 @@
+# AgentCore Runtime Configuration for MAGI Decision System
+# 個人開発用最適化設定
+
+# 基本設定
+region: ap-northeast-1
+runtime_type: agentcore
+
+# エージェント設定
+agent:
+  name: magi-decision-system
+  description: "MAGI Decision System - Multi-Agent Decision Making"
+  
+  # 実行環境設定（個人開発用）
+  runtime:
+    memory: 1024  # MB - 基本的なメモリ設定
+    timeout: 900  # 15分 - 個人開発用タイムアウト
+    
+  # モデル設定
+  models:
+    primary: anthropic.claude-3-5-sonnet-20241022-v2:0
+    fallback: anthropic.claude-3-haiku-20240307-v1:0
+    
+  # 環境変数
+  environment:
+    LOG_LEVEL: INFO
+    REGION: ap-northeast-1
+    ENABLE_TRACING: "true"
+
+# 監視設定（基本レベル）
+observability:
+  enabled: true
+  log_level: INFO
+  metrics:
+    enabled: true
+    namespace: MAGI/AgentCore
+  
+  # 基本トレーシング
+  tracing:
+    enabled: true
+    sample_rate: 0.1  # 10% サンプリング（コスト効率）
+
+# セキュリティ設定
+security:
+  # IAM Role（後で設定）
+  execution_role: ""  # 実際のARNは後で設定
+  
+  # VPC設定（個人開発では不要）
+  vpc_config:
+    enabled: false
+
+# デプロイ設定
+deployment:
+  # 自動スケーリング（基本設定）
+  auto_scaling:
+    enabled: true
+    min_capacity: 0
+    max_capacity: 5  # 個人開発用制限
+    
+  # 更新戦略
+  update_strategy:
+    type: rolling
+    max_unavailable: 1
+
+# コスト最適化
+cost_optimization:
+  # オンデマンド実行
+  provisioned_concurrency: 0
+  
+  # 自動停止
+  idle_timeout: 300  # 5分でアイドル停止
