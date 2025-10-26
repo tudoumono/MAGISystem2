@@ -25,7 +25,7 @@ const backend = defineBackend({
 });
 
 /**
- * カスタムAPI エンドポイントの追加
+ * カスタム関数の環境変数設定
  * 
  * 設計理由:
  * - Bedrock Multi-Agent Collaborationへの専用エンドポイント
@@ -33,22 +33,16 @@ const backend = defineBackend({
  * - REST APIによる柔軟な統合
  * 
  * 学習ポイント:
- * - API Gatewayとの統合
- * - Lambda関数のトリガー設定
- * - CORS設定とセキュリティ
+ * - Amplify Gen2での環境変数設定
+ * - Lambda関数への設定注入
+ * - 認証情報の安全な管理
  */
-backend.bedrockAgentGateway.addEnvironment({
-  // Amplify Data/AI Kitとの統合
-  AMPLIFY_DATA_ENDPOINT: backend.data.url,
-  AMPLIFY_DATA_REGION: backend.data.region,
-  
-  // 認証統合
-  AMPLIFY_AUTH_USER_POOL_ID: backend.auth.resources.userPool.userPoolId,
-  AMPLIFY_AUTH_USER_POOL_CLIENT_ID: backend.auth.resources.userPoolClient.userPoolClientId,
-  
-  // 環境識別
-  AMPLIFY_ENVIRONMENT: process.env.NODE_ENV || 'development',
-});
+// Note: GraphQL endpoint will be available at runtime through amplify_outputs.json
+backend.bedrockAgentGateway.addEnvironment("AMPLIFY_DATA_ENDPOINT", "https://api.amplify.aws/graphql");
+backend.bedrockAgentGateway.addEnvironment("AMPLIFY_DATA_REGION", "us-east-1");
+backend.bedrockAgentGateway.addEnvironment("AMPLIFY_AUTH_USER_POOL_ID", backend.auth.resources.userPool.userPoolId);
+backend.bedrockAgentGateway.addEnvironment("AMPLIFY_AUTH_USER_POOL_CLIENT_ID", backend.auth.resources.userPoolClient.userPoolClientId);
+backend.bedrockAgentGateway.addEnvironment("AMPLIFY_ENVIRONMENT", process.env.NODE_ENV || "development");
 
 /**
  * API Gateway統合の設定
