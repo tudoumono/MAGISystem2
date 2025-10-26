@@ -121,8 +121,8 @@ Lambda Function の中で動作
          │
          ▼
 ┌─────────────────┐
-│   Bedrock API   │
-│ (Claude Models) │
+│ Strands Agents  │
+│ (→ Bedrock API) │
 └─────────────────┘
 ```
 
@@ -135,7 +135,7 @@ Lambda Function の中で動作
    - **BALTHASAR**: 革新的・感情的視点（創造性重視）
    - **MELCHIOR**: バランス型・科学的視点（論理性重視）
 4. **SOLOMON Judge**: 3賢者の結果を統合・評価
-5. **Bedrock API**: Amazon Bedrock Claude 3.5 Sonnet モデル
+5. **Strands Agents SDK**: 内部でAmazon Bedrock Claude 3.5 Sonnet モデルを呼び出し
 
 ---
 
@@ -273,9 +273,10 @@ result = agent(prompt)  # Bedrock API呼び出し
 
 | 技術 | 役割 | 詳細 |
 |------|------|------|
-| **Strands Agents SDK** | AI Agent Framework | マルチエージェント実行 |
-| **Amazon Bedrock** | LLM API | Claude 3.5 Sonnet |
+| **Strands Agents SDK** | AI Agent Framework | マルチエージェント実行、内部でBedrock API呼び出し |
 | **OpenTelemetry** | 分散トレーシング | 監視、デバッグ |
+
+**注意**: Strands Agents SDKが内部でAmazon Bedrock APIを呼び出すため、直接Bedrock APIを使用する必要はありません。
 
 ---
 
