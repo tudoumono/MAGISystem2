@@ -1,14 +1,13 @@
 {
   "name": "bedrock-agent-gateway",
   "version": "1.0.0",
-  "description": "Amazon Bedrock Multi-Agent Collaboration Gateway for MAGI Decision System",
+  "description": "Strands Agents Gateway for MAGI Decision System",
   "main": "handler.js",
   "scripts": {
     "build": "tsc",
     "test": "jest"
   },
   "dependencies": {
-    "@aws-sdk/client-bedrock-agent-runtime": "^3.490.0",
     "@opentelemetry/api": "^1.7.0",
     "@opentelemetry/auto-instrumentations-node": "^0.40.0",
     "@opentelemetry/exporter-otlp-http": "^0.45.0",
@@ -24,9 +23,8 @@
   "keywords": [
     "aws",
     "lambda",
-    "bedrock",
+    "strands-agents",
     "multi-agent",
-    "collaboration",
     "magi",
     "decision-system"
   ],
