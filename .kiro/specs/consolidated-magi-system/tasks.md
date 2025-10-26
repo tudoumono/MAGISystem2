@@ -15,21 +15,21 @@
 
 ### ステップ1: AgentCore Runtime基盤構築（最優先）
 
-- [ ] 1.1 AgentCore Runtime開発環境構築 **[🤖 Kiro]**
+- [x] 1.1 AgentCore Runtime開発環境構築 **[🤖 Kiro]**
   - Python 3.11+ 仮想環境の作成
   - bedrock-agentcore、strands-agents、bedrock-agentcore-starter-toolkitのインストール
   - AWS認証情報の設定（ap-northeast-1リージョン）
   - 基本的な動作確認
   - _理由: 全ての後続タスクの前提条件_
 
-- [ ] 1.2 基本MAGI Agent実装 **[🤖 Kiro]**
+- [x] 1.2 基本MAGI Agent実装 **[🤖 Kiro]**
   - `magi_agent.py`の作成（BedrockAgentCoreApp使用）
   - 単一エージェントでの基本動作確認
   - エントリーポイント関数の実装
   - `requirements.txt`の作成
   - _理由: 複雑な並列処理前の基本動作確認_
 
-- [ ] 1.3 ローカル動作確認 **[🤖 Kiro]**
+- [x] 1.3 ローカル動作確認 **[🤖 Kiro]**
   - ローカルエージェントサーバーの起動（ポート8080）
   - curlによる基本動作テスト
   - レスポンス形式の確認
