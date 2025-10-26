@@ -1,53 +1,44 @@
-# 統合設計書 - MAGI Decision System
+# 統合設計書 - MAGI Decision System (AgentCore Runtime版)
 
 ## 概要
 
-MAGI Decision Systemは、エヴァンゲリオンのMAGIシステムにインスパイアされた多視点分析システムです。3賢者（CASPAR、BALTHASAR、MELCHIOR）による並列分析とSOLOMON統括システムによる最終判断を組み合わせ、包括的な意思決定支援を提供します。
+MAGI Decision Systemは、AWS公式の`bedrock-agentcore-starter-toolkit`を使用してAmazon Bedrock AgentCore Runtime上に実装される、エヴァンゲリオンのMAGIシステムにインスパイアされた多視点分析システムです。3賢者（CASPAR、BALTHASAR、MELCHIOR）による並列分析とSOLOMON統括システムによる最終判断を組み合わせ、包括的な意思決定支援を提供します。
 
-### 設計原則
+### 設計原則（個人開発最適化）
 
 - **多視点分析**: 3つの異なる視点による並列分析で偏見を軽減
-- **リアルタイム性**: GraphQL Subscriptionsによるライブ更新
-- **可観測性**: OpenTelemetryによる分散トレーシング
-- **スケーラビリティ**: サーバーレスアーキテクチャによる自動スケール
-- **セキュリティ**: オーナーベースアクセス制御とデータ分離
+- **学習効果重視**: AgentCore Runtimeによる最新技術の実践学習
+- **シンプル構成**: 理解しやすく保守しやすい基本構成
+- **AWS公式サポート**: bedrock-agentcore-starter-toolkitによる確実なデプロイ
+- **コスト効率**: 個人開発に適したリソース使用量
+- **基本監視**: 学習に必要な基本的な監視機能
 
 ## アーキテクチャ
 
-### システム全体構成
+### システム全体構成（ストリーミングパターン）
 
-```mermaid
-graph TB
-    subgraph "Frontend Layer"
-        UI[Next.js 15 App Router]
-        Auth[Amplify Auth]
-        RT[Real-time Updates]
-    end
-    
-    subgraph "API Gateway Layer"
-        GQL[AppSync GraphQL]
-        REST[Custom API Routes]
-    end
-    
-    subgraph "Business Logic Layer"
-        Gateway[Agent Gateway]
-        Orchestrator[SOLOMON Orchestrator]
-    end
-    
-    subgraph "Agent Layer"
-        CASPAR[CASPAR Agent]
-        BALTHASAR[BALTHASAR Agent]
-        MELCHIOR[MELCHIOR Agent]
-        SOLOMON[SOLOMON Judge]
-    end
-    
-    subgraph "Data Layer"
-        DDB[DynamoDB]
-        S3[S3 Storage]
-    end
-    
-    subgraph "Observability Layer"
-        OTEL[OpenTelemetry]
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Next.js UI   │────│  API Gateway    │────│ AgentCore       │
+│  (Frontend)     │    │   (REST API)    │    │ Runtime         │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         │ Request + Stream      │ InvokeAgentRuntime    │ MAGI処理
+         ▼                       ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│ ストリーミング   │    │   IAM Roles     │    │ 専用マイクロVM   │
+│ 表示更新        │    │ (Authentication)│    │ (8時間実行)     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         ▲                       │                       │
+         │ チャンク配信           │                       ▼
+         │                       ▼                ┌─────────────────┐
+┌─────────────────┐    ┌─────────────────┐     │ Strands Agents  │
+│   DynamoDB      │    │ AgentCore       │     │ 並列実行        │
+│ (会話履歴)      │    │ Observability   │     │ CASPAR/BALTHASAR│
+└─────────────────┘    └─────────────────┘     │ MELCHIOR/SOLOMON│
+         ▲                                      └─────────────────┘
+         │ 最終結果保存                                  │
+         └──────────────────────────────────────────────┘
         CW[CloudWatch]
         XRay[X-Ray Tracing]
     end
@@ -627,9 +618,9 @@ class ErrorRecoveryManager {
  * フォールバック機構設計
  * 
  * 設計理由:
- * - 高可用性の確保
- * - 異なるモデル/プロバイダーへの切り替え
- * - コスト最適化
+ * - 基本的な安定性確保
+ * - 学習用の異なるモデル体験
+ * - 個人開発でのコスト管理
  */
 
 interface FallbackConfiguration {
@@ -850,3 +841,289 @@ describe('Performance Tests', () => {
 - ユーザー満足度の維持
 
 この設計により、要件で定義された全ての機能要件を満たしつつ、拡張性と保守性を確保した統合システムを構築できます。
+## ストリーミ
+ング処理パターン設計（ChatGPT風）
+
+### ストリーミングフロー詳細
+
+#### 1. ストリーミングAPI実装
+```typescript
+// API Route: /api/agents/ask-stream
+export async function POST(request: NextRequest) {
+  const { message, conversationId } = await request.json();
+  
+  // ReadableStreamを作成
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        // 1. AgentCore Runtime呼び出し（ストリーミング）
+        const response = await client.send(new InvokeAgentRuntimeCommand({
+          agentRuntimeArn: process.env.MAGI_AGENT_ARN,
+          runtimeSessionId: conversationId,
+          payload: JSON.stringify({ prompt: message })
+        }));
+        
+        // 2. ストリーミングレスポンスを処理
+        if (response.response) {
+          for await (const chunk of response.response) {
+            // 3. チャンクをフロントエンドに送信
+            const data = JSON.stringify({
+              type: 'chunk',
+              data: chunk,
+              timestamp: new Date().toISOString()
+            });
+            
+            controller.enqueue(`data: ${data}\n\n`);
+          }
+        }
+        
+        // 4. ストリーム終了
+        controller.enqueue('data: [DONE]\n\n');
+        controller.close();
+        
+      } catch (error) {
+        controller.error(error);
+      }
+    }
+  });
+  
+  // 5. Server-Sent Eventsとして返却
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive'
+    }
+  });
+}
+```
+
+#### 2. フロントエンドストリーミング受信
+```typescript
+// React Hook: ストリーミング処理
+function useStreamingMAGI() {
+  const [streamingResponse, setStreamingResponse] = useState<string>('');
+  const [isStreaming, setIsStreaming] = useState(false);
+  
+  const askMAGIStream = async (message: string, conversationId: string) => {
+    setIsStreaming(true);
+    setStreamingResponse('');
+    
+    try {
+      // 1. Server-Sent Events接続
+      const response = await fetch('/api/agents/ask-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, conversationId })
+      });
+      
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      
+      // 2. ストリーミングデータを受信
+      while (true) {
+        const { done, value } = await reader!.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            
+            if (data === '[DONE]') {
+              setIsStreaming(false);
+              return;
+            }
+            
+            try {
+              const parsed = JSON.parse(data);
+              
+              // 3. リアルタイム表示更新
+              if (parsed.type === 'agent_response') {
+                updateAgentResponse(parsed.data);
+              } else if (parsed.type === 'chunk') {
+                setStreamingResponse(prev => prev + parsed.data);
+              }
+            } catch (e) {
+              // JSON解析エラーは無視
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Streaming error:', error);
+      setIsStreaming(false);
+    }
+  };
+  
+  return { askMAGIStream, streamingResponse, isStreaming };
+}
+```
+
+#### 3. MAGI並列ストリーミング
+```typescript
+// AgentCore Runtime内でのストリーミング実装
+class MAGIStreamingSystem {
+  async processStreamingDecision(prompt: string, streamCallback: Function) {
+    // 1. 処理開始通知
+    streamCallback({
+      type: 'status',
+      data: { status: 'starting', agents: ['caspar', 'balthasar', 'melchior'] }
+    });
+    
+    // 2. 3賢者並列実行（ストリーミング）
+    const agentPromises = [
+      this.streamAgentResponse('caspar', prompt, streamCallback),
+      this.streamAgentResponse('balthasar', prompt, streamCallback),
+      this.streamAgentResponse('melchior', prompt, streamCallback)
+    ];
+    
+    const agentResponses = await Promise.all(agentPromises);
+    
+    // 3. SOLOMON統合判断（ストリーミング）
+    const judgeResponse = await this.streamSolomonJudgment(
+      agentResponses, 
+      prompt, 
+      streamCallback
+    );
+    
+    // 4. 最終結果
+    streamCallback({
+      type: 'final_result',
+      data: {
+        agentResponses,
+        judgeResponse,
+        timestamp: new Date().toISOString()
+      }
+    });
+  }
+  
+  async streamAgentResponse(agentId: string, prompt: string, streamCallback: Function) {
+    const agent = this.agents[agentId];
+    
+    // エージェント開始通知
+    streamCallback({
+      type: 'agent_start',
+      data: { agentId, status: 'thinking' }
+    });
+    
+    // ストリーミング実行
+    let fullResponse = '';
+    const result = await agent.stream(prompt, (chunk: string) => {
+      fullResponse += chunk;
+      
+      // チャンクごとに通知
+      streamCallback({
+        type: 'agent_chunk',
+        data: { agentId, chunk, fullResponse }
+      });
+    });
+    
+    // エージェント完了通知
+    streamCallback({
+      type: 'agent_complete',
+      data: { 
+        agentId, 
+        decision: result.decision,
+        reasoning: result.reasoning,
+        confidence: result.confidence
+      }
+    });
+    
+    return result;
+  }
+}
+```
+
+#### 4. UI表示コンポーネント
+```typescript
+// ストリーミング表示コンポーネント
+function StreamingMAGIResponse({ 
+  streamingData, 
+  isStreaming 
+}: {
+  streamingData: StreamingData;
+  isStreaming: boolean;
+}) {
+  return (
+    <div className="magi-streaming-container">
+      {/* 3賢者の並列表示 */}
+      <div className="agents-grid">
+        {['caspar', 'balthasar', 'melchior'].map(agentId => (
+          <AgentStreamingCard
+            key={agentId}
+            agentId={agentId}
+            status={streamingData.agents[agentId]?.status}
+            response={streamingData.agents[agentId]?.response}
+            isStreaming={isStreaming && streamingData.activeAgent === agentId}
+          />
+        ))}
+      </div>
+      
+      {/* SOLOMON統合判断 */}
+      <SolomonStreamingCard
+        judgeResponse={streamingData.solomon}
+        isStreaming={isStreaming && streamingData.activeAgent === 'solomon'}
+      />
+      
+      {/* 進捗表示 */}
+      <StreamingProgress
+        totalAgents={4}
+        completedAgents={streamingData.completedCount}
+        currentAgent={streamingData.activeAgent}
+      />
+    </div>
+  );
+}
+
+function AgentStreamingCard({ agentId, status, response, isStreaming }) {
+  return (
+    <div className={`agent-card ${agentId}`}>
+      <div className="agent-header">
+        <AgentIcon agentId={agentId} />
+        <span className="agent-name">{agentId.toUpperCase()}</span>
+        <StreamingIndicator isActive={isStreaming} />
+      </div>
+      
+      <div className="agent-response">
+        {status === 'thinking' && (
+          <ThinkingAnimation />
+        )}
+        
+        {response && (
+          <div className="response-content">
+            <div className="decision-badge">
+              {response.decision}
+            </div>
+            <div className="reasoning">
+              {response.reasoning}
+              {isStreaming && <BlinkingCursor />}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+### ストリーミングパターンの利点
+
+#### 1. ChatGPT風UX
+- **即座の反応**: タイピング開始の視覚的フィードバック
+- **進捗表示**: どのエージェントが処理中かリアルタイム表示
+- **段階的表示**: 各エージェントの判断が順次表示
+
+#### 2. 長時間処理対応
+- **AgentCore Runtime**: 8時間実行でタイムアウトなし
+- **接続維持**: Server-Sent Eventsで安定した接続
+- **エラー回復**: 接続断時の自動再接続
+
+#### 3. パフォーマンス最適化
+- **並列処理**: 3賢者の真の並列実行
+- **メモリ効率**: ストリーミングによる低メモリ使用
+- **レスポンシブ**: UIブロックなしの応答性
+
+この同期ストリーミングパターンにより、ChatGPTのような優れたユーザーエクスペリエンスを提供しながら、AgentCore Runtimeの長時間実行能力を最大限活用できます。
