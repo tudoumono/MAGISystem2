@@ -231,10 +231,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               </Button>
               <Button
                 size="sm"
-                variant="destructive"
+                variant="outline"
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="text-xs px-2 py-1"
+                className="text-xs px-2 py-1 text-red-600 border-red-300 hover:bg-red-50"
               >
                 {isDeleting ? '削除中...' : '削除'}
               </Button>

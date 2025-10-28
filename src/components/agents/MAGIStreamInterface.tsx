@@ -303,10 +303,12 @@ const ResponseDisplay: React.FC<{
   const parsedSections: { title: string; content: string }[] = [];
   
   for (let i = 0; i < sections.length; i += 2) {
-    if (sections[i] && sections[i + 1]) {
+    const title = sections[i];
+    const content = sections[i + 1];
+    if (title && content) {
       parsedSections.push({
-        title: sections[i],
-        content: sections[i + 1].trim()
+        title: title,
+        content: content.trim()
       });
     }
   }
@@ -460,11 +462,11 @@ export const MAGIStreamInterface: React.FC<MAGIStreamInterfaceProps> = ({
             </div>
             <div className="flex gap-2">
               {streamState.isStreaming && (
-                <Button variant="secondary" size="sm" onClick={abortStream}>
+                <Button variant="outline" size="sm" onClick={abortStream}>
                   中断
                 </Button>
               )}
-              <Button variant="primary" size="sm" onClick={handleNewQuestion}>
+              <Button variant="default" size="sm" onClick={handleNewQuestion}>
                 新しい質問
               </Button>
             </div>

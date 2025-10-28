@@ -389,7 +389,7 @@ export function ConversationExample() {
         </h3>
         <div className="text-xs text-gray-600 space-y-1">
           <p>ローディング状態: {loading ? 'true' : 'false'}</p>
-          <p>エラー状態: {error ? (error instanceof Error ? error.message : String(error)) : 'なし'}</p>
+          <p>エラー状態: {(error as Error | null)?.message || 'なし'}</p>
           <p>総会話数: {conversations.length}</p>
           <p>フィルタ後: {filteredConversations.length}</p>
           <p>検索クエリ: {searchQuery || '(なし)'}</p>

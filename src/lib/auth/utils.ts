@@ -127,7 +127,11 @@ export function isValidToken(token: string | undefined): boolean {
     }
 
     // Base64デコードテスト
-    const payload = JSON.parse(atob(parts[1]));
+    const payloadPart = parts[1];
+    if (!payloadPart) {
+      return false;
+    }
+    const payload = JSON.parse(atob(payloadPart));
 
     // 有効期限チェック
     if (payload.exp && payload.exp < Date.now() / 1000) {

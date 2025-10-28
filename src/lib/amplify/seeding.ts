@@ -477,9 +477,9 @@ export async function seedDefaultPresets(options: SeedingOptions = {}): Promise<
   errors: string[];
 }> {
   const currentMode = getCurrentEnvironmentMode();
-  if (currentMode === 'MOCK') {
+  if (currentMode === 'DEVELOPMENT') {
     if (options.verbose) {
-      console.log('📝 Mock mode: Preset seeding handled by mock client');
+      console.log('📝 Development mode: Preset seeding handled by mock client');
     }
     return { success: true, created: 0, errors: [] };
   }
@@ -560,9 +560,9 @@ export async function seedSampleConversations(options: SeedingOptions = {}): Pro
   errors: string[];
 }> {
   const currentMode = getCurrentEnvironmentMode();
-  if (currentMode === 'MOCK') {
+  if (currentMode === 'DEVELOPMENT') {
     if (options.verbose) {
-      console.log('📝 Mock mode: Conversation seeding handled by mock client');
+      console.log('📝 Development mode: Conversation seeding handled by mock client');
     }
     return { success: true, created: { conversations: 0, messages: 0 }, errors: [] };
   }
@@ -752,8 +752,8 @@ export async function clearAllData(options: { confirm?: boolean } = {}): Promise
   }
 
   const currentMode = getCurrentEnvironmentMode();
-  if (currentMode === 'MOCK') {
-    console.log('📝 Mock mode: Data clearing handled by mock client');
+  if (currentMode === 'DEVELOPMENT') {
+    console.log('📝 Development mode: Data clearing handled by mock client');
     return { success: true, cleared: { presets: 0, conversations: 0, messages: 0 }, errors: [] };
   }
 

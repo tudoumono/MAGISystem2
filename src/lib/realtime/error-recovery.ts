@@ -100,13 +100,13 @@ export interface ErrorInfo {
   severity: ErrorSeverity;
   message: string;
   originalError: Error;
-  context?: string;
+  context?: string | undefined;
   timestamp: Date;
-  userAgent?: string;
-  url?: string;
-  userId?: string;
-  sessionId?: string;
-  additionalData?: Record<string, any>;
+  userAgent?: string | undefined;
+  url?: string | undefined;
+  userId?: string | undefined;
+  sessionId?: string | undefined;
+  additionalData?: Record<string, any> | undefined;
 }
 
 /**
@@ -342,12 +342,12 @@ export class ErrorRecoveryManager {
       severity: ErrorSeverity.MEDIUM,
       message: error.message,
       originalError: error,
-      context,
+      context: context ?? undefined,
       timestamp: new Date(),
       userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
       url: typeof window !== 'undefined' ? window.location.href : undefined,
-      userId: this.getCurrentUserId(),
-      sessionId: this.getSessionId(),
+      userId: this.getCurrentUserId() ?? undefined,
+      sessionId: this.getSessionId() ?? undefined,
       additionalData: {
         stack: error.stack,
         name: error.name

@@ -263,7 +263,7 @@ export default function AgentResponseTestPage() {
             {scenarios.map((scenario) => (
               <Button
                 key={scenario.name}
-                variant={currentScenario === scenario.name ? "primary" : "secondary"}
+                variant={currentScenario === scenario.name ? "default" : "outline"}
                 onClick={() => runParallelScenario(scenario.name, scenario.fn)}
                 disabled={loading}
                 className="h-auto p-4 text-left"

@@ -32,7 +32,7 @@ import { PresetManager } from '@/lib/agents/orchestration';
  */
 interface BedrockAgentConfigProps {
   // 現在の設定
-  currentConfigs?: AgentConfig[];
+  currentConfigs?: AgentConfig[] | undefined;
   currentPreset?: AgentPreset | null;
   
   // コールバック関数
@@ -166,6 +166,7 @@ export function BedrockAgentConfig({
         Object.keys(prev)
           .filter(key => !key.startsWith(`${agentId}_`))
           .map(key => [key, prev[key]])
+          .filter(([, value]) => value !== undefined)
       ),
       ...errors,
     }));
@@ -212,7 +213,12 @@ export function BedrockAgentConfig({
    * 現在の設定を取得
    */
   const getCurrentConfig = useCallback((agentId: AgentType): AgentConfig => {
-    return configs.find(config => config.agentId === agentId) || getDefaultConfigs()[0];
+    const found = configs.find(config => config.agentId === agentId);
+    if (found) return found;
+    
+    const defaults = getDefaultConfigs();
+    const defaultForAgent = defaults.find(config => config.agentId === agentId);
+    return defaultForAgent || defaults[0]!; // defaults[0]は常に存在する
   }, [configs]);
 
   /**

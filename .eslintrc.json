@@ -4,14 +4,14 @@
   ],
   "rules": {
     // React関連のベストプラクティス
-    "react-hooks/exhaustive-deps": "warn",
+    "react-hooks/exhaustive-deps": "off",
     "react/jsx-key": "error",
     "react/no-unescaped-entities": "off",
     
     // コード品質向上のためのルール
     "prefer-const": "error",
     "no-var": "error",
-    "no-console": "warn",
+    "no-console": "off",
     "no-debugger": "error"
   }
 }

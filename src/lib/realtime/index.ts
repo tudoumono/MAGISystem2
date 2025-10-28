@@ -147,6 +147,11 @@ export interface RealtimeConfig {
   };
 }
 
+// 型のインポート
+import { SubscriptionManager } from './subscription-manager';
+import { OfflineManager } from './offline-support';
+import { ErrorRecoveryManager } from './error-recovery';
+
 export async function initializeRealtimeFeatures(config: RealtimeConfig = {}): Promise<{
   subscriptionManager: SubscriptionManager;
   offlineManager: OfflineManager;
@@ -233,7 +238,7 @@ export function getRealtimeStatus(): {
     subscription: {
       activeSubscriptions: activeSubscriptions.length,
       connectionStatus: activeSubscriptions.length > 0 ? 'connected' : 'disconnected',
-      errors: activeSubscriptions.filter(sub => sub.status === 'error').length
+      errors: activeSubscriptions.filter((sub: any) => sub.status === 'error').length
     },
     offline: {
       isOnline: offManager.isOnline(),

@@ -124,7 +124,7 @@ export class AgentOrchestrator {
       // 2. リクエストの構築
       const request: AskAgentRequest = {
         message,
-        conversationId,
+        conversationId: conversationId || `conv_${Date.now()}`,
         agentConfig,
       };
 
@@ -340,7 +340,7 @@ export class AgentOrchestrator {
       error: error ? {
         message: error.message,
         name: error.name,
-        stack: error.stack,
+        ...(error.stack && { stack: error.stack }),
       } : null,
       preset: this.currentPreset ? {
         id: this.currentPreset.id,
@@ -364,35 +364,51 @@ export class AgentOrchestrator {
    * - ユーザーフレンドリーなエラーメッセージ
    * - リトライ可能性の判定
    */
+  private isAPIError(error: any): error is APIError {
+    return error && typeof error === 'object' && 'code' in error && 'retryable' in error;
+  }
+
+  private createAPIError(message: string, statusCode: number, code: string): APIError {
+    return {
+      message,
+      code,
+      timestamp: new Date(),
+      retryable: statusCode >= 500,
+    };
+  }
+
   private handleExecutionError(error: Error, executionId: string): Error {
     // APIエラーの場合はそのまま再スロー
-    if (error instanceof APIError) {
+    if (this.isAPIError(error)) {
       return error;
     }
 
     // 一般的なエラーをAPIErrorに変換
     if (error.message.includes('timeout')) {
-      return new APIError(
+      const apiError = this.createAPIError(
         'エージェント実行がタイムアウトしました。しばらく待ってから再試行してください。',
         408,
         'EXECUTION_TIMEOUT'
       );
+      return new Error(apiError.message);
     }
 
     if (error.message.includes('network') || error.message.includes('fetch')) {
-      return new APIError(
+      const apiError = this.createAPIError(
         'ネットワークエラーが発生しました。接続を確認して再試行してください。',
         503,
         'NETWORK_ERROR'
       );
+      return new Error(apiError.message);
     }
 
     // その他のエラー
-    return new APIError(
+    const apiError = this.createAPIError(
       'エージェント実行中に予期しないエラーが発生しました。',
       500,
       'UNKNOWN_ERROR'
     );
+    return new Error(apiError.message);
   }
 
   /**
