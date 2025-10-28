@@ -122,6 +122,17 @@ agents/*/dist/
 agents/*/.env
 agents/*/logs/
 
+# MAGI Decision System - AgentCore Runtime
+agents/.bedrock_agentcore.yaml
+agents/.bedrock_agentcore/
+agents/.dockerignore
+agents/Dockerfile
+agents/venv/
+agents/*.pyc
+agents/__pycache__/
+agents/response.json
+agents/test_request.json
+
 # MAGI Decision System - Agent Gateway (disabled)
 amplify/functions/agent-gateway-disabled/
 
@@ -150,6 +161,12 @@ config.json
 .env.*.local
 .env.production
 .env.staging
+
+# AgentCore Runtime sensitive files
+agents/.bedrock_agentcore.yaml
+agents/agentcore_test.py
+agents/local_server.py
+agents/test_local_server.py
 
 # AWS and cloud credentials
 .aws/credentials
@@ -194,3 +211,33 @@ local-config.json
 # Documentation builds
 docs/build/
 site/
+
+# ============================================================================
+# AgentCore Runtime - AWS Deployment Files
+# 
+# これらのファイルはAWS環境固有の設定や機密情報を含むため除外
+# ============================================================================
+
+# AgentCore configuration (contains AWS account info)
+**/.bedrock_agentcore.yaml
+
+# Docker build artifacts
+**/.dockerignore
+**/Dockerfile
+
+# Python virtual environments
+**/venv/
+**/env/
+
+# AgentCore build artifacts
+**/.bedrock_agentcore/
+
+# Test and development files
+**/test_*.json
+**/response.json
+**/agentcore_test.py
+**/local_server.py
+**/test_local_server.py
+
+# Archive directory (deprecated implementations)
+agents/archive/
