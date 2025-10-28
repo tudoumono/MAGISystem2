@@ -39,9 +39,6 @@ import { getCurrentUser, signOut } from 'aws-amplify/auth';
 import { Amplify } from 'aws-amplify';
 import { getAmplifyConfig, getCurrentEnvironmentMode } from '@/lib/amplify/config';
 
-// サーバーサイドでのモード判定を固定化
-const SERVER_MODE = getCurrentEnvironmentMode();
-const IS_SERVER_MOCK_MODE = SERVER_MODE === 'MOCK';
 import { getSecureCookieOptions } from './utils';
 
 /**
@@ -77,7 +74,6 @@ export interface SessionInfo {
   user: ServerAuthUser | null;
   isAuthenticated: boolean;
   error: ServerAuthError | null;
-  isMockMode: boolean;
 }
 
 /**
@@ -176,11 +172,6 @@ class MockServerAuthService {
  */
 export async function getCurrentUserServer(): Promise<ServerAuthUser | null> {
   try {
-    if (IS_SERVER_MOCK_MODE) {
-      const mockAuth = MockServerAuthService.getInstance();
-      return await mockAuth.getCurrentUser();
-    }
-    
     // 実環境での処理
     ensureAmplifyConfigured();
     
@@ -226,16 +217,15 @@ export async function getCurrentUserServer(): Promise<ServerAuthUser | null> {
 export async function getSessionInfo(): Promise<SessionInfo> {
   try {
     const user = await getCurrentUserServer();
-    
+
     return {
       user,
       isAuthenticated: !!user,
       error: null,
-      isMockMode: IS_SERVER_MOCK_MODE,
     };
   } catch (error) {
     console.error('Failed to get session info:', error);
-    
+
     return {
       user: null,
       isAuthenticated: false,
@@ -244,7 +234,6 @@ export async function getSessionInfo(): Promise<SessionInfo> {
         message: 'セッション情報の取得に失敗しました',
         timestamp: new Date().toISOString(),
       },
-      isMockMode: IS_SERVER_MOCK_MODE,
     };
   }
 }
@@ -277,13 +266,8 @@ export async function requireAuth(redirectTo: string = '/signin'): Promise<Serve
  */
 export async function signOutAction(): Promise<{ success: boolean; error?: string }> {
   try {
-    if (IS_SERVER_MOCK_MODE) {
-      const mockAuth = MockServerAuthService.getInstance();
-      await mockAuth.signOut();
-    } else {
-      ensureAmplifyConfigured();
-      await signOut();
-    }
+    ensureAmplifyConfigured();
+    await signOut();
     
     // 追加のセッションクリーンアップ
     const cookieStore = await cookies();
@@ -325,14 +309,6 @@ export async function signOutAction(): Promise<{ success: boolean; error?: strin
  */
 export async function refreshSession(): Promise<{ success: boolean; user?: ServerAuthUser; error?: string }> {
   try {
-    if (IS_SERVER_MOCK_MODE) {
-      // モックモードでは現在のユーザーを返すだけ
-      const user = await getCurrentUserServer();
-      return user 
-        ? { success: true, user } 
-        : { success: true };
-    }
-    
     ensureAmplifyConfigured();
     
     // 実環境では Amplify の自動トークン更新を利用
@@ -388,20 +364,8 @@ export async function validateSession(): Promise<{ valid: boolean; user?: Server
         error: '認証されていません',
       };
     }
-    
-    // セッション有効期限のチェック（モックモードの場合）
-    if (sessionInfo.isMockMode && sessionInfo.user.sessionExpiry) {
-      const expiryTime = new Date(sessionInfo.user.sessionExpiry);
-      const now = new Date();
-      
-      if (now > expiryTime) {
-        return {
-          valid: false,
-          error: 'セッションが期限切れです',
-        };
-      }
-    }
-    
+
+    // Amplifyが自動的にトークンの有効期限を管理
     return {
       valid: true,
       user: sessionInfo.user,

@@ -63,7 +63,6 @@ export interface ClientSessionInfo {
     email?: string | undefined;
     name?: string | undefined;
   } | null;
-  isMockMode: boolean;
   timestamp: string;
 }
 
@@ -98,7 +97,6 @@ export async function ServerAuthProvider({ children }: ServerAuthProviderProps) 
         message: 'サーバーエラーが発生しました',
         timestamp: new Date().toISOString(),
       },
-      isMockMode: true, // エラー時はモックモードにフォールバック
     };
   }
   
@@ -111,7 +109,6 @@ export async function ServerAuthProvider({ children }: ServerAuthProviderProps) 
       email: sessionInfo.user.email,
       name: sessionInfo.user.name,
     } : null,
-    isMockMode: sessionInfo.isMockMode,
     timestamp: new Date().toISOString(),
   };
   
@@ -162,14 +159,13 @@ export function getServerSessionInfo(): ClientSessionInfo | null {
     }
     
     const sessionInfo: ClientSessionInfo = JSON.parse(scriptElement.textContent);
-    
+
     // 基本的な検証
-    if (typeof sessionInfo.isAuthenticated !== 'boolean' || 
-        typeof sessionInfo.isMockMode !== 'boolean') {
+    if (typeof sessionInfo.isAuthenticated !== 'boolean') {
       console.warn('Invalid server session info format');
       return null;
     }
-    
+
     return sessionInfo;
   } catch (error) {
     console.error('Failed to parse server session info:', error);
