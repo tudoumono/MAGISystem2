@@ -1,109 +1,149 @@
 # 統合実装計画 - MAGI Decision System
 
-## 🎯 実装戦略: 効率的タスク順序
+## 🚨 **重要な設計変更: AgentCore Runtime + ストリーミング対応**
+
+**みのるん氏の指摘を受けた緊急修正**:
+- AWS AmplifyのdefineFunction()はストリーミングレスポンス（RESPONSE_STREAM）に対応していない
+- MAGIシステムでは4エージェント並列実行で2-10分の待機時間が発生し、UXが完全に破綻
+- 解決策: Next.js API Routes + AgentCore Runtime呼び出し + ストリーミング対応
+
+## 🎯 **修正された実装戦略**
+
+### 📊 **新しいアーキテクチャ**
+```
+Amplify Hosting (Next.js App)
+├── フロントエンド: React コンポーネント（継続使用）
+├── データ: Amplify Data + AppSync（継続使用）
+├── 認証: Amplify Auth（継続使用）
+└── API: Next.js API Routes（新規実装）
+    └── AgentCore Runtime呼び出し + ストリーミング
+```
 
 ### 📊 **実装順序最適化による効果**
-- **早期フィードバック**: 基本動作確認を最優先
-- **段階的構築**: 依存関係を考慮した順序
-- **学習効果最大化**: 理解しやすい順序で技術習得
-- **リスク最小化**: 複雑な統合を後回しにして安定性確保
-- **個人開発最適化**: 一人での実装に適した順序
+- **ストリーミング対応**: リアルタイムエージェント応答
+- **UX向上**: ChatGPT並みの体験実現
+- **AgentCore Runtime活用**: 8時間実行、高度なエージェント機能
+- **既存資産活用**: UI、認証、データベースそのまま
+- **学習効果向上**: ストリーミング技術の習得
 
 ---
 
-## � 実装タスク（最参適化された順序）
+## 🔄 **修正された実装タスク**
 
-### ステップ1: AgentCore Runtime基盤構築（最優先）
+### ステップ0: 既存AgentCore Runtime基盤（完了済み）
 
-- [x] 1.1 AgentCore Runtime開発環境構築 **[🤖 Kiro]**
+- [x] 0.1 AgentCore Runtime開発環境構築 **[🤖 Kiro]** ✅ **完了**
   - Python 3.11+ 仮想環境の作成
   - bedrock-agentcore、strands-agents、bedrock-agentcore-starter-toolkitのインストール
   - AWS認証情報の設定（ap-northeast-1リージョン）
   - 基本的な動作確認
-  - _理由: 全ての後続タスクの前提条件_
+  - _完了状況: agents/venv/, agents/requirements.txt, agents/.python-version_
 
-- [x] 1.2 基本MAGI Agent実装 **[🤖 Kiro]**
+- [x] 0.2 基本MAGI Agent実装 **[🤖 Kiro]** ✅ **完了**
   - `magi_agent.py`の作成（BedrockAgentCoreApp使用）
   - 単一エージェントでの基本動作確認
   - エントリーポイント関数の実装
-  - `requirements.txt`の作成
-  - _理由: 複雑な並列処理前の基本動作確認_
+  - Strands Agentsフレームワーク統合
+  - _完了状況: agents/magi_agent.py, agents/magi_strands_agents.py_
 
-- [x] 1.3 ローカル動作確認 **[🤖 Kiro]**
-  - ローカルエージェントサーバーの起動（ポート8080）
-  - curlによる基本動作テスト
-  - レスポンス形式の確認
-  - 基本的なエラーハンドリング
-  - _理由: デプロイ前の動作保証_
-
-### ステップ2: AgentCore Runtime設定・デプロイ
-
-- [ ] 2.1 AgentCore設定 **[🤖 Kiro]**
+- [x] 0.3 AgentCore設定 **[🤖 Kiro]** ✅ **完了**
   - `agentcore configure`による設定ファイル生成
   - ap-northeast-1リージョンの指定
   - `.bedrock_agentcore.yaml`設定の最適化
   - メモリ・タイムアウト設定（個人開発用）
-  - _理由: デプロイ前の必須設定_
+  - _完了状況: agents/.bedrock_agentcore.yaml_
 
-- [ ] 2.2 初回デプロイ実行 **[🤖 Kiro + 👤 Human]**
+- [x] 0.4 ローカル動作確認 **[🤖 Kiro]** ✅ **完了**
+  - ローカルエージェントサーバーの起動（ポート8080）
+  - curlによる基本動作テスト
+  - レスポンス形式の確認
+  - 基本的なエラーハンドリング
+  - _完了状況: agents/local_server.py, agents/test_local_server.py_
+
+### ステップ1: AgentCore Runtime デプロイ（完了済み）
+
+- [x] 1.1 初回デプロイ実行 **[🤖 Kiro + 👤 Human]** ✅ **完了**
   - Claude 3.5 Sonnetモデルアクセスの有効化 **[👤 Human]**
   - `agentcore launch`によるデプロイ **[🤖 Kiro]**
-  - Agent ARNの取得・記録
+  - Agent ARNの取得・記録: `arn:aws:bedrock-agentcore:ap-northeast-1:262152767881:runtime/magi_agent-4ORNam2cHb`
   - デプロイ成功の確認
-  - _理由: 実際のAWS環境での動作確認_
+  - _完了状況: AgentCore Runtime完全デプロイ済み_
 
-- [ ] 2.3 デプロイ済みエージェントテスト **[🤖 Kiro]**
+- [x] 1.2 デプロイ済みエージェントテスト **[🤖 Kiro]** ✅ **完了**
   - `agentcore invoke`による動作確認
-  - 基本的なレスポンス確認
+  - MAGIシステム完全動作確認（3賢者 + SOLOMON Judge）
   - エラーケースのテスト
+  - パフォーマンス測定: 36.954秒実行時間
+  - _完了状況: MAGIシステム完璧動作、投票システム確認済み_
+
+### ステップ2: ストリーミング対応API実装
+
+- [ ] 2.1 Next.js API Routes基盤構築 **[🤖 Kiro]**
+  - `app/api/magi/stream/route.ts`の作成
+  - Server-Sent Eventsによるストリーミング実装
+  - AWS SDK for Bedrock Agent Runtime統合
+  - 基本的なエラーハンドリング
+  - _理由: ストリーミング対応の実現_
+
+- [ ] 2.2 AgentCore Runtime呼び出し実装 **[🤖 Kiro]**
+  - BedrockAgentRuntimeClientの設定
+  - InvokeAgentWithResponseStreamCommandの実装
+  - デプロイ済みAgentCore Runtime ARN統合
+  - 認証・権限設定（IAM）
+  - _理由: AgentCore Runtimeの継続使用 + ストリーミング対応_
+
+- [ ] 2.3 ストリーミング動作確認 **[🤖 Kiro]**
+  - ローカル開発サーバーでのテスト
+  - curlによるストリーミングレスポンステスト
+  - AgentCore Runtimeとの接続確認
   - パフォーマンス基本測定
-  - _理由: 本格実装前の動作保証_
+  - _理由: AgentCore Runtime + ストリーミング実装前の動作保証_
 
-### ステップ3: MAGI Decision System実装
+### ステップ3: AgentCore Runtime内MAGI Decision System実装
 
-- [ ] 3.1 3賢者エージェント実装 **[🤖 Kiro]**
+- [ ] 3.1 AgentCore Runtime内3賢者エージェント実装 **[🤖 Kiro]**
+  - 既存のmagi_agent.pyの拡張
   - CASPAR（保守的）、BALTHASAR（革新的）、MELCHIOR（バランス型）の実装
-  - 各エージェントのシステムプロンプト作成
-  - 並列実行ロジックの実装（asyncio）
-  - JSON形式レスポンスの統一
-  - _理由: MAGI システムの核心機能_
+  - Strands Agentsフレームワークでの並列実行
+  - ストリーミングレスポンス対応（stream_async）
+  - _理由: AgentCore Runtime内でのMAGI システム核心機能_
 
 - [ ] 3.2 SOLOMON Judge統合評価実装 **[🤖 Kiro]**
-  - 統括者システムプロンプトの作成
+  - AgentCore Runtime内での統括者実装
   - 3賢者判断の統合ロジック実装
   - 投票結果集計機能（可決/否決/棄権）
-  - 最終判断とスコアリング機能
-  - _理由: MAGI投票システムの完成_
+  - 最終判断とスコアリング機能のストリーミング対応
+  - _理由: AgentCore Runtime内でのMAGI投票システム完成_
 
-- [ ] 3.3 エラーハンドリング・復旧機能 **[🤖 Kiro]**
-  - 個別エージェント失敗時の処理
+- [ ] 3.3 AgentCore Runtimeストリーミングエラーハンドリング **[🤖 Kiro]**
+  - 個別エージェント失敗時のストリーミング継続
   - 段階的機能縮退（部分的結果による継続）
-  - 自動リトライ機構
-  - 詳細エラーログ出力
-  - _理由: 安定した動作の保証_
+  - 自動リトライ機構（AgentCore Runtime内）
+  - リアルタイムエラー通知
+  - _理由: AgentCore Runtime内での安定したストリーミング動作保証_
 
 ### ステップ4: フロントエンド統合
 
-- [ ] 4.1 AgentCore Runtime API統合 **[🤖 Kiro]**
-  - BedrockAgentCoreClientの実装
-  - InvokeAgentRuntimeCommandの統合
-  - ストリーミング応答の処理
+- [ ] 4.1 ストリーミングクライアント実装 **[🤖 Kiro]**
+  - `src/lib/agents/bedrock-client.ts`の修正
+  - Server-Sent Events受信ロジック
+  - リアルタイムレスポンス処理
   - エラーハンドリングとフォールバック
-  - _理由: フロントエンドとAgentCore Runtimeの接続_
+  - _理由: フロントエンドとAPI Routesの接続_
 
-- [ ] 4.2 API Routeの実装 **[🤖 Kiro]**
-  - `/api/agents/ask-stream`エンドポイント作成
-  - Server-Sent Eventsによるストリーミング
-  - 認証・認可の実装
-  - CORS設定とセキュリティ
-  - _理由: ChatGPT風ストリーミング体験の実現_
-
-- [ ] 4.3 既存UIの統合・調整 **[🤖 Kiro]**
+- [ ] 4.2 既存UIのストリーミング対応 **[🤖 Kiro]**
   - 既存MAGIデザインシステムの活用
-  - AgentCore Runtime対応のステータス表示
-  - ストリーミング表示機能の実装
+  - リアルタイムエージェント応答表示
+  - ストリーミング進行状況の視覚化
   - エラー表示の改善
-  - _理由: 既存UIコンポーネントの有効活用_
+  - _理由: 既存UIコンポーネントのストリーミング対応_
+
+- [ ] 4.3 レガシーAmplify Function削除 **[🤖 Kiro]**
+  - `amplify/functions/bedrock-agent-gateway/`の削除
+  - `amplify/backend.ts`からの関数定義削除
+  - 不要な依存関係の整理
+  - 設定ファイルのクリーンアップ
+  - _理由: システムの簡素化とメンテナンス性向上_
 
 ### ステップ5: エンドツーエンド統合テスト
 
@@ -237,9 +277,9 @@
 
 ### 🎯 **次のアクション**
 
-**ステップ1.1「AgentCore Runtime開発環境構築」から開始してください。**
+**ステップ1.1「初回デプロイ実行」から開始してください。**
 
-この最適化された順序により、効率的で学習効果の高い実装が可能になります！
+既存のAgentCore Runtime基盤を活用し、効率的なストリーミング対応実装が可能になります！
 
 ## 🔄 統合移行手順
 
