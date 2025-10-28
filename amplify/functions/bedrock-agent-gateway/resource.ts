@@ -49,9 +49,10 @@ export const bedrockAgentGateway = defineFunction({
    * - Inline AgentsとPayload Referencingの設定
    */
   environment: {
-    // Amazon Bedrock Multi-Agent Collaboration設定
+    // Amazon Bedrock AgentCore Runtime設定
     BEDROCK_REGION: 'ap-northeast-1',
-    BEDROCK_MULTI_AGENT_COLLABORATION_ENABLED: 'true',
+    MAGI_AGENT_ID: 'magi_agent-4ORNam2cHb',
+    MAGI_AGENT_ALIAS_ID: 'TSTALIASID',
     
     // SOLOMON Supervisor Agent設定
     SOLOMON_SUPERVISOR_AGENT_ID: 'solomon-supervisor-v1',
