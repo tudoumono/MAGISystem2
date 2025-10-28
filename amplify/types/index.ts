@@ -51,14 +51,6 @@ export type {
 // ドメインモデルの実装クラス
 export { VotingResultImpl } from './domain';
 
-// 定数の再エクスポート
-export { 
-  AgentType,
-  DecisionType,
-  UrgencyLevel,
-  DecisionCategory 
-} from './domain';
-
 /**
  * 型ガード関数
  * 
@@ -68,33 +60,37 @@ export {
 /**
  * AgentTypeの型ガード
  */
-export function isAgentType(value: any): value is AgentType {
+export function isAgentType(value: any): value is import('./domain').AgentType {
+  const { AgentType } = require('./domain');
   return typeof value === 'string' && 
-         Object.values(AgentType).includes(value as AgentType);
+         Object.values(AgentType).includes(value);
 }
 
 /**
  * DecisionTypeの型ガード
  */
-export function isDecisionType(value: any): value is DecisionType {
+export function isDecisionType(value: any): value is import('./domain').DecisionType {
+  const { DecisionType } = require('./domain');
   return typeof value === 'string' && 
-         Object.values(DecisionType).includes(value as DecisionType);
+         Object.values(DecisionType).includes(value);
 }
 
 /**
  * UrgencyLevelの型ガード
  */
-export function isUrgencyLevel(value: any): value is UrgencyLevel {
+export function isUrgencyLevel(value: any): value is import('./domain').UrgencyLevel {
+  const { UrgencyLevel } = require('./domain');
   return typeof value === 'string' && 
-         Object.values(UrgencyLevel).includes(value as UrgencyLevel);
+         Object.values(UrgencyLevel).includes(value);
 }
 
 /**
  * DecisionCategoryの型ガード
  */
-export function isDecisionCategory(value: any): value is DecisionCategory {
+export function isDecisionCategory(value: any): value is import('./domain').DecisionCategory {
+  const { DecisionCategory } = require('./domain');
   return typeof value === 'string' && 
-         Object.values(DecisionCategory).includes(value as DecisionCategory);
+         Object.values(DecisionCategory).includes(value);
 }
 
 /**
@@ -109,7 +105,7 @@ export function isAskAgentRequest(value: any): value is import('./api').AskAgent
 /**
  * MAGIDecisionRequestの型ガード
  */
-export function isMAGIDecisionRequest(value: any): value is MAGIDecisionRequest {
+export function isMAGIDecisionRequest(value: any): value is import('./domain').MAGIDecisionRequest {
   return typeof value === 'object' && 
          value !== null && 
          typeof value.question === 'string';
@@ -128,7 +124,7 @@ export namespace TypeConverters {
    */
   export function apiToAgentResponse(
     apiResponse: import('./api').AgentResponse
-  ): AgentResponse {
+  ): import('./domain').AgentResponse {
     return {
       ...apiResponse,
       // 必要に応じて型変換ロジックを追加
@@ -139,7 +135,7 @@ export namespace TypeConverters {
    * AgentResponseからAPIAgentResponseへの変換
    */
   export function agentResponseToApi(
-    domainResponse: AgentResponse
+    domainResponse: import('./domain').AgentResponse
   ): import('./api').AgentResponse {
     return {
       ...domainResponse,
@@ -154,7 +150,8 @@ export namespace TypeConverters {
     approved: number,
     rejected: number,
     abstained: number = 0
-  ): VotingResultImpl {
+  ): import('./domain').VotingResultImpl {
+    const { VotingResultImpl } = require('./domain');
     return new VotingResultImpl(approved, rejected, abstained);
   }
 }
@@ -164,7 +161,7 @@ export namespace TypeConverters {
  */
 export namespace Defaults {
   /** デフォルトのエージェント設定 */
-  export const DEFAULT_AGENT_CONFIGS: AgentConfigs = {
+  export const DEFAULT_AGENT_CONFIGS: import('./domain').AgentConfigs = {
     solomon: {
       modelId: 'anthropic.claude-sonnet-4-20250514-v1:0',
       temperature: 0.4,
@@ -197,10 +194,10 @@ export namespace Defaults {
   export const DEFAULT_TIMEOUT = 120000; // 2分
   
   /** デフォルトの緊急度レベル */
-  export const DEFAULT_URGENCY_LEVEL: UrgencyLevel = UrgencyLevel.MEDIUM;
+  export const DEFAULT_URGENCY_LEVEL = 'MEDIUM' as import('./domain').UrgencyLevel;
   
   /** デフォルトの意思決定カテゴリ */
-  export const DEFAULT_DECISION_CATEGORY: DecisionCategory = DecisionCategory.TECHNICAL;
+  export const DEFAULT_DECISION_CATEGORY = 'TECHNICAL' as import('./domain').DecisionCategory;
 }
 
 /**
@@ -225,13 +222,13 @@ export namespace Validators {
    * 実行時間の妥当性チェック
    */
   export function validateExecutionTime(executionTime: number): boolean {
-    return executionTime >= 0 && executionTime <= DEFAULT_TIMEOUT;
+    return executionTime >= 0 && executionTime <= Defaults.DEFAULT_TIMEOUT;
   }
   
   /**
    * エージェント応答の完全性チェック
    */
-  export function validateAgentResponse(response: AgentResponse): boolean {
+  export function validateAgentResponse(response: import('./domain').AgentResponse): boolean {
     return (
       isAgentType(response.agentId) &&
       isDecisionType(response.decision) &&
