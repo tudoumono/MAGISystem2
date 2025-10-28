@@ -79,7 +79,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({
   showSignInLink = true,
   className,
 }) => {
-  const { signUp, loading, error, clearError, isMockMode } = useAuth();
+  const { signUp, loading, error, clearError } = useAuth();
   
   // フォーム状態管理
   const [formData, setFormData] = useState<FormData>({
@@ -236,11 +236,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({
       <CardHeader className="space-y-1">
         <CardTitle className="text-2xl text-center">新規登録</CardTitle>
         <CardDescription className="text-center">
-          {isMockMode ? (
-            'デモモード: サインアップ機能をテストできます'
-          ) : (
-            'アカウントを作成してMAGIシステムを利用開始'
-          )}
+          アカウントを作成してMAGIシステムを利用開始
         </CardDescription>
       </CardHeader>
       
