@@ -58,7 +58,7 @@ export async function streamMAGIResponse(options: StreamOptions): Promise<string
 
   return new Promise((resolve, reject) => {
     let fullResponse = '';
-    let eventSource: EventSource | null = null;
+    // let eventSource: EventSource | null = null; // 現在未使用
 
     try {
       // Server-Sent Events接続
