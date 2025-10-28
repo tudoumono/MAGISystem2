@@ -213,28 +213,27 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
           };
           
           await resetPassword(credentials);
-
-          // 確認メール送信完了
+          
+          // 実際のパスワードリセット処理
           setCurrentStep('verify');
           break;
-
+          
         case 'verify':
           // 確認コード検証
           // 実環境では Amplify の confirmResetPassword を呼び出し
           // await confirmResetPassword({ username: formData.email, confirmationCode: formData.verificationCode });
           setCurrentStep('reset');
           break;
-
+          
         case 'reset':
           // 新パスワード設定
           // 実環境では Amplify の confirmResetPassword を呼び出し
-          // await confirmResetPassword({
+          // await confirmResetPassword({ 
           //   username: formData.email, 
-            //   confirmationCode: formData.verificationCode,
-            //   newPassword: formData.newPassword 
-            // });
-            setCurrentStep('success');
-          }
+          //   confirmationCode: formData.verificationCode,
+          //   newPassword: formData.newPassword 
+          // });
+          setCurrentStep('success');
           break;
           
         case 'success':
@@ -263,7 +262,8 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
             <CardHeader className="space-y-1">
               <CardTitle className="text-2xl text-center">パスワードリセット</CardTitle>
               <CardDescription className="text-center">
-                メールアドレスを入力してください。リセット用のリンクをお送りします。
+
+                  メールアドレスを入力してください。リセット用のリンクをお送りします。
               </CardDescription>
             </CardHeader>
             

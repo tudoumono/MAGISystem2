@@ -4,16 +4,6 @@ const nextConfig = {
   experimental: {
     // React 19の新機能を有効化（React Compilerは後で追加）
     // reactCompiler: true,
-
-    // AWS SDK等のNode.js専用パッケージをバンドリングから除外
-    serverComponentsExternalPackages: [
-      '@aws-sdk/client-bedrock-agent-runtime',
-      '@aws-sdk/client-lambda',
-      '@aws-sdk/client-cloudwatch',
-      '@aws-sdk/client-cloudwatch-logs',
-      'aws-xray-sdk-core',
-      '@opentelemetry/auto-instrumentations-node',
-    ],
   },
 
   // TypeScript設定の最適化
@@ -32,6 +22,22 @@ const nextConfig = {
   images: {
     domains: ['localhost'],
     formats: ['image/webp', 'image/avif'],
+  },
+
+  // Webpack設定でサーバーサイド専用モジュールを処理
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // クライアントサイドビルドでAWS SDK関連モジュールを除外
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        'aws-sdk': false,
+        '@aws-sdk/client-cloudwatch': false,
+        '@aws-sdk/client-cloudwatch-logs': false,
+        'aws-xray-sdk-core': false,
+        '@opentelemetry/instrumentation-aws-sdk': false,
+      };
+    }
+    return config;
   },
 
   // セキュリティヘッダー設定
