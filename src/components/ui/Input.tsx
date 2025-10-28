@@ -92,7 +92,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     ...props 
   }, ref) => {
     // 一意のIDを生成（ラベルとの関連付けに使用）
-    const inputId = id || `input-${React.useId()}`;
+    const generatedId = React.useId();
+    const inputId = id || `input-${generatedId}`;
     const errorId = error ? `${inputId}-error` : undefined;
     const helpId = helpText ? `${inputId}-help` : undefined;
     
