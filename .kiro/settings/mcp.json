@@ -65,7 +65,7 @@
       "env": {
         "PATH": "C:\\fnm\\data\\node-versions\\v22.12.0\\installation;${PATH}"
       },
-      "disabled": true,
+      "disabled": false,
       "autoApprove": [
         "performance_start_trace",
         "list_pages",
