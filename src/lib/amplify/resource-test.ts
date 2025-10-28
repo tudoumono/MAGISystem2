@@ -198,7 +198,7 @@ export async function testAmplifyConnectionDetailed(): Promise<AmplifyConnection
   try {
     const mode = getCurrentEnvironmentMode();
     
-    if (mode === 'MOCK') {
+    if (mode === 'DEVELOPMENT') {
       return {
         success: true,
         mode: 'MOCK',
@@ -249,13 +249,13 @@ export async function testAmplifyConnectionDetailed(): Promise<AmplifyConnection
     return {
       success: allSuccessful,
       mode,
-      error: failedResources.length > 0 ? failedResources.join('; ') : undefined,
+      ...(failedResources.length > 0 && { error: failedResources.join('; ') }),
       resources,
       details: {
         summary: `${successCount}/${totalCount} AWS resources connected`,
         resourceCount: totalCount,
         successCount: successCount,
-        failedResources: failedResources.length > 0 ? failedResources : undefined,
+        ...(failedResources.length > 0 && { failedResources }),
         overallStatus: allSuccessful ? 'all_connected' : 'partial_connection'
       }
     };

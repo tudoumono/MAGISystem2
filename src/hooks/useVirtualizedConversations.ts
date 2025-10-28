@@ -171,7 +171,7 @@ export function useVirtualizedConversations(
     currentPage: 1,
     hasNextPage: true,
     isFetchingNextPage: false,
-    totalCount: undefined
+    totalCount: 0
   });
   
   // 表示用の会話データ（ページネーション適用）
@@ -325,7 +325,7 @@ export function useVirtualizedConversations(
       currentPage: 1,
       hasNextPage: true,
       isFetchingNextPage: false,
-      totalCount: undefined
+      totalCount: 0
     });
     
     // 基本データを更新
@@ -343,7 +343,7 @@ export function useVirtualizedConversations(
       currentPage: 1,
       hasNextPage: true,
       isFetchingNextPage: false,
-      totalCount: undefined
+      totalCount: 0
     });
   }, []);
 
@@ -377,7 +377,7 @@ export function useVirtualizedConversations(
     // 仮想スクロール
     virtualItems: virtualScrollResult.virtualItems,
     totalSize: virtualScrollResult.totalSize,
-    scrollElementRef,
+    scrollElementRef: scrollElementRef as React.RefObject<HTMLDivElement>,
     scrollToIndex,
     scrollToTop,
     

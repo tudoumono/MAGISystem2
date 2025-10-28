@@ -303,7 +303,7 @@ export const JudgeResponsePanel: React.FC<JudgeResponsePanelProps> = ({
           <h3 className="font-semibold text-red-800 mb-2">SOLOMON Judge エラー</h3>
           <p className="text-red-600 text-sm mb-4">{error}</p>
           <Button 
-            variant="secondary"
+            variant="outline"
             onClick={() => window.location.reload()}
             className="text-red-700 hover:text-red-800"
           >

@@ -94,7 +94,7 @@ export type NetworkChangeCallback = (isOnline: boolean, status: NetworkStatus) =
  */
 export interface OperationResult {
   success: boolean;
-  error?: Error;
+  error?: Error | undefined;
   data?: any;
 }
 
@@ -320,8 +320,8 @@ export class OfflineManager {
       id: crypto.randomUUID(),
       timestamp: Date.now(),
       retryCount: 0,
-      maxRetries: operation.maxRetries || this.config.maxRetries,
-      ...operation
+      ...operation,
+      maxRetries: operation.maxRetries || this.config.maxRetries
     };
 
     // キューサイズの制限チェック
@@ -372,10 +372,12 @@ export class OfflineManager {
     
     if (lowPriorityOps.length > 0) {
       const toRemove = lowPriorityOps[0];
-      const index = this.operationQueue.indexOf(toRemove);
-      if (index > -1) {
-        this.operationQueue.splice(index, 1);
-        console.log(`Removed old low priority operation: ${toRemove.id}`);
+      if (toRemove) {
+        const index = this.operationQueue.indexOf(toRemove);
+        if (index > -1) {
+          this.operationQueue.splice(index, 1);
+          console.log(`Removed old low priority operation: ${toRemove.id}`);
+        }
       }
     }
   }
@@ -473,7 +475,7 @@ export class OfflineManager {
             success: !!createResult.data,
             data: createResult.data,
             error: createResult.errors?.[0] ? new Error(createResult.errors[0].message) : undefined
-          };
+          } as OperationResult;
 
         case 'UPDATE_CONVERSATION':
           const updateResult = await client.models.Conversation.update(operation.data);
@@ -481,7 +483,7 @@ export class OfflineManager {
             success: !!updateResult.data,
             data: updateResult.data,
             error: updateResult.errors?.[0] ? new Error(updateResult.errors[0].message) : undefined
-          };
+          } as OperationResult;
 
         case 'DELETE_CONVERSATION':
           const deleteResult = await client.models.Conversation.delete({ id: operation.data.id });
@@ -489,7 +491,7 @@ export class OfflineManager {
             success: !!deleteResult.data,
             data: deleteResult.data,
             error: deleteResult.errors?.[0] ? new Error(deleteResult.errors[0].message) : undefined
-          };
+          } as OperationResult;
 
         case 'CREATE_MESSAGE':
           const createMsgResult = await client.models.Message.create(operation.data);
@@ -497,7 +499,7 @@ export class OfflineManager {
             success: !!createMsgResult.data,
             data: createMsgResult.data,
             error: createMsgResult.errors?.[0] ? new Error(createMsgResult.errors[0].message) : undefined
-          };
+          } as OperationResult;
 
         case 'UPDATE_MESSAGE':
           const updateMsgResult = await client.models.Message.update(operation.data);
@@ -505,7 +507,7 @@ export class OfflineManager {
             success: !!updateMsgResult.data,
             data: updateMsgResult.data,
             error: updateMsgResult.errors?.[0] ? new Error(updateMsgResult.errors[0].message) : undefined
-          };
+          } as OperationResult;
 
         case 'DELETE_MESSAGE':
           const deleteMsgResult = await client.models.Message.delete({ id: operation.data.id });
@@ -513,7 +515,7 @@ export class OfflineManager {
             success: !!deleteMsgResult.data,
             data: deleteMsgResult.data,
             error: deleteMsgResult.errors?.[0] ? new Error(deleteMsgResult.errors[0].message) : undefined
-          };
+          } as OperationResult;
 
         default:
           throw new Error(`Unknown operation type: ${operation.type}`);

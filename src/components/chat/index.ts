@@ -12,7 +12,3 @@
 // メインコンポーネントのエクスポート
 export { default as ChatInterface } from './ChatInterface';
 export { default as MessageBubble } from './MessageBubble';
-
-// 名前付きエクスポートも提供
-export { ChatInterface } from './ChatInterface';
-export { MessageBubble } from './MessageBubble';

@@ -137,7 +137,7 @@ const AgentResponseError: React.FC<{ agentId: AgentType; error: string }> = ({ a
       </div>
       
       <Button 
-        variant="secondary" 
+        variant="outline" 
         size="sm"
         onClick={() => window.location.reload()}
         className="text-red-700 hover:text-red-800"
