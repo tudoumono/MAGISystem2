@@ -8,6 +8,7 @@ const nextConfig = {
     // AWS SDK等のNode.js専用パッケージをバンドリングから除外
     serverComponentsExternalPackages: [
       '@aws-sdk/client-bedrock-agent-runtime',
+      '@aws-sdk/client-lambda',
       '@aws-sdk/client-cloudwatch',
       '@aws-sdk/client-cloudwatch-logs',
       'aws-xray-sdk-core',

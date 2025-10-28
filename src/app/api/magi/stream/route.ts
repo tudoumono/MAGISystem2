@@ -17,11 +17,18 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { BedrockAgentRuntimeClient, InvokeAgentCommand } from '@aws-sdk/client-bedrock-agent-runtime';
+import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 
-// Bedrock Agent Runtime クライアント設定
-const bedrockClient = new BedrockAgentRuntimeClient({
-  region: process.env.BEDROCK_REGION || 'ap-northeast-1',
+/**
+ * Lambda クライアント設定
+ *
+ * 設計理由:
+ * - API Route → Lambda Function → AgentCore Runtime のアーキテクチャ
+ * - Lambda関数内でBedrockAgentRuntimeClientを使用
+ * - API Routeは軽量なゲートウェイとして機能
+ */
+const lambdaClient = new LambdaClient({
+  region: process.env.AWS_REGION || 'ap-northeast-1',
   // 本番環境では IAM Role を使用、開発環境では環境変数から取得
   ...(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY ? {
     credentials: {
@@ -31,14 +38,21 @@ const bedrockClient = new BedrockAgentRuntimeClient({
   } : {}),
 });
 
-// AgentCore Runtime ARN（デプロイ済み）
-const MAGI_AGENT_ARN = process.env.MAGI_AGENT_ARN || 'arn:aws:bedrock-agentcore:ap-northeast-1:262152767881:runtime/magi_agent-4ORNam2cHb';
+// Lambda関数名（Amplify Gen2が自動生成）
+// 形式: <backend-id>-bedrockAgentGateway-<hash>
+// 実際の関数名は amplify sandbox または amplify deploy 後に確認
+const LAMBDA_FUNCTION_NAME = process.env.BEDROCK_GATEWAY_LAMBDA_NAME || 'bedrock-agent-gateway';
 
 /**
- * 実際のMAGI AgentCore Runtime呼び出し
- * 
- * 目的: デプロイ済みのAgentCore RuntimeでMAGI Decision Systemを実行
- * 設計理由: 短縮されたAgent IDを使用してBedrock AgentCore Runtimeを呼び出し
+ * Lambda関数経由でMAGI AgentCore Runtimeを呼び出し
+ *
+ * アーキテクチャ:
+ * API Route → Lambda Function → BedrockAgentRuntimeClient → AgentCore Runtime
+ *
+ * 設計理由:
+ * - Lambda関数でBedrockAgentRuntimeClientを使用（IAM Role認証）
+ * - API Routeは軽量なゲートウェイとして機能
+ * - ストリーミングレスポンスを段階的に配信
  */
 async function invokeMAGIAgentCore(
   controller: ReadableStreamDefaultController,
@@ -79,187 +93,109 @@ async function invokeMAGIAgentCore(
     sendMessage('system', `質問をAgentCore Runtimeに送信: "${question}"`);
     await delay(600);
 
-    // AgentCore RuntimeはHTTPエンドポイント経由で呼び出す
-    sendMessage('system', 'AgentCore Runtime: MAGI Decision System実行中...');
-    await delay(1000);
+    // Lambda関数経由でAgentCore Runtimeを呼び出し
+    sendMessage('system', 'Lambda関数経由でAgentCore Runtimeを呼び出し中...');
+    await delay(500);
 
-    // AgentCore Runtimeの正しい呼び出し方法
-    // BedrockAgentRuntimeClientではなく、AWS CLIコマンドを使用
-    
     try {
-      sendMessage('system', 'AgentCore Runtime呼び出し中...');
-      await delay(500);
+      // Lambda関数の呼び出し
+      const lambdaPayload = {
+        httpMethod: 'POST',
+        path: '/magi/invoke',
+        body: JSON.stringify({
+          question: question,
+          sessionId: sessionId,
+        }),
+      };
 
-      // 直接Pythonスクリプトを実行してAgentCore Runtimeを呼び出し
-      const { exec } = require('child_process');
-      const path = require('path');
-      
-      const agentsPath = path.join(process.cwd(), 'agents');
-      const pythonPath = path.join(agentsPath, 'venv', 'Scripts', 'python.exe');
-      
-      const command = `"${pythonPath}" -c "
-import sys
-sys.path.append('${agentsPath.replace(/\\/g, '\\\\')}')
-from magi_agent import handler
-import asyncio
-import json
+      sendMessage('system', 'Lambda関数実行中...');
+      await delay(300);
 
-async def run_magi():
-    event = {'question': '${question.replace(/'/g, "\\'")}'}
-    result = await handler(event)
-    print(json.dumps(result, ensure_ascii=False, indent=2))
-
-asyncio.run(run_magi())
-"`;
-
-      const agentcoreProcess = exec(command, {
-        cwd: agentsPath,
-        timeout: 120000, // 2分タイムアウト
+      const command = new InvokeCommand({
+        FunctionName: LAMBDA_FUNCTION_NAME,
+        Payload: JSON.stringify(lambdaPayload),
       });
 
-      let responseData = '';
-      let errorData = '';
+      const lambdaResponse = await lambdaClient.send(command);
 
-      // 標準出力を監視
-      agentcoreProcess.stdout.on('data', (data: Buffer) => {
-        const chunk = data.toString();
-        responseData += chunk;
-        
-        // リアルタイムでチャンクを送信
-        sendMessage('agent_chunk', chunk);
-      });
+      // Lambda応答の解析
+      const responsePayload = JSON.parse(
+        new TextDecoder().decode(lambdaResponse.Payload)
+      );
 
-      // エラー出力を監視
-      agentcoreProcess.stderr.on('data', (data: Buffer) => {
-        errorData += data.toString();
-      });
+      sendMessage('system', 'Lambda関数からレスポンス受信');
+      await delay(300);
 
-      // プロセス完了を待機
-      await new Promise((resolve, reject) => {
-        agentcoreProcess.on('close', (code) => {
-          if (code === 0) {
-            resolve(code);
-          } else {
-            reject(new Error(`AgentCore process exited with code ${code}: ${errorData}`));
+      // エラーチェック
+      if (lambdaResponse.FunctionError) {
+        throw new Error(`Lambda function error: ${lambdaResponse.FunctionError}`);
+      }
+
+      if (responsePayload.statusCode !== 200) {
+        throw new Error(`Lambda returned status ${responsePayload.statusCode}: ${responsePayload.body}`);
+      }
+
+      // レスポンスボディの解析
+      const responseBody = typeof responsePayload.body === 'string'
+        ? JSON.parse(responsePayload.body)
+        : responsePayload.body;
+
+      sendMessage('system', 'AgentCore Runtime実行完了');
+      await delay(400);
+
+      // Phase 3: レスポンス処理
+      sendMessage('phase', 'Processing MAGI Response');
+      await delay(300);
+
+      // AgentCore Runtimeからの構造化レスポンスを表示
+      if (responseBody.success && responseBody.response) {
+        const magiResponse = responseBody.response;
+
+        // レスポンスが文字列の場合はパース
+        let parsedResponse;
+        if (typeof magiResponse === 'string') {
+          try {
+            parsedResponse = JSON.parse(magiResponse);
+          } catch (e) {
+            // パース失敗時は raw_response を使用
+            parsedResponse = magiResponse.raw_response ? JSON.parse(magiResponse.raw_response) : null;
           }
-        });
-      });
+        } else {
+          parsedResponse = magiResponse;
+        }
 
-      // レスポンスの解析と構造化表示
-      try {
-        // AgentCore Runtimeの出力からJSON部分を抽出
-        const jsonMatch = responseData.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsedResponse = JSON.parse(jsonMatch[0]);
-          if (parsedResponse.body) {
-            await displayStructuredMAGIResponse(parsedResponse.body, sendMessage, delay);
+        // 構造化されたMAGI応答を表示
+        if (parsedResponse && parsedResponse.body) {
+          await displayStructuredMAGIResponse(parsedResponse.body, sendMessage, delay);
+        } else if (responseBody.fullResponse) {
+          // fullResponseをパースして表示
+          try {
+            const fullParsed = JSON.parse(responseBody.fullResponse);
+            if (fullParsed.body) {
+              await displayStructuredMAGIResponse(fullParsed.body, sendMessage, delay);
+            }
+          } catch (e) {
+            sendMessage('system', 'AgentCore Runtime実行完了（レスポンス形式が異なります）');
+            sendMessage('agent_chunk', responseBody.fullResponse || JSON.stringify(responseBody.response));
           }
         }
-      } catch (parseError) {
-        console.log('Response parsing failed, using raw response');
-        sendMessage('system', 'AgentCore Runtime実行完了（解析エラー）');
+      } else {
+        throw new Error('Invalid response format from Lambda function');
       }
-      
-    } catch (agentError) {
-      console.error('AgentCore Runtime call failed:', agentError);
-      
+
+    } catch (lambdaError) {
+      console.error('Lambda invocation failed:', lambdaError);
+
       // エラーの詳細をログに出力
-      sendMessage('system', `AgentCore Runtime エラー: ${agentError instanceof Error ? agentError.message : 'Unknown error'}`);
+      sendMessage('system', `Lambda呼び出しエラー: ${lambdaError instanceof Error ? lambdaError.message : 'Unknown error'}`);
       await delay(500);
-      
+
       // フォールバック: 高品質なモックレスポンス
-      sendMessage('system', 'フォールバック: 高品質モックで継続');
+      sendMessage('system', 'フォールバック: モックレスポンスで継続');
       await delay(500);
-      
+
       await simulateMAGIStreaming(controller, encoder, question);
       return;
-    }
-
-    // Phase 3: レスポンス処理とストリーミング配信
-    sendMessage('phase', 'Processing MAGI Response');
-    await delay(300);
-
-    if (response.completion) {
-      let fullResponse = '';
-      let parsedResponse: any = null;
-
-      // ストリーミングレスポンスを処理
-      for await (const chunk of response.completion) {
-        if (chunk.chunk?.bytes) {
-          const text = new TextDecoder().decode(chunk.chunk.bytes);
-          fullResponse += text;
-          
-          // チャンクをそのまま送信
-          sendMessage('agent_chunk', text);
-          await delay(100); // 自然なストリーミング感のための遅延
-        }
-      }
-
-      // 完全なレスポンスを解析
-      try {
-        parsedResponse = JSON.parse(fullResponse);
-      } catch (e) {
-        // JSON解析失敗時のフォールバック
-        sendMessage('system', 'レスポンス解析中...');
-        await delay(500);
-      }
-
-      // Phase 4: 結果の構造化表示
-      if (parsedResponse && parsedResponse.body) {
-        const body = parsedResponse.body;
-        
-        sendMessage('phase', 'MAGI Decision Results');
-        await delay(400);
-
-        // 各エージェントの結果を段階的に表示
-        if (body.agent_responses) {
-          sendMessage('system', '3賢者の判断結果:');
-          await delay(300);
-
-          for (const agentResponse of body.agent_responses) {
-            const agentName = agentResponse.agent_id.toUpperCase();
-            const decision = agentResponse.decision;
-            const confidence = (agentResponse.confidence * 100).toFixed(0);
-            
-            sendMessage('agent_complete', 
-              `${agentName}: ${decision} (確信度: ${confidence}%)`, 
-              agentResponse.agent_id.toLowerCase()
-            );
-            await delay(400);
-            
-            sendMessage('agent_chunk', 
-              `理由: ${agentResponse.reasoning}`, 
-              agentResponse.agent_id.toLowerCase()
-            );
-            await delay(300);
-          }
-        }
-
-        // SOLOMON Judgeの最終判断
-        sendMessage('phase', 'SOLOMON Judge Final Decision');
-        await delay(500);
-        
-        sendMessage('judge_thinking', 'SOLOMON Judge: 統合評価中...');
-        await delay(800);
-        
-        sendMessage('judge_chunk', `【最終判断】: ${body.final_decision}`);
-        await delay(400);
-        
-        sendMessage('judge_chunk', `【投票結果】: 可決${body.voting_result.approved}票 / 否決${body.voting_result.rejected}票`);
-        await delay(400);
-        
-        sendMessage('judge_chunk', `【統合評価】: ${body.summary}`);
-        await delay(400);
-        
-        sendMessage('judge_chunk', `【推奨事項】: ${body.recommendation}`);
-        await delay(400);
-        
-        sendMessage('judge_chunk', `【確信度】: ${(body.confidence * 100).toFixed(0)}%`);
-        await delay(400);
-        
-        sendMessage('judge_chunk', `【実行時間】: ${body.execution_time}ms`);
-        await delay(300);
-      }
     }
 
     // Phase 5: 完了
