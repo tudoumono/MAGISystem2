@@ -112,7 +112,7 @@ export function EnvironmentStatus({
       amplifyOutputsKeys: amplifyOutputs ? Object.keys(amplifyOutputs) : 'none'
     });
     
-    if (currentMode === 'MOCK' || !amplifyOutputs) {
+    if (currentMode === 'DEVELOPMENT' && !amplifyOutputs) {
       return {
         auth: {
           type: 'Mock',
@@ -198,7 +198,7 @@ export function EnvironmentStatus({
       setResourceInfo(resources);
       
       // 接続テスト（実環境のみ）
-      if (currentMode !== 'MOCK') {
+      if (currentMode === 'PRODUCTION') {
         // amplify_outputs.jsonが存在し、必要な情報が含まれている場合は成功とみなす
         if (resources && !resources.auth.isMock && resources.auth.userPoolId !== 'N/A') {
           setConnectionTest({
@@ -267,14 +267,6 @@ export function EnvironmentStatus({
    */
   const getModeStyles = (mode: EnvironmentMode) => {
     switch (mode) {
-      case 'MOCK':
-        return {
-          bg: 'bg-blue-50',
-          border: 'border-blue-200',
-          text: 'text-blue-800',
-          icon: '🔧',
-          label: 'Mock Mode'
-        };
       case 'DEVELOPMENT':
         return {
           bg: 'bg-green-50',
@@ -472,8 +464,8 @@ export function EnvironmentStatus({
                         <div className="text-xs text-gray-500">認証・ユーザー管理</div>
                       </div>
                     </div>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${connectionTest?.resources?.cognito?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                      {connectionTest?.resources?.cognito?.success ? 'AWS ✅' : 'AWS ❌'}
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${connectionTest?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {connectionTest?.success ? 'AWS ✅' : 'AWS ❌'}
                     </span>
                   </div>
                   <div className="text-xs text-gray-600 space-y-1 pl-6">
@@ -481,9 +473,9 @@ export function EnvironmentStatus({
                     <div><span className="font-medium">Client ID:</span> {resourceInfo.auth.userPoolId?.includes('_') ? resourceInfo.auth.userPoolId.split('_')[1] : 'N/A'}</div>
                     <div><span className="font-medium">Region:</span> {resourceInfo.auth.region}</div>
                     <div><span className="font-medium">Identity Pool:</span> {process.env.NEXT_PUBLIC_IDENTITY_POOL_ID?.split(':')[1] || 'N/A'}</div>
-                    {connectionTest?.resources?.cognito && (
-                      <div className={`mt-2 p-2 rounded ${connectionTest.resources.cognito.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                        <span className="font-medium">Status:</span> {connectionTest.resources.cognito.details?.message || 'Unknown'}
+                    {connectionTest && (
+                      <div className={`mt-2 p-2 rounded ${connectionTest.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                        <span className="font-medium">Status:</span> {connectionTest.error || 'Connection test completed'}
                       </div>
                     )}
                   </div>
@@ -499,8 +491,8 @@ export function EnvironmentStatus({
                         <div className="text-xs text-gray-500">GraphQL API</div>
                       </div>
                     </div>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${connectionTest?.resources?.appSync?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                      {connectionTest?.resources?.appSync?.success ? 'AWS ✅' : 'AWS ❌'}
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${connectionTest?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {connectionTest?.success ? 'AWS ✅' : 'AWS ❌'}
                     </span>
                   </div>
                   <div className="text-xs text-gray-600 space-y-1 pl-6">
@@ -508,9 +500,9 @@ export function EnvironmentStatus({
                     <div><span className="font-medium">Region:</span> {resourceInfo.api.region}</div>
                     <div><span className="font-medium">Auth Mode:</span> {resourceInfo.api.authMode}</div>
                     <div><span className="font-medium">API Key:</span> {process.env.NEXT_PUBLIC_API_KEY?.substring(0, 20)}...</div>
-                    {connectionTest?.resources?.appSync && (
-                      <div className={`mt-2 p-2 rounded ${connectionTest.resources.appSync.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                        <span className="font-medium">Status:</span> {connectionTest.resources.appSync.details?.message || 'Unknown'}
+                    {connectionTest && (
+                      <div className={`mt-2 p-2 rounded ${connectionTest.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                        <span className="font-medium">Status:</span> {connectionTest.error || 'Connection test completed'}
                       </div>
                     )}
                   </div>
@@ -526,17 +518,17 @@ export function EnvironmentStatus({
                         <div className="text-xs text-gray-500">データストレージ</div>
                       </div>
                     </div>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${connectionTest?.resources?.dynamoDB?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                      {connectionTest?.resources?.dynamoDB?.success ? 'AWS ✅' : 'AWS ❌'}
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${connectionTest?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {connectionTest?.success ? 'AWS ✅' : 'AWS ❌'}
                     </span>
                   </div>
                   <div className="text-xs text-gray-600 space-y-1 pl-6">
                     <div><span className="font-medium">Tables:</span> User, Conversation, Message, TraceStep, AgentPreset</div>
                     <div><span className="font-medium">Access:</span> AppSync GraphQL API経由</div>
                     <div><span className="font-medium">Auth:</span> Cognito User Pools + Owner-based</div>
-                    {connectionTest?.resources?.dynamoDB && (
-                      <div className={`mt-2 p-2 rounded ${connectionTest.resources.dynamoDB.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                        <span className="font-medium">Status:</span> {connectionTest.resources.dynamoDB.details?.message || 'Unknown'}
+                    {connectionTest && (
+                      <div className={`mt-2 p-2 rounded ${connectionTest.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                        <span className="font-medium">Status:</span> {connectionTest.error || 'Connection test completed'}
                       </div>
                     )}
                   </div>
@@ -656,7 +648,7 @@ export function EnvironmentStatus({
               {isLoading ? '🔄 Refreshing...' : '🔄 Refresh'}
             </button>
             
-            {mode === 'MOCK' && (
+            {mode === 'DEVELOPMENT' && (
               <button
                 onClick={() => {
                   console.log(getEnvironmentSetupGuide());

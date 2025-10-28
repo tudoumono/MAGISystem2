@@ -163,7 +163,6 @@ function generateAgentResponse(
     reasoning: selectedResponse.reasoning,
     confidence: randomBetween(0.7, 0.95),
     executionTime: executionTime || Math.floor(randomBetween(800, 2000)),
-    timestamp: new Date(),
   };
 }
 
@@ -243,8 +242,6 @@ function generateJudgeResponse(
     finalRecommendation: randomChoice(recommendationTemplates[finalDecision]),
     reasoning: randomChoice(reasoningTemplates[finalDecision]),
     confidence: randomBetween(0.75, 0.92),
-    executionTime: executionTime || Math.floor(randomBetween(500, 1200)),
-    timestamp: new Date(),
   };
 }
 
@@ -376,7 +373,7 @@ export function generateUnanimousApproval(question: string): Promise<AskAgentRes
         agentResponses,
         judgeResponse,
         traceId,
-        executionTime: Math.max(...agentResponses.map(r => r.executionTime)) + judgeResponse.executionTime,
+        executionTime: Math.max(...agentResponses.map(r => r.executionTime)) + 500,
         timestamp: new Date(),
       });
     }, randomBetween(1200, 2000));
@@ -404,7 +401,7 @@ export function generateUnanimousRejection(question: string): Promise<AskAgentRe
         agentResponses,
         judgeResponse,
         traceId,
-        executionTime: Math.max(...agentResponses.map(r => r.executionTime)) + judgeResponse.executionTime,
+        executionTime: Math.max(...agentResponses.map(r => r.executionTime)) + 500,
         timestamp: new Date(),
       });
     }, randomBetween(1200, 2000));
@@ -441,7 +438,7 @@ export function generateSplitDecision(question: string): Promise<AskAgentRespons
         agentResponses,
         judgeResponse,
         traceId,
-        executionTime: Math.max(...agentResponses.map(r => r.executionTime)) + judgeResponse.executionTime,
+        executionTime: Math.max(...agentResponses.map(r => r.executionTime)) + 500,
         timestamp: new Date(),
       });
     }, randomBetween(1500, 2500));

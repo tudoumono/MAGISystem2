@@ -312,7 +312,7 @@ export function useBedrockAgents(options: UseBedrockAgentsOptions = {}) {
         error: 'Cancelled',
         message: '実行がキャンセルされました',
         code: 'EXECUTION_CANCELLED',
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         retryable: false,
       } as APIError,
       hasError: true,

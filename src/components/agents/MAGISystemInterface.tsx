@@ -44,7 +44,7 @@ interface MAGISystemInterfaceProps {
   /** ローディング状態 */
   loading?: boolean;
   /** エラー状態 */
-  error?: string;
+  error?: string | undefined;
   /** 実行進行状況 */
   executionProgress?: {
     phase: 'initializing' | 'agents_thinking' | 'judge_evaluating' | 'completed';
@@ -484,7 +484,7 @@ const SystemStatus: React.FC<{
             </Button>
           )}
           {onNewQuestion && (
-            <Button variant="primary" size="sm" onClick={onNewQuestion}>
+            <Button variant="default" size="sm" onClick={onNewQuestion}>
               新しい質問
             </Button>
           )}
@@ -528,12 +528,12 @@ export const MAGISystemInterface: React.FC<MAGISystemInterfaceProps> = ({
           <p className="text-red-600 mb-6">{error}</p>
           <div className="flex gap-3 justify-center">
             {onRetry && (
-              <Button variant="secondary" onClick={onRetry}>
+              <Button variant="outline" onClick={onRetry}>
                 再試行
               </Button>
             )}
             {onNewQuestion && (
-              <Button variant="primary" onClick={onNewQuestion}>
+              <Button variant="default" onClick={onNewQuestion}>
                 新しい質問
               </Button>
             )}

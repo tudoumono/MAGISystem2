@@ -115,9 +115,9 @@ export const TraceModal: React.FC<TraceModalProps> = ({
       aria-modal="true"
       aria-labelledby="trace-modal-title"
     >
-      <Card
+      <div
         ref={modalRef}
-        className="w-full max-w-6xl max-h-[90vh] bg-white rounded-lg shadow-xl overflow-hidden"
+        className="w-full max-w-6xl max-h-[90vh] bg-white rounded-lg shadow-xl overflow-hidden border border-gray-200"
       >
         {/* モーダルヘッダー */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
@@ -200,7 +200,7 @@ export const TraceModal: React.FC<TraceModalProps> = ({
             </Button>
           </div>
         </div>
-      </Card>
+      </div>
     </div>
   );
 };

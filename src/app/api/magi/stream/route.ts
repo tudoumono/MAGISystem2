@@ -157,8 +157,8 @@ async function invokeMAGIAgentCore(
           try {
             parsedResponse = JSON.parse(magiResponse);
           } catch (e) {
-            // パース失敗時は raw_response を使用
-            parsedResponse = magiResponse.raw_response ? JSON.parse(magiResponse.raw_response) : null;
+            // パース失敗時はそのまま使用
+            parsedResponse = null;
           }
         } else {
           parsedResponse = magiResponse;
@@ -229,7 +229,7 @@ async function invokeMAGIAgentCore(
 async function displayStructuredMAGIResponse(
   responseBody: any,
   sendMessage: (type: string, content: string, agentId?: string) => void,
-  delay: (ms: number) => Promise<void>
+  delay: (ms: number) => Promise<unknown>
 ) {
   // Phase: 結果の構造化表示
   sendMessage('phase', 'MAGI Decision Results');

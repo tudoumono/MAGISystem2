@@ -71,17 +71,17 @@ export interface LogEntry {
   timestamp: string;
   level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
   service: string;
-  traceId?: string;
-  sessionId?: string;
-  userId?: string;
+  traceId?: string | undefined;
+  sessionId?: string | undefined;
+  userId?: string | undefined;
   component: string;
   message: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, any> | undefined;
   error?: {
     name: string;
     message: string;
-    stack?: string;
-  };
+    stack?: string | undefined;
+  } | undefined;
 }
 
 /**
@@ -253,7 +253,7 @@ export class MAGIMetricsPublisher {
       {
         MetricName: 'SystemThroughput',
         Value: metrics.throughput,
-        Unit: StandardUnit.CountPerSecond,
+        Unit: StandardUnit.Count_Second,
         Timestamp: timestamp,
         Dimensions: dimensions,
       },
@@ -362,8 +362,8 @@ export class MAGIStructuredLogger {
       level: entry.success ? 'INFO' : 'ERROR',
       service: 'magi-decision-ui',
       traceId: entry.traceId,
-      sessionId: entry.sessionId,
-      userId: entry.userId,
+      sessionId: entry.sessionId ?? undefined,
+      userId: entry.userId ?? undefined,
       component: `agent-${entry.agentId}`,
       message: `Agent execution ${entry.success ? 'completed' : 'failed'}`,
       metadata: {
@@ -374,7 +374,7 @@ export class MAGIStructuredLogger {
       error: entry.error ? {
         name: entry.error.name,
         message: entry.error.message,
-        stack: entry.error.stack,
+        stack: entry.error.stack ?? undefined,
       } : undefined,
     };
 
@@ -402,8 +402,8 @@ export class MAGIStructuredLogger {
       level: 'INFO',
       service: 'magi-decision-ui',
       traceId: entry.traceId,
-      sessionId: entry.sessionId,
-      userId: entry.userId,
+      sessionId: entry.sessionId ?? undefined,
+      userId: entry.userId ?? undefined,
       component: 'solomon-judge',
       message: `SOLOMON evaluation completed: ${entry.finalDecision}`,
       metadata: {
@@ -413,6 +413,7 @@ export class MAGIStructuredLogger {
         evaluationDuration: entry.evaluationDuration,
         agentResponseCount: entry.agentResponses.length,
       },
+      error: undefined,
     };
 
     await this.writeLog(logEntry);
@@ -435,16 +436,16 @@ export class MAGIStructuredLogger {
       timestamp: new Date().toISOString(),
       level: 'ERROR',
       service: 'magi-decision-ui',
-      traceId: context.traceId,
-      sessionId: context.sessionId,
-      userId: context.userId,
+      traceId: context.traceId ?? undefined,
+      sessionId: context.sessionId ?? undefined,
+      userId: context.userId ?? undefined,
       component: context.component,
       message: error.message,
-      metadata: context.metadata,
+      metadata: context.metadata ?? undefined,
       error: {
         name: error.name,
         message: error.message,
-        stack: error.stack,
+        stack: error.stack ?? undefined,
       },
     };
 

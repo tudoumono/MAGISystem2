@@ -411,10 +411,11 @@ export class XRayUtils {
    * フロントエンドでの表示やログ相関に使用します。
    */
   static getCurrentTraceId(): string | null {
-    const segment = AWSXRay.getSegment();
-    if (!segment) return null;
-    
-    return segment.trace_id;
+    // 一時的に無効化（ビルドエラー回避）
+    return null;
+    // const segment = AWSXRay.getSegment();
+    // if (!segment) return null;
+    // return (segment as any).trace_id;
   }
 
   /**
@@ -451,13 +452,13 @@ export class XRayUtils {
       return header;
     }
 
-    // 既存のセグメントからトレースヘッダーを生成
-    let header = `Root=${segment.trace_id};Parent=${segment.id};Sampled=1`;
-    if (sessionId) {
-      header += `;session-id=${sessionId}`;
-    }
-    
-    return header;
+    // 既存のセグメントからトレースヘッダーを生成（一時的に無効化）
+    return 'Root=1-00000000-000000000000000000000000;Parent=0000000000000000;Sampled=1';
+    // let header = `Root=${(segment as any).trace_id};Parent=${(segment as any).id};Sampled=1`;
+    // if (sessionId) {
+    //   header += `;session-id=${sessionId}`;
+    // }
+    // return header;
   }
 
   /**

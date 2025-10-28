@@ -172,7 +172,7 @@ export class BedrockAgentClient {
       // レスポンス検証
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new APIError(
+        throw createAPIError(
           errorData.message || 'Bedrock Agent execution failed',
           response.status,
           errorData.code || 'BEDROCK_API_ERROR'
@@ -190,7 +190,7 @@ export class BedrockAgentClient {
       clearTimeout(timeoutId);
       
       if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new APIError(
+        throw createAPIError(
           'Bedrock Agent execution timed out',
           408,
           'BEDROCK_TIMEOUT'
@@ -222,7 +222,7 @@ export class BedrockAgentClient {
 
     for (const field of requiredFields) {
       if (!(field in response)) {
-        throw new APIError(
+        throw createAPIError(
           `Invalid response: missing field '${field}'`,
           500,
           'INVALID_RESPONSE_STRUCTURE'
@@ -232,7 +232,7 @@ export class BedrockAgentClient {
 
     // エージェント応答の検証
     if (!Array.isArray(response.agentResponses) || response.agentResponses.length !== 3) {
-      throw new APIError(
+      throw createAPIError(
         'Invalid response: agentResponses must be an array of 3 elements',
         500,
         'INVALID_AGENT_RESPONSES'
@@ -241,7 +241,7 @@ export class BedrockAgentClient {
 
     // Judge応答の検証
     if (!response.judgeResponse || typeof response.judgeResponse !== 'object') {
-      throw new APIError(
+      throw createAPIError(
         'Invalid response: judgeResponse must be an object',
         500,
         'INVALID_JUDGE_RESPONSE'
@@ -304,31 +304,16 @@ export class BedrockAgentClient {
 }
 
 /**
- * APIエラークラス
- * 
- * 設計理由:
- * - 構造化されたエラー情報
- * - エラー分類による適切な処理
- * - デバッグ情報の提供
+ * APIError作成ヘルパー関数
  */
-export class APIError extends Error {
-  constructor(
-    message: string,
-    public statusCode: number,
-    public code: string,
-    public retryable: boolean = false
-  ) {
-    super(message);
-    this.name = 'APIError';
-    
-    // リトライ可能性の判定
-    this.retryable = this.determineRetryability(statusCode, code);
-  }
-
-  /**
-   * リトライ可能性の判定
-   */
-  private determineRetryability(statusCode: number, code: string): boolean {
+function createAPIError(
+  message: string,
+  statusCode: number,
+  code: string,
+  retryable?: boolean
+): APIError {
+  // リトライ可能性の判定
+  const isRetryable = retryable ?? (() => {
     // 5xx系エラーは一般的にリトライ可能
     if (statusCode >= 500) return true;
     
@@ -340,7 +325,14 @@ export class APIError extends Error {
     ];
     
     return retryableCodes.includes(code);
-  }
+  })();
+
+  return {
+    message,
+    code,
+    timestamp: new Date(),
+    retryable: isRetryable,
+  };
 }
 
 /**
@@ -434,7 +426,6 @@ export const BedrockAgentDebug = {
           reasoning: 'モック応答: リスク分析の結果',
           confidence: 0.85,
           executionTime: 1200,
-          timestamp: new Date(),
         },
         {
           agentId: 'balthasar',
@@ -443,7 +434,6 @@ export const BedrockAgentDebug = {
           reasoning: 'モック応答: 創造性の観点から評価',
           confidence: 0.92,
           executionTime: 980,
-          timestamp: new Date(),
         },
         {
           agentId: 'melchior',
@@ -452,7 +442,6 @@ export const BedrockAgentDebug = {
           reasoning: 'モック応答: 科学的分析による結論',
           confidence: 0.78,
           executionTime: 1450,
-          timestamp: new Date(),
         },
       ],
       judgeResponse: {
@@ -467,8 +456,6 @@ export const BedrockAgentDebug = {
         finalRecommendation: 'モック応答: 段階的実装を推奨',
         reasoning: 'モック応答: 多数決により可決',
         confidence: 0.85,
-        executionTime: 800,
-        timestamp: new Date(),
       },
       traceId: `mock_trace_${Date.now()}`,
       executionTime: 1450,

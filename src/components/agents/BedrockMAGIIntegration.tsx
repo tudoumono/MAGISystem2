@@ -194,14 +194,15 @@ export function BedrockMAGIIntegration({
     if (!isExecuting || !progress) return undefined;
 
     // 進行状況をMAGISystemInterface形式に変換
-    const phase = progress.currentStep.includes('SOLOMON初期化') ? 'initializing' :
+    const phase: 'initializing' | 'agents_thinking' | 'judge_evaluating' | 'completed' = 
+                  progress.currentStep.includes('SOLOMON初期化') ? 'initializing' :
                   progress.currentStep.includes('3賢者') ? 'agents_thinking' :
                   progress.currentStep.includes('SOLOMON評価') ? 'judge_evaluating' :
                   'completed';
 
     return {
       phase,
-      completedAgents: agentResponses.map(r => r.agentId),
+      completedAgents: agentResponses.map(r => r.agentId as string),
       activeAgents: phase === 'agents_thinking' ? ['caspar', 'balthasar', 'melchior'] : [],
       agentThoughtHistory: {
         caspar: phase === 'agents_thinking' ? [
@@ -397,7 +398,7 @@ export function BedrockMAGIIntegration({
       {/* エージェント設定 */}
       {showConfig && (
         <BedrockAgentConfig
-          currentConfigs={currentPreset?.configs}
+          currentConfigs={currentPreset?.configs || undefined}
           currentPreset={currentPreset}
           onPresetChange={handlePresetChange}
           disabled={isExecuting}
@@ -407,9 +408,9 @@ export function BedrockMAGIIntegration({
       {/* MAGI システムインターフェース */}
       <MAGISystemInterface
         question={question}
-        response={response}
+        response={response || undefined}
         loading={isExecuting}
-        error={error?.message}
+        error={error?.message || undefined}
         executionProgress={convertProgressToMAGIFormat()}
         onRetry={handleRetry}
         onNewQuestion={handleNewQuestion}
