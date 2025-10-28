@@ -123,7 +123,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   redirectAfterAuth = '/',
   className,
 }) => {
-  const { user, loading, isAuthenticated, isMockMode } = useAuth();
+  const { user, loading, isAuthenticated } = useAuth();
   const router = useRouter();
   
   /**
@@ -253,15 +253,14 @@ export function withAuth<P extends object>(
  * ```
  */
 export const useAuthGuard = () => {
-  const { user, loading, isAuthenticated, error, isMockMode } = useAuth();
-  
+  const { user, loading, isAuthenticated, error } = useAuth();
+
   return React.useMemo(() => ({
     isAuthenticated,
     isLoading: loading,
     user,
     error,
-    isMockMode,
     canAccess: isAuthenticated && !loading,
     needsAuth: !isAuthenticated && !loading,
-  }), [isAuthenticated, loading, user, error, isMockMode]);
+  }), [isAuthenticated, loading, user, error]);
 };

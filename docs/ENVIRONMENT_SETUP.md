@@ -222,14 +222,19 @@ export AMPLIFY_MODE=PRODUCTION
 ### プログラムでの制御
 
 ```typescript
-import { getCurrentEnvironmentMode, isMockMode } from '@/lib/amplify/config';
+import { getCurrentEnvironmentMode, isProductionMode, isDevelopmentMode } from '@/lib/amplify/config';
 
 // 現在のモードを取得
 const mode = getCurrentEnvironmentMode();
 
-// モック判定
-if (isMockMode()) {
-  console.log('Using mock data');
+// 本番環境判定
+if (isProductionMode()) {
+  console.log('Running in production mode');
+}
+
+// 開発環境判定
+if (isDevelopmentMode()) {
+  console.log('Running in development mode');
 }
 ```
 
