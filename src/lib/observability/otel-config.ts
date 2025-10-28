@@ -148,6 +148,10 @@ export const initializeOTEL = (): NodeSDK | null => {
           sqsExtractLinkTags: true,
           suppressInternalInstrumentation: false,
         },
+        // Winston instrumentation を無効化（winston-transportパッケージが不要）
+        '@opentelemetry/instrumentation-winston': {
+          enabled: false,
+        },
       }),
     ],
 
