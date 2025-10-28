@@ -36,13 +36,12 @@ import { ResourcesConfig } from 'aws-amplify';
 
 /**
  * 環境モードの定義
- * 
+ *
  * 学習ポイント:
- * - MOCK: モックデータを使用（Phase 1-2）
  * - DEVELOPMENT: 実AWS + 開発設定（Phase 3）
  * - PRODUCTION: 実AWS + 本番設定（Phase 4-6）
  */
-export type EnvironmentMode = 'MOCK' | 'DEVELOPMENT' | 'PRODUCTION';
+export type EnvironmentMode = 'DEVELOPMENT' | 'PRODUCTION';
 
 /**
  * Amplify設定の型定義
@@ -149,60 +148,6 @@ export function isDevelopmentMode(): boolean {
 }
 
 /**
- * モックモードかどうかの判定
- * 
- * 学習ポイント:
- * - Phase 1-2 での開発
- * - モックデータの使用判定
- * - AWS接続なしでの動作
- */
-export function isMockMode(): boolean {
-  return getCurrentEnvironmentMode() === 'MOCK';
-}
-
-/**
- * モック用のAmplify設定
- * 
- * 設計理由:
- * - Phase 1-2 でのフロントエンド開発用
- * - AWS接続なしでの動作確認
- * - 学習用の設定例
- */
-const mockAmplifyConfig: ResourcesConfig = {
-  Auth: {
-    Cognito: {
-      userPoolId: 'mock-user-pool-id',
-      userPoolClientId: 'mock-client-id',
-      identityPoolId: 'mock-identity-pool-id',
-      loginWith: {
-        email: true,
-      },
-      signUpVerificationMethod: 'code',
-      userAttributes: {
-        email: {
-          required: true,
-        },
-      },
-      allowGuestAccess: false,
-      passwordFormat: {
-        minLength: 8,
-        requireLowercase: true,
-        requireUppercase: true,
-        requireNumbers: true,
-        requireSpecialCharacters: true,
-      },
-    },
-  },
-  API: {
-    GraphQL: {
-      endpoint: 'https://mock-api.example.com/graphql',
-      region: 'us-east-1',
-      defaultAuthMode: 'userPool',
-    },
-  },
-};
-
-/**
  * 実際のAmplify設定を生成
  * 
  * 学習ポイント:
@@ -288,12 +233,6 @@ export function getAmplifyConfig(options: AmplifyConfigOptions = { mode: getCurr
   }
 
   switch (mode) {
-    case 'MOCK':
-      if (options.enableLogging !== false && !hasLoggedAmplifyConfig) {
-        console.log('📱 Using mock Amplify configuration (Phase 1-2)');
-      }
-      return mockAmplifyConfig;
-
     case 'DEVELOPMENT':
     case 'PRODUCTION':
       // amplify_outputs.jsonを直接使用（model_introspectionが含まれている）
@@ -339,8 +278,36 @@ export function getAmplifyConfig(options: AmplifyConfigOptions = { mode: getCurr
       }
 
     default:
-      console.warn(`⚠️ Unknown mode: ${mode}, using development config`);
-      return amplifyOutputs ? (amplifyOutputs as ResourcesConfig) : mockAmplifyConfig;
+      console.warn(`⚠️ Unknown mode: ${mode}, using development config with environment variables`);
+      // 環境変数からの最小限の設定をフォールバックとして使用
+      return {
+        Auth: {
+          Cognito: {
+            userPoolId: process.env.NEXT_PUBLIC_USER_POOL_ID || 'missing-user-pool-id',
+            userPoolClientId: process.env.NEXT_PUBLIC_USER_POOL_CLIENT_ID || 'missing-client-id',
+            identityPoolId: process.env.NEXT_PUBLIC_IDENTITY_POOL_ID || 'missing-identity-pool-id',
+            loginWith: { email: true },
+            signUpVerificationMethod: 'code',
+            userAttributes: { email: { required: true } },
+            allowGuestAccess: false,
+            passwordFormat: {
+              minLength: 8,
+              requireLowercase: true,
+              requireUppercase: true,
+              requireNumbers: true,
+              requireSpecialCharacters: true,
+            },
+          },
+        },
+        API: {
+          GraphQL: {
+            endpoint: process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || 'missing-graphql-endpoint',
+            region: process.env.NEXT_PUBLIC_AWS_REGION || 'ap-northeast-1',
+            defaultAuthMode: 'userPool',
+            ...(process.env.NEXT_PUBLIC_API_KEY && { apiKey: process.env.NEXT_PUBLIC_API_KEY }),
+          },
+        },
+      };
   }
 }
 
@@ -371,27 +338,21 @@ export function validateAmplifyConfig(config?: ResourcesConfig): ConfigValidatio
   // 認証設定の検証
   if (!currentConfig.Auth?.Cognito?.userPoolId) {
     errors.push('Missing User Pool ID');
-  } else if (currentConfig.Auth.Cognito.userPoolId.startsWith('mock-')) {
-    if (mode !== 'MOCK') {
-      warnings.push('Using mock User Pool ID in non-mock mode');
-    }
+  } else if (currentConfig.Auth.Cognito.userPoolId.startsWith('missing-')) {
+    warnings.push('Using placeholder User Pool ID - amplify_outputs.json may be missing');
   }
 
   if (!currentConfig.Auth?.Cognito?.userPoolClientId) {
     errors.push('Missing User Pool Client ID');
-  } else if (currentConfig.Auth.Cognito.userPoolClientId.startsWith('mock-')) {
-    if (mode !== 'MOCK') {
-      warnings.push('Using mock User Pool Client ID in non-mock mode');
-    }
+  } else if (currentConfig.Auth.Cognito.userPoolClientId.startsWith('missing-')) {
+    warnings.push('Using placeholder User Pool Client ID - amplify_outputs.json may be missing');
   }
 
   // API設定の検証
   if (!currentConfig.API?.GraphQL?.endpoint) {
     errors.push('Missing GraphQL endpoint');
-  } else if (currentConfig.API.GraphQL.endpoint.includes('mock-api.example.com')) {
-    if (mode !== 'MOCK') {
-      warnings.push('Using mock GraphQL endpoint in non-mock mode');
-    }
+  } else if (currentConfig.API.GraphQL.endpoint.startsWith('missing-')) {
+    warnings.push('Using placeholder GraphQL endpoint - amplify_outputs.json may be missing');
   }
 
   if (!currentConfig.API?.GraphQL?.region) {
@@ -463,24 +424,23 @@ export function displayConfigInfo(): void {
 export function getEnvironmentSetupGuide(): string {
   const mode = getCurrentEnvironmentMode();
 
-  if (mode === 'MOCK') {
+  if (!amplifyOutputs) {
     return `
 🔧 Environment Setup Guide
 
-Current Mode: MOCK (Phase 1-2 Development)
+amplify_outputs.json not found!
 
-To switch to real AWS resources:
-1. Run: npx ampx push
-2. Copy values from amplify_outputs.json to .env.local:
-   NEXT_PUBLIC_AWS_REGION=${amplifyOutputs?.data?.aws_region || 'your-region'}
-   NEXT_PUBLIC_USER_POOL_ID=${amplifyOutputs?.auth?.user_pool_id || 'your-user-pool-id'}
-   NEXT_PUBLIC_USER_POOL_CLIENT_ID=${amplifyOutputs?.auth?.user_pool_client_id || 'your-client-id'}
-   NEXT_PUBLIC_GRAPHQL_ENDPOINT=${amplifyOutputs?.data?.url || 'your-graphql-endpoint'}
-   NEXT_PUBLIC_API_KEY=${amplifyOutputs?.data?.api_key || 'your-api-key'}
-
+To set up AWS resources:
+1. Deploy Amplify backend: npx ampx sandbox
+2. The amplify_outputs.json file will be generated automatically
 3. Restart your development server
 
-Or set AMPLIFY_MODE=DEVELOPMENT to force development mode.
+Alternatively, set environment variables in .env.local:
+   NEXT_PUBLIC_AWS_REGION=your-region
+   NEXT_PUBLIC_USER_POOL_ID=your-user-pool-id
+   NEXT_PUBLIC_USER_POOL_CLIENT_ID=your-client-id
+   NEXT_PUBLIC_GRAPHQL_ENDPOINT=your-graphql-endpoint
+   NEXT_PUBLIC_API_KEY=your-api-key
     `;
   }
 
@@ -492,9 +452,8 @@ Region: ${amplifyOutputs?.data?.aws_region}
 Status: Connected to AWS resources
 
 To switch modes:
-- AMPLIFY_MODE=MOCK (Phase 1-2: Mock data)
-- AMPLIFY_MODE=DEVELOPMENT (Phase 3: Real AWS + Dev settings)  
-- AMPLIFY_MODE=PRODUCTION (Phase 4-6: Real AWS + Prod settings)
+- AMPLIFY_MODE=DEVELOPMENT (Development: Real AWS + Dev settings)
+- AMPLIFY_MODE=PRODUCTION (Production: Real AWS + Prod settings)
   `;
 }
 
