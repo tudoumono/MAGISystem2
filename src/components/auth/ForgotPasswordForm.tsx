@@ -82,7 +82,7 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
   showSignInLink = true,
   className,
 }) => {
-  const { resetPassword, loading, error, clearError, isMockMode } = useAuth();
+  const { resetPassword, loading, error, clearError } = useAuth();
   
   // フロー状態管理
   const [currentStep, setCurrentStep] = useState<ResetStep>('request');
@@ -213,35 +213,23 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
           };
           
           await resetPassword(credentials);
-          
-          if (isMockMode) {
-            // モックモードでは次のステップに進む
-            setCurrentStep('verify');
-          } else {
-            // 実環境では確認メール送信完了
-            setCurrentStep('verify');
-          }
+
+          // 確認メール送信完了
+          setCurrentStep('verify');
           break;
-          
+
         case 'verify':
-          // 確認コード検証（モックモードでは自動成功）
-          if (isMockMode) {
-            setCurrentStep('reset');
-          } else {
-            // 実環境では Amplify の confirmResetPassword を呼び出し
-            // await confirmResetPassword({ username: formData.email, confirmationCode: formData.verificationCode });
-            setCurrentStep('reset');
-          }
+          // 確認コード検証
+          // 実環境では Amplify の confirmResetPassword を呼び出し
+          // await confirmResetPassword({ username: formData.email, confirmationCode: formData.verificationCode });
+          setCurrentStep('reset');
           break;
-          
+
         case 'reset':
-          // 新パスワード設定（モックモードでは自動成功）
-          if (isMockMode) {
-            setCurrentStep('success');
-          } else {
-            // 実環境では Amplify の confirmResetPassword を呼び出し
-            // await confirmResetPassword({ 
-            //   username: formData.email, 
+          // 新パスワード設定
+          // 実環境では Amplify の confirmResetPassword を呼び出し
+          // await confirmResetPassword({
+          //   username: formData.email, 
             //   confirmationCode: formData.verificationCode,
             //   newPassword: formData.newPassword 
             // });
@@ -275,11 +263,7 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
             <CardHeader className="space-y-1">
               <CardTitle className="text-2xl text-center">パスワードリセット</CardTitle>
               <CardDescription className="text-center">
-                {isMockMode ? (
-                  'デモモード: 任意のメールアドレスでテストできます'
-                ) : (
-                  'メールアドレスを入力してください。リセット用のリンクをお送りします。'
-                )}
+                メールアドレスを入力してください。リセット用のリンクをお送りします。
               </CardDescription>
             </CardHeader>
             

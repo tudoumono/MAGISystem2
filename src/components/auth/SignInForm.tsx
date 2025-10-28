@@ -78,7 +78,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({
   showForgotPasswordLink = true,
   className,
 }) => {
-  const { signIn, loading, error, clearError, isMockMode, isAuthenticated } = useAuth();
+  const { signIn, loading, error, clearError, isAuthenticated } = useAuth();
   
   // Hydrationエラー回避のためのクライアントサイド判定
   const [isClient, setIsClient] = useState(false);
@@ -222,10 +222,6 @@ export const SignInForm: React.FC<SignInFormProps> = ({
         <CardDescription className="text-center">
           {!isClient ? (
             'アカウントにログインしてください'
-          ) : isMockMode ? (
-            <>
-              デモモード: <code className="text-xs bg-muted px-1 rounded">demo@demo.com</code> / <code className="text-xs bg-muted px-1 rounded">P@ssw0rd</code>
-            </>
           ) : (
             <>
               AWS Cognito認証: 有効なアカウントでログインしてください

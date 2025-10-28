@@ -43,7 +43,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
  * - レスポンシブデザインの実装
  */
 export default function DashboardPage() {
-  const { user, signOut, isMockMode } = useAuth();
+  const { user, signOut } = useAuth();
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = React.useState(false);
   
@@ -93,7 +93,6 @@ export default function DashboardPage() {
             <div className="flex items-center gap-4">
               {user && (
                 <div className="text-sm text-muted-foreground">
-                  {isMockMode && <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded mr-2">DEMO</span>}
                   {user.username}
                 </div>
               )}
@@ -204,12 +203,6 @@ export default function DashboardPage() {
                 <h4 className="font-medium text-foreground mb-2">環境</h4>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">モード:</span>
-                    <span className={`font-medium ${isMockMode ? 'text-yellow-600' : 'text-green-600'}`}>
-                      {isMockMode ? 'デモモード' : '本番モード'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
                     <span className="text-muted-foreground">ユーザーID:</span>
                     <span className="font-mono text-xs">{user?.userId}</span>
                   </div>
@@ -234,15 +227,6 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
-            
-            {isMockMode && (
-              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                <p className="text-sm text-yellow-800">
-                  <strong>デモモード:</strong> 現在はモックデータを使用しています。
-                  実際のAWS接続は今後のPhaseで実装予定です。
-                </p>
-              </div>
-            )}
           </CardContent>
         </Card>
       </main>
