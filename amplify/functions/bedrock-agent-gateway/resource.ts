@@ -50,7 +50,7 @@ export const bedrockAgentGateway = defineFunction({
    */
   environment: {
     // Amazon Bedrock Multi-Agent Collaboration設定
-    BEDROCK_REGION: 'us-east-1',
+    BEDROCK_REGION: 'ap-northeast-1',
     BEDROCK_MULTI_AGENT_COLLABORATION_ENABLED: 'true',
     
     // SOLOMON Supervisor Agent設定
