@@ -26,7 +26,7 @@ export async function register() {
     
     try {
       // 観測可能性スタックの初期化
-      const { initializeObservability } = await import('./src/lib/observability');
+      const { initializeObservability } = await import('./lib/observability');
       await initializeObservability();
       
       console.log('✅ MAGI instrumentation initialized successfully');
