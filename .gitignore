@@ -79,6 +79,18 @@ Thumbs.db
 # Logs
 logs/
 *.log
+log/
+log.txt
+debug.log
+error.log
+access.log
+application.log
+server.log
+npm-debug.log
+yarn-debug.log
+pnpm-debug.log
+*.log.*
+*.log.gz
 
 # Runtime data
 pids/
@@ -242,3 +254,4 @@ site/
 
 # Archive directory (deprecated implementations)
 agents/archive/
+
