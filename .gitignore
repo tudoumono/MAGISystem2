@@ -211,6 +211,8 @@ tokens.json
 test-results/
 playwright-report/
 playwright/.cache/
+tests/e2e/
+tests/integration/
 
 # Backup files
 *.bak
