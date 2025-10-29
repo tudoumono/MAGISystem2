@@ -1,7 +1,7 @@
 import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
-import { bedrockAgentGateway } from './functions/bedrock-agent-gateway/resource';
+// import { bedrockAgentGateway } from './functions/bedrock-agent-gateway/resource';
 
 /**
  * Amplify Gen2 Backend Configuration
@@ -11,7 +11,7 @@ import { bedrockAgentGateway } from './functions/bedrock-agent-gateway/resource'
  * 構成要素:
  * - auth: Cognito認証設定
  * - data: DynamoDB + GraphQL API設定
- * - bedrockAgentGateway: Bedrock Agent Runtime統合Lambda関数
+ * - bedrockAgentGateway: Bedrock Agent Runtime統合Lambda関数（一時的に無効化）
  *
  * 学習ポイント:
  * - Amplify Gen2でのリソース統合
@@ -22,7 +22,7 @@ import { bedrockAgentGateway } from './functions/bedrock-agent-gateway/resource'
 const backend = defineBackend({
   auth,
   data,
-  bedrockAgentGateway,
+  // bedrockAgentGateway, // 一時的に無効化
 });
 
 export default backend;

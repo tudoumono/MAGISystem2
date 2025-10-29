@@ -52,14 +52,7 @@ export const TraceModal: React.FC<TraceModalProps> = ({
   const modalRef = useRef<HTMLDivElement>(null);
   
   // トレースデータの取得
-  const { traceSteps, error, connectionStatus, startTracing } = useTraceUpdates();
-  
-  // トレースIDが変更された時にトレースを開始
-  useEffect(() => {
-    if (traceId && isOpen) {
-      startTracing(traceId);
-    }
-  }, [traceId, isOpen, startTracing]);
+  const { traceSteps, error, connectionStatus } = useTraceUpdates(traceId || undefined, isOpen);
   
   const isLoading = connectionStatus === 'connecting' || connectionStatus === 'disconnected';
 

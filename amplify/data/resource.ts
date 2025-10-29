@@ -26,7 +26,7 @@ const schema = a.schema({
     })
     .authorization((allow) => [
       allow.owner(),
-      allow.publicApiKey().to(['create', 'read', 'update']), // テスト用に追加
+      allow.publicApiKey().to(['create', 'read', 'update', 'delete']), // テスト用にdeleteも追加
     ]),
 
   Message: a
@@ -44,7 +44,7 @@ const schema = a.schema({
     })
     .authorization((allow) => [
       allow.owner(),
-      allow.publicApiKey().to(['create', 'read', 'update']), // テスト用に追加
+      allow.publicApiKey().to(['create', 'read', 'update', 'delete']), // テスト用にdeleteも追加
     ]),
 
   TraceStep: a
