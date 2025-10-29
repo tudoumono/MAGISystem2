@@ -92,6 +92,11 @@ pnpm-debug.log
 *.log.*
 *.log.gz
 
+# Deployment logs
+ログ/
+Deployment-*-logs*
+*Deployment-*-logs*
+
 # Runtime data
 pids/
 *.pid
@@ -254,4 +259,3 @@ site/
 
 # Archive directory (deprecated implementations)
 agents/archive/
-
