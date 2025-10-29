@@ -403,9 +403,16 @@ export function useConversations(): UseConversationsReturn {
         authMode: 'apiKey' // テスト用にAPIキー認証を使用
       });
 
-      if (!result.data) {
-        throw new Error('Failed to delete conversation');
+      console.log('Delete result:', { data: result.data, errors: result.errors });
+
+      // エラーがある場合は失敗
+      if (result.errors && result.errors.length > 0) {
+        throw new Error(result.errors[0].message || 'Failed to delete conversation');
       }
+
+      // 削除後に実際に削除されたかを確認（オプション）
+      // 削除操作が成功した場合、result.dataはnullまたは削除されたオブジェクトになる
+      console.log('Conversation deleted successfully:', id);
     } catch (err) {
       // 失敗時: 前の状態に復元
       setConversations(previousConversations);

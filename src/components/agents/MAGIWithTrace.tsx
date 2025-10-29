@@ -211,15 +211,28 @@ export default function MAGIWithTrace({
       // 会話履歴にメッセージを保存（useMessagesフックを使用）
       await sendMessage({ content: question });
       
-      // MAGIシステムの実行をシミュレート
-      // Phase 3以降では実際のエージェント実行に置き換え
-      const { mockMAGIExecution } = await import('@/lib/mock/data');
-      const response = await mockMAGIExecution.random(question);
+      // 実際のMAGIシステムの実行
+      const response = await fetch('/api/magi/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          question,
+          conversationId,
+          traceId,
+          enableRealTimeTrace: true
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`MAGI API error: ${response.status}`);
+      }
+
+      const magiResult = await response.json();
       
-      // トレースIDを設定
-      response.traceId = traceId;
-      
-      setMagiResponse(response);
+      // レスポンスからMAGI結果を設定
+      setMagiResponse(magiResult);
       setIsHistoryRestored(false); // 新しい実行なのでフラグをリセット
       
       console.log('MAGI execution completed and saved to conversation:', conversationId);
