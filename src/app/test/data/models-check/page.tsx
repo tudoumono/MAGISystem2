@@ -39,12 +39,16 @@ export default function ModelsCheckPage() {
                 // 3. amplify_outputs.json の存在確認
                 let amplifyOutputsExists = false;
                 try {
-                    const outputs = require('../../../../amplify_outputs.json');
-                    amplifyOutputsExists = !!outputs;
-                    console.log('🔍 amplify_outputs.json exists:', amplifyOutputsExists);
-                    console.log('🔍 amplify_outputs content:', outputs);
+                    // fetch APIを使用してファイルの存在を確認
+                    const response = await fetch('/amplify_outputs.json');
+                    amplifyOutputsExists = response.ok;
+                    if (amplifyOutputsExists) {
+                        const outputs = await response.json();
+                        console.log('🔍 amplify_outputs.json exists:', amplifyOutputsExists);
+                        console.log('🔍 amplify_outputs content:', outputs);
+                    }
                 } catch (e) {
-                    console.log('🔍 amplify_outputs.json not found');
+                    console.log('🔍 amplify_outputs.json not found or not accessible');
                 }
 
                 // 4. クライアントの初期化テスト
