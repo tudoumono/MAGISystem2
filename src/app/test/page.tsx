@@ -55,6 +55,15 @@ export default function TestPage() {
 
       {/* メインコンテンツ */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {/* ナビゲーションリンク */}
+        <div className="px-4 mb-6 sm:px-0">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <a href="/dashboard" className="hover:text-blue-600 transition-colors">
+              ← ダッシュボードに戻る
+            </a>
+          </div>
+        </div>
+        
         {/* 説明セクション */}
         <div className="px-4 py-6 sm:px-0">
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
@@ -87,6 +96,53 @@ export default function TestPage() {
                   </ul>
                 </div>
               </div>
+            </div>
+          </div>
+          
+          {/* 他のテストページへのリンク */}
+          <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              🔗 その他のテストページ
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <a 
+                href="/test/data" 
+                className="block p-4 border rounded-lg hover:border-blue-500 hover:shadow-md transition-all"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-2xl">💾</span>
+                  <h3 className="font-medium text-gray-900">データ統合</h3>
+                </div>
+                <p className="text-sm text-gray-600">
+                  Amplify Data、GraphQL APIの動作確認
+                </p>
+              </a>
+              
+              <a 
+                href="/test/agents" 
+                className="block p-4 border rounded-lg hover:border-blue-500 hover:shadow-md transition-all"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-2xl">🤖</span>
+                  <h3 className="font-medium text-gray-900">エージェント統合</h3>
+                </div>
+                <p className="text-sm text-gray-600">
+                  MAGI 3賢者エージェントの動作確認
+                </p>
+              </a>
+              
+              <a 
+                href="/test/integration" 
+                className="block p-4 border rounded-lg hover:border-blue-500 hover:shadow-md transition-all"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-2xl">🔗</span>
+                  <h3 className="font-medium text-gray-900">統合テスト</h3>
+                </div>
+                <p className="text-sm text-gray-600">
+                  ストリーミング、トレース、本番環境テスト
+                </p>
+              </a>
             </div>
           </div>
 
