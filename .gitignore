@@ -122,6 +122,23 @@ ENV/
 env.bak/
 venv.bak/
 .pytest_cache/
+*.pyc
+.python-version
+
+# Python virtual environments
+agents/venv/
+agents/env/
+agents/.venv/
+
+# Python build artifacts
+agents/dist/
+agents/build/
+agents/*.egg-info/
+
+# Python test artifacts
+agents/.coverage
+agents/htmlcov/
+agents/.tox/
 
 # Jupyter Notebook
 .ipynb_checkpoints
