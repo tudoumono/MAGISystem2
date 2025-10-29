@@ -44,6 +44,21 @@ export default function IntegrationTestsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {/* ナビゲーションリンク */}
+      <div className="mb-6">
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <Link href="/dashboard" className="hover:text-blue-600 transition-colors">
+            ダッシュボード
+          </Link>
+          <span>/</span>
+          <Link href="/test" className="hover:text-blue-600 transition-colors">
+            テスト一覧
+          </Link>
+          <span>/</span>
+          <span className="text-gray-900 font-medium">統合テスト</span>
+        </div>
+      </div>
+      
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
           Integration Tests
