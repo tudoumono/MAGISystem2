@@ -1,157 +1,232 @@
-/**
- * Strands Agents - MAGI Decision System
- * 
- * このディレクトリはエヴァンゲリオンのMAGIシステムにインスパイアされた
- * 多エージェント意思決定システムのStrands Agents実装を含みます。
- * 
- * システム構成:
- * - SOLOMON Judge: 統括者として3賢者を管理し、最終判断を行う
- * - CASPAR: 保守的・現実的な視点（リスク重視）
- * - BALTHASAR: 革新的・感情的な視点（創造性重視）
- * - MELCHIOR: バランス型・科学的な視点（論理性重視）
- * 
- * 学習ポイント:
- * - Strands Agentsフレームワークの使用方法
- * - A2A (Agent-to-Agent) プロトコルによる通信
- * - マルチエージェント協調による意思決定
- * - Amazon Bedrock AgentCoreとの統合パターン
- */
+# MAGI Decision System - Python Agents
 
-# Strands Agents - MAGI Decision System
+## 概要
 
-## Overview
+このディレクトリには、MAGIシステムのPythonベースのエージェント実装が含まれています。
+Amazon Bedrock AgentCoreにデプロイされ、3賢者（CASPAR、BALTHASAR、MELCHIOR）とSOLOMON Judgeによる多視点分析を提供します。
 
-エヴァンゲリオンのMAGIシステムにインスパイアされた多エージェント意思決定システムです。
-
-### Architecture
-
-```
-SOLOMON Judge (Orchestrator)
-    ↓ Tool Calls
-┌─────────┬─────────┬─────────┐
-│ CASPAR  │BALTHASAR│MELCHIOR │
-│(保守的) │(革新的) │(バランス)│
-│ Tool    │ Tool    │ Tool    │
-└─────────┴─────────┴─────────┘
-```
-
-### Agent Roles
-
-- **SOLOMON Judge**: 統括者として3賢者の投票を集計し、最終的な可決/否決を決定
-- **CASPAR**: 保守的・現実的な視点で可決/否決を判断（リスク重視）
-- **BALTHASAR**: 革新的・感情的な視点で可決/否決を判断（創造性重視）
-- **MELCHIOR**: バランス型・科学的な視点で可決/否決を判断（論理性重視）
-
-## Directory Structure
+## ディレクトリ構造
 
 ```
 agents/
-├── README.md                 # このファイル
-├── requirements.txt          # Python依存関係
-├── shared/                   # 共通ユーティリティ
-│   ├── __init__.py
-│   ├── types.py             # 共通型定義
-│   ├── prompts.py           # プロンプト管理
-│   └── utils.py             # ユーティリティ関数
-├── solomon/                  # SOLOMON Judge
-│   ├── __init__.py
-│   ├── agent.py             # SOLOMONエージェント実装
-│   └── tools.py             # 3賢者ツール定義
-├── caspar/                   # CASPAR エージェント
+├── caspar/              # CASPAR（保守的・現実的視点）
 │   ├── __init__.py
 │   └── agent.py
-├── balthasar/                # BALTHASAR エージェント
+│
+├── balthasar/           # BALTHASAR（革新的・感情的視点）
 │   ├── __init__.py
 │   └── agent.py
-├── melchior/                 # MELCHIOR エージェント
+│
+├── melchior/            # MELCHIOR（バランス型・科学的視点）
 │   ├── __init__.py
 │   └── agent.py
-└── tests/                    # テスト
-    ├── __init__.py
-    ├── test_agents.py
-    └── test_integration.py
+│
+├── solomon/             # SOLOMON Judge（統括者）
+│   ├── __init__.py
+│   ├── agent.py
+│   └── tools.py
+│
+├── shared/              # 共通ユーティリティ
+│   ├── __init__.py
+│   ├── prompts.py      # プロンプトテンプレート
+│   ├── types.py        # 型定義
+│   └── utils.py        # ユーティリティ関数
+│
+├── tests/               # テストコード
+│   ├── __init__.py
+│   ├── test_agents.py
+│   └── test_integration.py
+│
+├── archive/             # 非推奨・アーカイブ
+│   └── ...
+│
+├── magi_agent.py        # メインエージェント（AgentCore用）
+├── requirements.txt     # Python依存関係
+├── pyproject.toml       # プロジェクト設定
+└── README.md           # このファイル
 ```
 
-## Setup Instructions
+## セットアップ
 
-### Prerequisites
-- Python 3.11+ 
-- [uv](https://docs.astral.sh/uv/) - Fast Python package manager
+### 1. Python環境の準備
 
-### Installation
-
-1. uvのインストール（まだの場合）:
 ```bash
-# macOS/Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# Python 3.13以上が必要
+python --version
 
+# 仮想環境の作成
+python -m venv venv
+
+# 仮想環境の有効化
 # Windows
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-
-# または pip経由
-pip install uv
-```
-
-2. プロジェクトのセットアップ:
-```bash
-cd agents
+venv\Scripts\activate
+# macOS/Linux
+source venv/bin/activate
 
 # 依存関係のインストール
-uv sync
-
-# 開発用依存関係も含める場合
-uv sync --extra dev
+pip install -r requirements.txt
 ```
 
-3. 環境変数の設定:
+### 2. 環境変数の設定
+
 ```bash
-export AWS_REGION=us-east-1
-export BEDROCK_MODEL_ID=anthropic.claude-3-sonnet-20240229-v1:0
+# .env ファイルを作成（agents/.env）
+AWS_REGION=ap-northeast-1
+BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0
 ```
 
-4. エージェントのテスト:
+## エージェント構成
+
+### CASPAR（カスパー）
+- **視点**: 保守的・現実的
+- **重視**: 実行可能性、安全性、リスク管理
+- **特徴**: 慎重なアプローチ、段階的な実装を推奨
+
+### BALTHASAR（バルタザール）
+- **視点**: 革新的・感情的
+- **重視**: 創造性、倫理、人間的側面
+- **特徴**: 革新的なアプローチ、新しい可能性の探求
+
+### MELCHIOR（メルキオール）
+- **視点**: バランス型・科学的
+- **重視**: データ、論理、統計的分析
+- **特徴**: バランスの取れた解決策、科学的根拠
+
+### SOLOMON Judge（ソロモン）
+- **役割**: 統括者・最終判断
+- **機能**: 3賢者の回答を評価・統合
+- **出力**: 0-100点のスコアリング、最終判断、推奨事項
+
+## 開発
+
+### ローカルテスト
+
 ```bash
-# 基本テスト
-uv run python simple_test.py
+# 単体テスト
+python -m pytest tests/
 
-# 包括的テスト
-uv run python run_tests.py
+# 統合テスト
+python -m pytest tests/test_integration.py
 
-# pytest実行
-uv run pytest tests/ -v
-
-# デモ実行
-uv run python demo.py
+# 特定のエージェントテスト
+python -m pytest tests/test_agents.py::test_caspar
 ```
 
-## Integration with Bedrock AgentCore
+### デバッグ
 
-このStrands Agentsシステムは、Amazon Bedrock AgentCoreと統合されます：
+```bash
+# ローカルサーバーの起動（開発用）
+python local_server.py
 
-1. **Runtime Integration**: AgentCore Runtimeでの実行
-2. **Observability**: OpenTelemetryによるトレーシング
-3. **Memory Management**: AgentCore Memory Serviceとの連携
-4. **A2A Protocol**: エージェント間通信の標準化
+# エージェントの直接実行
+python magi_agent.py
+```
 
-## Development Phases
+## デプロイ
 
-- **Phase 1-2**: モックデータでの基本実装とテスト ✅
-- **Phase 3**: 部分統合（認証・データは実データ、エージェントはモック）
-- **Phase 4-6**: 完全統合（Bedrock AgentCore + 実データ）
+### Amazon Bedrock AgentCoreへのデプロイ
 
-## Why uv?
+1. **AgentCore設定の確認**
+```bash
+# .bedrock_agentcore.yaml が正しく設定されているか確認
+cat .bedrock_agentcore.yaml
+```
 
-このプロジェクトでは[uv](https://docs.astral.sh/uv/)を使用してPython依存関係を管理しています：
+2. **デプロイ実行**
+```bash
+# AWS CLIでデプロイ
+aws bedrock-agent create-agent \
+  --agent-name magi_agent \
+  --agent-resource-role-arn <ROLE_ARN> \
+  --foundation-model anthropic.claude-3-5-sonnet-20241022-v2:0
+```
 
-### 利点
-- **高速**: Rustで実装された高速パッケージマネージャー
-- **AWS互換**: Amplify Functions、AgentCore、Lambda環境で完全サポート
-- **現代的**: pyproject.tomlベースの標準的なPythonプロジェクト管理
-- **セキュリティ**: 依存関係の脆弱性チェック機能
-- **再現性**: uv.lockによる確定的な依存関係解決
+3. **動作確認**
+```bash
+# テストリクエストの送信
+python agentcore_test.py
+```
 
-### AWS統合での利点
-- **Amplify Functions**: uvで管理された依存関係は自動的にデプロイ
-- **AgentCore**: Python環境での依存関係解決が高速化
-- **Lambda Layers**: uvによる効率的なレイヤー構築
-- **Container**: Dockerイメージでのビルド時間短縮
+## API仕様
+
+### 入力形式
+
+```json
+{
+  "question": "新しいAIシステムを導入すべきでしょうか？",
+  "context": {
+    "user_id": "user123",
+    "session_id": "session456"
+  }
+}
+```
+
+### 出力形式
+
+```json
+{
+  "agent_responses": [
+    {
+      "agent_id": "caspar",
+      "decision": "慎重に進めるべき",
+      "reasoning": "...",
+      "confidence": 0.85
+    },
+    {
+      "agent_id": "balthasar",
+      "decision": "積極的に導入すべき",
+      "reasoning": "...",
+      "confidence": 0.90
+    },
+    {
+      "agent_id": "melchior",
+      "decision": "段階的に導入すべき",
+      "reasoning": "...",
+      "confidence": 0.88
+    }
+  ],
+  "final_decision": "段階的な導入を推奨",
+  "voting_result": {
+    "approved": 2,
+    "rejected": 0,
+    "abstained": 1
+  },
+  "confidence": 0.87,
+  "summary": "...",
+  "recommendation": "...",
+  "execution_time": 2500
+}
+```
+
+## トラブルシューティング
+
+### よくある問題
+
+1. **ImportError: No module named 'boto3'**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **AWS認証エラー**
+   ```bash
+   aws configure
+   # または
+   export AWS_ACCESS_KEY_ID=xxx
+   export AWS_SECRET_ACCESS_KEY=xxx
+   ```
+
+3. **Bedrock APIエラー**
+   - リージョンが正しいか確認
+   - モデルIDが正しいか確認
+   - IAMロールに適切な権限があるか確認
+
+## 関連ドキュメント
+
+- [プロジェクト全体のREADME](../README.md)
+- [環境セットアップガイド](../docs/ENVIRONMENT_SETUP.md)
+- [Amplify Gen2ガイド](../docs/learning/03-aws-amplify-gen2.md)
+- [AgentCore統合ガイド](../docs/learning/06-bedrock-agentcore.md)
+
+## ライセンス
+
+このプロジェクトは内部使用のみを目的としています。
