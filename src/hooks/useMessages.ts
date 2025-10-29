@@ -100,12 +100,18 @@ function parseMessageData(message: any): any {
     };
   } catch (error) {
     console.error('Failed to parse message data:', error, message);
-    // パースエラー時は安全なデフォルト値を返す
+    
+    // パースエラーを記録
+    const errorMessage = error instanceof Error ? error.message : 'Unknown parse error';
+    
+    // 安全なデフォルト値を返す
     return {
       ...message,
       agentResponses: null,
       judgeResponse: null,
-      _parseError: true // エラーフラグを追加
+      _parseError: true,
+      _parseErrorMessage: errorMessage,
+      _parseErrorTimestamp: new Date().toISOString()
     };
   }
 }

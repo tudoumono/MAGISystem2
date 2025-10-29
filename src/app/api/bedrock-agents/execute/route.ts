@@ -38,65 +38,53 @@ import { AskAgentRequest, AskAgentResponse, APIError } from '@/types/api';
  * - 認証チェックの実装
  */
 export async function POST(request: NextRequest) {
-    // Temporarily disable Amplify server context for deployment
     try {
-        // 1. 認証チェック（一時的に無効化）
-        // const user = await getCurrentUser(contextSpec);
-        // if (!user) {
-        //     return NextResponse.json(
-        //         {
-        //             error: 'Unauthorized',
-        //             message: '認証が必要です',
-        //             code: 'UNAUTHORIZED',
-        //             timestamp: new Date().toISOString(),
-        //         },
-        //         { status: 401 }
-        //     );
-        // }
+        // 本番環境では認証必須
+        if (process.env.NODE_ENV === 'production' && !process.env.SKIP_AUTH_CHECK) {
+            return NextResponse.json(
+                {
+                    error: 'Authentication Required',
+                    message: '本番環境では認証が必要です。Amplify Auth統合を完了してください。',
+                    code: 'AUTH_REQUIRED',
+                    timestamp: new Date().toISOString(),
+                },
+                { status: 401 }
+            );
+        }
 
-        // 2. リクエストボディの解析（一時的に無効化）
-        // const body: AskAgentRequest = await request.json();
+        // リクエストボディの解析
+        const body: AskAgentRequest = await request.json();
 
-        // 3. リクエストの検証（一時的に無効化）
-        // const validationError = validateRequest(body);
-        // if (validationError) {
-        //     return NextResponse.json(validationError, { status: 400 });
-        // }
+        // リクエストの検証
+        const validationError = validateRequest(body);
+        if (validationError) {
+            return NextResponse.json(validationError, { status: 400 });
+        }
 
-        // 4. ログ出力（一時的に無効化）
-        // console.log('Bedrock API Route: Request received', {
-        //     userId: user.userId,
-        //     message: body.message.substring(0, 100) + (body.message.length > 100 ? '...' : ''),
-        //     conversationId: body.conversationId,
-        //     hasCustomConfig: !!body.agentConfig,
-        //     timestamp: new Date().toISOString(),
-        // });
+        // ログ出力
+        console.log('Bedrock API Route: Request received', {
+            message: body.message.substring(0, 100) + (body.message.length > 100 ? '...' : ''),
+            conversationId: body.conversationId,
+            hasCustomConfig: !!body.agentConfig,
+            timestamp: new Date().toISOString(),
+        });
 
-        // 5. 現在はモック応答を返す（Phase 1-2: フロントエンドファースト開発）
-        // Phase 3以降でBedrock Lambda関数との統合を実装
-        // const response = await executeWithMockData(body, user.userId);
-
-        // 6. 成功レスポンス（一時的に無効化）
-        // return NextResponse.json(response, {
-        //     status: 200,
-        //     headers: {
-        //         'Content-Type': 'application/json',
-        //     },
-        // });
-        
-        // 開発環境でのみモックレスポンスを返す
+        // 開発環境: モックデータで応答
         if (process.env.NODE_ENV !== 'production') {
-            return NextResponse.json({
-                message: 'Development mode: Using mock responses',
-                status: 'mock',
-                note: 'Enable Lambda integration for production'
+            console.log('Development mode: Using mock data');
+            const response = await executeWithMockData(body, 'dev-user');
+            return NextResponse.json(response, {
+                status: 200,
+                headers: {
+                    'Content-Type': 'application/json',
+                },
             });
         }
         
-        // 本番環境では実装が必要
+        // 本番環境: Lambda統合が必要
         return NextResponse.json({
             error: 'Service Unavailable',
-            message: 'Bedrock agent integration not configured',
+            message: 'Bedrock agent integration not configured. Please complete Lambda integration.',
             code: 'NOT_CONFIGURED'
         }, { status: 503 });
     } catch (error) {

@@ -118,7 +118,8 @@ async function invokeMAGIAgentCore(
         Payload: JSON.stringify(lambdaPayload),
       });
 
-      const lambdaResponse = await lambdaClient.send(command);
+      // リトライロジック付きでLambda呼び出し
+      const lambdaResponse = await invokeLambdaWithRetry(command, 3, 1000);
 
       // Lambda応答の解析
       const responsePayload = JSON.parse(
@@ -186,13 +187,27 @@ async function invokeMAGIAgentCore(
       }
 
     } catch (lambdaError) {
-      console.error('Lambda invocation failed:', lambdaError);
+      console.error('Lambda invocation failed after retries:', lambdaError);
 
-      // エラーの詳細をログに出力
-      sendMessage('error', `Lambda呼び出しエラー: ${lambdaError instanceof Error ? lambdaError.message : 'Unknown error'}`);
+      // エラーの詳細をユーザーに通知
+      sendMessage('error', 'Lambda関数の呼び出しに失敗しました');
+      await delay(300);
       
-      // エラーをthrow（モックレスポンスは返さない）
-      throw new Error(`AgentCore Runtime invocation failed: ${lambdaError instanceof Error ? lambdaError.message : 'Unknown error'}`);
+      const errorMessage = lambdaError instanceof Error ? lambdaError.message : 'Unknown error';
+      sendMessage('error', `エラー詳細: ${errorMessage}`);
+      await delay(300);
+      
+      // 開発環境でのみフォールバック
+      if (process.env.NODE_ENV !== 'production') {
+        sendMessage('system', '開発環境: フォールバックモードで継続します');
+        await delay(500);
+        await sendDevelopmentFallback(controller, encoder, question);
+        return;
+      }
+      
+      // 本番環境ではエラーをthrow
+      sendMessage('error', '本番環境ではフォールバックは利用できません。システム管理者に連絡してください。');
+      throw new Error(`AgentCore Runtime invocation failed: ${errorMessage}`);
     }
 
     // Phase 5: 完了
@@ -283,12 +298,41 @@ async function displayStructuredMAGIResponse(
 }
 
 /**
- * MAGIストリーミングシミュレーション（フォールバック用）
+ * リトライロジック付きLambda呼び出し
  * 
- * 目的: AWS認証情報が設定されていない場合のフォールバック
- * 設計理由: 段階的なコンテンツ配信によるリアルタイム感の実現
+ * 指数バックオフによるリトライを実装
  */
-async function simulateMAGIStreaming(
+async function invokeLambdaWithRetry(
+  command: any,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<any> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await lambdaClient.send(command);
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`Lambda invocation attempt ${attempt + 1} failed:`, error);
+      
+      if (attempt < maxRetries - 1) {
+        const delay = baseDelay * Math.pow(2, attempt);
+        console.log(`Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw lastError || new Error('Lambda invocation failed after retries');
+}
+
+/**
+ * 開発環境用のフォールバックレスポンス
+ * 
+ * 注意: 本番環境では使用されません
+ */
+async function sendDevelopmentFallback(
   controller: ReadableStreamDefaultController,
   encoder: TextEncoder,
   question: string
@@ -460,22 +504,32 @@ async function simulateMAGIStreaming(
 export async function POST(request: NextRequest) {
   try {
     // 認証チェック
-    // TODO: Amplify Auth統合後に有効化
-    // import { getCurrentUser } from '@aws-amplify/auth/server';
-    // const user = await getCurrentUser({ request });
-    // if (!user) {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    // }
-    
-    // 開発環境でのみ認証をバイパス
-    if (process.env.NODE_ENV === 'production') {
+    // TODO: Amplify Auth統合完了後にコメントを解除
+    /*
+    import { getCurrentUser } from '@aws-amplify/auth/server';
+    const user = await getCurrentUser({ request });
+    if (!user) {
       return NextResponse.json(
-        { error: 'Authentication required in production' },
+        { error: 'Unauthorized', message: '認証が必要です' },
+        { status: 401 }
+      );
+    }
+    */
+    
+    // 本番環境では認証必須（Amplify Auth統合前の安全策）
+    if (process.env.NODE_ENV === 'production' && !process.env.SKIP_AUTH_CHECK) {
+      return NextResponse.json(
+        { 
+          error: 'Authentication Required',
+          message: '本番環境では認証が必要です。Amplify Auth統合を完了してください。'
+        },
         { status: 401 }
       );
     }
     
-    console.log('⚠️ Development mode: Authentication bypassed');
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('⚠️ Development mode: Authentication bypassed');
+    }
 
     // リクエストボディの解析
     const body = await request.json();

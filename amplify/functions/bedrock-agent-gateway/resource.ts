@@ -32,11 +32,12 @@ export const bedrockAgentGateway = defineFunction({
    * ランタイム設定
    * 
    * 学習ポイント:
-   * - entry: ハンドラーファイルのパス
+   * - entry: ストリーミングハンドラーを使用
    * - timeout: 600秒 - Multi-Agent Collaborationの実行時間を考慮
    * - memoryMB: 2048MB - Supervisor + Sub-Agentsの並列実行に必要なメモリ
+   * - invokeMode: RESPONSE_STREAM - Lambda Response Streamingを有効化
    */
-  entry: './handler.ts',
+  entry: './streaming-handler.ts',  // ストリーミング対応ハンドラー
   timeoutSeconds: 600, // 10分
   memoryMB: 2048,
   
