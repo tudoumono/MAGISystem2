@@ -57,10 +57,21 @@ export default function TestPage() {
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         {/* ナビゲーションリンク */}
         <div className="px-4 mb-6 sm:px-0">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <a href="/dashboard" className="hover:text-blue-600 transition-colors">
-              ← ダッシュボードに戻る
-            </a>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <a href="/dashboard" className="hover:text-blue-600 transition-colors flex items-center gap-1">
+                <span>←</span>
+                <span>ダッシュボードに戻る</span>
+              </a>
+            </div>
+            <div className="flex items-center gap-2">
+              <a 
+                href="/test/integration/magi-stream" 
+                className="px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded hover:bg-green-200 transition-colors"
+              >
+                🌊 MAGIストリームテスト
+              </a>
+            </div>
           </div>
         </div>
         
