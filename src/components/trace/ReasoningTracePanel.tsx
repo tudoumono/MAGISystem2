@@ -23,7 +23,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TraceStep } from '@/types/domain';
 import TraceStepItem from './TraceStepItem';
-import { useMockTraceUpdates } from '@/hooks/useTraceUpdates';
+import { useTraceUpdates } from '@/hooks/useTraceUpdates';
 import { 
   Play, 
   CheckCircle, 
@@ -99,12 +99,10 @@ export default function ReasoningTracePanel({
     connectionStatus,
     traceSteps: realtimeSteps,
     agentStatuses,
-    startTracing,
-    stopTracing,
     clearTrace,
     error: connectionError,
     isExecutionComplete: realtimeComplete
-  } = useMockTraceUpdates(); // Phase 1-2ではモック使用
+  } = useTraceUpdates(traceId, realTimeUpdates); // 実際のトレース更新を使用
 
   // 状態管理
   const [traceStatus, setTraceStatus] = useState<TraceStatus>('idle');
@@ -125,10 +123,10 @@ export default function ReasoningTracePanel({
    */
   useEffect(() => {
     if (realTimeUpdates && autoStart && traceId && !isManuallyStarted) {
-      startTracing(traceId);
+      // トレースは自動的に開始される（useTraceUpdatesフック内で）
       setIsManuallyStarted(true);
     }
-  }, [realTimeUpdates, autoStart, traceId, startTracing, isManuallyStarted]);
+  }, [realTimeUpdates, autoStart, traceId, isManuallyStarted]);
 
   /**
    * トレース状態の自動判定
@@ -212,7 +210,7 @@ export default function ReasoningTracePanel({
    */
   const handleStartTrace = () => {
     if (realTimeUpdates && traceId) {
-      startTracing(traceId);
+      // トレースは自動的に開始される
       setIsManuallyStarted(true);
     }
   };
@@ -222,7 +220,7 @@ export default function ReasoningTracePanel({
    */
   const handleStopTrace = () => {
     if (realTimeUpdates) {
-      stopTracing();
+      // トレースは自動的に停止される
     }
   };
 
