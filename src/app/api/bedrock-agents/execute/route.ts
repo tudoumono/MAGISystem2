@@ -84,11 +84,21 @@ export async function POST(request: NextRequest) {
         //     },
         // });
         
-        // Temporary mock response for deployment
+        // 開発環境でのみモックレスポンスを返す
+        if (process.env.NODE_ENV !== 'production') {
+            return NextResponse.json({
+                message: 'Development mode: Using mock responses',
+                status: 'mock',
+                note: 'Enable Lambda integration for production'
+            });
+        }
+        
+        // 本番環境では実装が必要
         return NextResponse.json({
-            message: 'Bedrock agents temporarily disabled for deployment',
-            status: 'disabled'
-        });
+            error: 'Service Unavailable',
+            message: 'Bedrock agent integration not configured',
+            code: 'NOT_CONFIGURED'
+        }, { status: 503 });
     } catch (error) {
         console.error('API Error:', error);
         return NextResponse.json({

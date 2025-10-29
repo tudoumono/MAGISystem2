@@ -100,7 +100,13 @@ function parseMessageData(message: any): any {
     };
   } catch (error) {
     console.error('Failed to parse message data:', error, message);
-    return message; // パースエラー時は元のデータを返す
+    // パースエラー時は安全なデフォルト値を返す
+    return {
+      ...message,
+      agentResponses: null,
+      judgeResponse: null,
+      _parseError: true // エラーフラグを追加
+    };
   }
 }
 

@@ -189,6 +189,106 @@ export default function DashboardPage() {
           </Card>
         </div>
         
+        {/* テスト環境セクション */}
+        <div className="mb-8">
+          <h3 className="text-xl font-semibold text-foreground mb-4">
+            🧪 テスト環境
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* UI基本機能テスト */}
+            <Card className="hover:shadow-md transition-shadow">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <span className="text-lg">🎨</span>
+                  UI基本機能
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-3">
+                  会話UI、メッセージ表示の基本機能テスト
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => router.push('/test')}
+                  className="w-full"
+                >
+                  テストページへ
+                </Button>
+              </CardContent>
+            </Card>
+            
+            {/* データ統合テスト */}
+            <Card className="hover:shadow-md transition-shadow">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <span className="text-lg">💾</span>
+                  データ統合
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Amplify Data、GraphQL APIの動作確認
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => router.push('/test/data')}
+                  className="w-full"
+                >
+                  テストページへ
+                </Button>
+              </CardContent>
+            </Card>
+            
+            {/* エージェント統合テスト */}
+            <Card className="hover:shadow-md transition-shadow">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <span className="text-lg">🤖</span>
+                  エージェント統合
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-3">
+                  MAGI 3賢者エージェントの動作確認
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => router.push('/test/agents')}
+                  className="w-full"
+                >
+                  テストページへ
+                </Button>
+              </CardContent>
+            </Card>
+            
+            {/* 統合テスト */}
+            <Card className="hover:shadow-md transition-shadow">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <span className="text-lg">🔗</span>
+                  統合テスト
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-3">
+                  ストリーミング、トレース、本番環境テスト
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => router.push('/test/integration')}
+                  className="w-full"
+                >
+                  テストページへ
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+        
         {/* システム情報 */}
         <Card>
           <CardHeader>

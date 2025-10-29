@@ -18,6 +18,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
+import { checkRateLimit } from '@/lib/security/rate-limit';
+import { validateRequestBody } from '@/lib/security/request-validator';
 
 /**
  * Lambda クライアント設定
@@ -457,23 +459,58 @@ async function simulateMAGIStreaming(
  */
 export async function POST(request: NextRequest) {
   try {
-    // TODO: 本番環境では認証チェックを有効化
+    // 認証チェック
+    // TODO: Amplify Auth統合後に有効化
     // import { getCurrentUser } from '@aws-amplify/auth/server';
     // const user = await getCurrentUser({ request });
     // if (!user) {
     //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     // }
     
-    console.log('⚠️ Authentication bypassed for development - Enable before production deployment');
+    // 開発環境でのみ認証をバイパス
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json(
+        { error: 'Authentication required in production' },
+        { status: 401 }
+      );
+    }
+    
+    console.log('⚠️ Development mode: Authentication bypassed');
 
     // リクエストボディの解析
     const body = await request.json();
     const { question, sessionId } = body;
 
-    if (!question || typeof question !== 'string') {
+    // リクエストの検証
+    const validation = validateRequestBody(body);
+    if (!validation.valid) {
       return NextResponse.json(
-        { error: 'Question is required' },
+        { error: 'Validation Error', message: validation.error },
         { status: 400 }
+      );
+    }
+
+    // レート制限チェック（IPアドレスベース）
+    const clientIp = request.headers.get('x-forwarded-for') || 
+                     request.headers.get('x-real-ip') || 
+                     'unknown';
+    const rateLimit = checkRateLimit(clientIp, 10, 60000); // 1分間に10リクエスト
+    
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { 
+          error: 'Rate Limit Exceeded',
+          message: 'リクエスト制限を超えました。しばらく待ってから再試行してください。',
+          resetTime: new Date(rateLimit.resetTime).toISOString()
+        },
+        { 
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': '10',
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': rateLimit.resetTime.toString()
+          }
+        }
       );
     }
 
