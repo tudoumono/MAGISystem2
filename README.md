@@ -97,7 +97,25 @@ magi-decision-ui/
 │   ├── auth/                    # 認証設定
 │   ├── data/                    # データモデル設定
 │   ├── functions/               # Lambda関数
-│   │   └── agent-gateway/       # エージェントゲートウェイ
+│   │   └── bedrock-agent-gateway/  # Bedrockエージェントゲートウェイ
+│   └── backend.ts               # バックエンド設定
+├── agents/                      # Pythonエージェント
+│   ├── caspar/                  # CASPAR（保守的視点）
+│   ├── balthasar/               # BALTHASAR（革新的視点）
+│   ├── melchior/                # MELCHIOR（バランス型視点）
+│   ├── solomon/                 # SOLOMON Judge（統括者）
+│   ├── shared/                  # 共通ユーティリティ
+│   ├── tests/                   # テストコード
+│   ├── scripts/                 # 開発用スクリプト
+│   ├── magi_agent.py            # メインエージェント
+│   └── requirements.txt         # Python依存関係
+├── tests/                       # テストファイル
+│   └── fixtures/                # テストフィクスチャ
+├── scripts/                     # ビルド・セットアップスクリプト
+├── docs/                        # ドキュメント
+│   ├── learning/                # 学習ガイド
+│   ├── ENVIRONMENT_SETUP.md     # 環境セットアップ
+│   └── TEST_STRUCTURE.md        # テスト構造
 │   └── backend.ts               # バックエンド設定
 ├── agents/                      # Strands Agents (将来実装)
 │   ├── caspar/                  # CASPAR エージェント
