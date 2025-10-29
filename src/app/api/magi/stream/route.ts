@@ -187,15 +187,10 @@ async function invokeMAGIAgentCore(
       console.error('Lambda invocation failed:', lambdaError);
 
       // エラーの詳細をログに出力
-      sendMessage('system', `Lambda呼び出しエラー: ${lambdaError instanceof Error ? lambdaError.message : 'Unknown error'}`);
-      await delay(500);
-
-      // フォールバック: 高品質なモックレスポンス
-      sendMessage('system', 'フォールバック: モックレスポンスで継続');
-      await delay(500);
-
-      await simulateMAGIStreaming(controller, encoder, question);
-      return;
+      sendMessage('error', `Lambda呼び出しエラー: ${lambdaError instanceof Error ? lambdaError.message : 'Unknown error'}`);
+      
+      // エラーをthrow（モックレスポンスは返さない）
+      throw new Error(`AgentCore Runtime invocation failed: ${lambdaError instanceof Error ? lambdaError.message : 'Unknown error'}`);
     }
 
     // Phase 5: 完了
@@ -462,9 +457,14 @@ async function simulateMAGIStreaming(
  */
 export async function POST(request: NextRequest) {
   try {
-    // 認証チェック（開発時は一時的に無効化）
-    // Amplifyリソースが未設定のため、認証チェックをスキップ
-    console.log('🔓 Authentication bypassed for development testing');
+    // TODO: 本番環境では認証チェックを有効化
+    // import { getCurrentUser } from '@aws-amplify/auth/server';
+    // const user = await getCurrentUser({ request });
+    // if (!user) {
+    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // }
+    
+    console.log('⚠️ Authentication bypassed for development - Enable before production deployment');
 
     // リクエストボディの解析
     const body = await request.json();
