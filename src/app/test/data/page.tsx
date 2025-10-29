@@ -1,7 +1,7 @@
 /**
- * Agent Tests Index Page
+ * Data Tests Index Page
  * 
- * エージェント関連のテストページ一覧
+ * データ関連のテストページ一覧
  */
 
 'use client';
@@ -10,13 +10,25 @@ import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 
-export default function AgentTestsPage() {
+export default function DataTestsPage() {
   const tests = [
     {
-      title: 'Bedrock Agents',
-      description: 'Amazon Bedrock Agentsの基本的な動作テスト',
-      href: '/test/agents',
-      category: 'Basic'
+      title: 'Amplify Models',
+      description: 'Amplify Data Modelの動作確認',
+      href: '/test/data/amplify-models',
+      category: 'Data'
+    },
+    {
+      title: 'Conversation',
+      description: '会話機能のテスト',
+      href: '/test/data/conversation',
+      category: 'Data'
+    },
+    {
+      title: 'Models Check',
+      description: 'データモデルの整合性チェック',
+      href: '/test/data/models-check',
+      category: 'Data'
     },
   ];
 
@@ -24,10 +36,10 @@ export default function AgentTestsPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Agent Tests
+          Data Tests
         </h1>
         <p className="text-gray-600">
-          エージェント機能のテストページ一覧
+          データ関連機能のテストページ一覧
         </p>
       </div>
 
@@ -35,7 +47,7 @@ export default function AgentTestsPage() {
         {tests.map((test) => (
           <Card key={test.href} className="p-6">
             <div className="mb-4">
-              <span className="inline-block px-2 py-1 text-xs font-semibold text-blue-600 bg-blue-100 rounded">
+              <span className="inline-block px-2 py-1 text-xs font-semibold text-green-600 bg-green-100 rounded">
                 {test.category}
               </span>
             </div>
