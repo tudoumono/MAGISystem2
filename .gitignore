@@ -258,9 +258,9 @@ site/
 # AgentCore configuration (contains AWS account info)
 **/.bedrock_agentcore.yaml
 
-# Docker build artifacts
-**/.dockerignore
-**/Dockerfile
+# Docker build artifacts (agents配下のみ除外、ルートは管理対象)
+agents/.dockerignore
+agents/Dockerfile
 
 # Python virtual environments
 **/venv/
