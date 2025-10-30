@@ -130,3 +130,6 @@ export const bedrockAgentGateway = defineFunction({
  * 注意: 実際の権限設定は、Human側でIAMユーザーに
  * AmazonBedrockFullAccess権限を追加する必要があります。
  */
+
+// 明示的なデフォルトエクスポート（Amplifyビルド互換性のため）
+export default bedrockAgentGateway;
