@@ -19,7 +19,6 @@
  */
 
 import { defineFunction } from '@aws-amplify/backend';
-import * as aws_lambda from 'aws-cdk-lib/aws-lambda';
 
 /**
  * Bedrock Multi-Agent Collaboration Gateway関数の定義
@@ -99,51 +98,9 @@ export const bedrockAgentGateway = defineFunction({
 });
 
 /**
- * Lambda Response Streaming対応の追加（みのるん氏のアプローチ）
- *
- * CDKを使ってLambda関数URLのストリーミングを直接設定します。
- * これにより、Amplify Hostingのストリーミング制限を回避できます。
- *
- * 学習ポイント:
- * - CfnUrlを使ったLambda関数URLの作成
- * - invokeMode: 'RESPONSE_STREAM'でストリーミングを有効化
- * - CORS設定でフロントエンドからのアクセスを許可
- *
- * 使用方法:
- * backend.ts で以下のように呼び出します：
- * ```
- * const streamingUrl = addStreamingSupport(backend);
- * ```
- */
-export function addStreamingSupport(backend: any) {
-  const streamingFunctionUrl = new aws_lambda.CfnUrl(
-    backend.bedrockAgentGateway.resources.lambda.stack,
-    'MAGIStreamingFunctionUrl',
-    {
-      targetFunctionArn: backend.bedrockAgentGateway.resources.lambda.functionArn,
-      authType: 'AWS_IAM', // セキュリティ考慮：IAM認証を使用
-      invokeMode: 'RESPONSE_STREAM', // Lambda Response Streamingを有効化
-      cors: {
-        allowOrigins: ['*'], // 本番環境では適切なオリジンに制限してください
-        allowMethods: ['POST'],
-        allowHeaders: [
-          'content-type',
-          'authorization',
-          'accept',
-          'x-access-token',
-          'x-amz-date',
-          'x-amz-security-token',
-        ],
-        maxAge: 3600,
-      },
-    }
-  );
-
-  return streamingFunctionUrl;
-}
-
-/**
  * 必要なIAM権限（2025年GA版対応）:
+ *
+ * 注意: Lambda Response Streamingの設定は backend.ts で行われます。
  *
  * Amazon Bedrock Multi-Agent Collaboration用の権限:
  * - bedrock:InvokeAgent
