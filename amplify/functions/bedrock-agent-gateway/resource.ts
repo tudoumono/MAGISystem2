@@ -30,14 +30,13 @@ import { defineFunction } from '@aws-amplify/backend';
 export const bedrockAgentGateway = defineFunction({
   /**
    * ランタイム設定
-   * 
+   *
    * 学習ポイント:
-   * - entry: ストリーミングハンドラーを使用
+   * - entry: 標準ハンドラーを使用（ビルド時の互換性を確保）
    * - timeout: 600秒 - Multi-Agent Collaborationの実行時間を考慮
    * - memoryMB: 2048MB - Supervisor + Sub-Agentsの並列実行に必要なメモリ
-   * - invokeMode: RESPONSE_STREAM - Lambda Response Streamingを有効化
    */
-  entry: './streaming-handler.ts',  // ストリーミング対応ハンドラー
+  entry: './handler.ts',  // 標準ハンドラー（ビルド互換性）
   timeoutSeconds: 600, // 10分
   memoryMB: 2048,
   
