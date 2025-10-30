@@ -73,7 +73,7 @@ export default function ModelsCheckPage() {
                         models: [],
                         environmentMode,
                         configValidation,
-                        amplifyOutputsExists,
+                        amplifyOutputsExists: amplifyOutputsAccessible,
                         detailedError: clientError
                     });
                     return;
