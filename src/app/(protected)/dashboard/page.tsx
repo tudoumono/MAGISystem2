@@ -135,7 +135,7 @@ export default function DashboardPage() {
         </div>
         
         {/* 機能カード */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           {/* チャット機能 */}
           <Card 
             className="hover:shadow-md transition-shadow cursor-pointer"
@@ -152,7 +152,8 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">
-                CASPAR、BALTHASAR、MELCHIORの3賢者とSOLOMON Judgeによる包括的な分析
+                CASPAR、BALTHASAR、MELCHIORの3賢者とSOLOMON Judgeによる包括的な分析。
+                推論トレースもリアルタイムで確認できます。
               </p>
               <Button variant="outline" size="sm">
                 チャットを開始
@@ -161,7 +162,10 @@ export default function DashboardPage() {
           </Card>
           
           {/* エージェント設定 */}
-          <Card className="hover:shadow-md transition-shadow cursor-pointer">
+          <Card 
+            className="hover:shadow-md transition-shadow cursor-pointer"
+            onClick={() => router.push('/settings/agents')}
+          >
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <div className="w-4 h-4 bg-magi-caspar-500 rounded" />
@@ -173,187 +177,80 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">
-                各エージェントのプロンプト、モデル、パラメータを調整
+                各エージェントのプロンプト、モデル、パラメータを調整。
+                デフォルト設定をコピーしてカスタマイズできます。
               </p>
-              <Button variant="outline" size="sm" disabled>
-                近日公開
-              </Button>
-            </CardContent>
-          </Card>
-          
-          {/* 推論トレース */}
-          <Card className="hover:shadow-md transition-shadow cursor-pointer">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-magi-melchior-500 rounded" />
-                推論トレース
-              </CardTitle>
-              <CardDescription>
-                エージェントの思考過程を可視化
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                リアルタイムでエージェントの推論ステップを追跡
-              </p>
-              <Button variant="outline" size="sm" disabled>
-                近日公開
+              <Button variant="outline" size="sm">
+                設定を開く
               </Button>
             </CardContent>
           </Card>
         </div>
         
-        {/* デバッグパネル */}
+        {/* システムステータス */}
         {showDebugPanel && (
           <div className="mb-8">
             <Card className="border-blue-500 bg-blue-50">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-blue-900">
                   <span className="text-xl">🔧</span>
-                  デバッグ & テストツール
+                  システムステータス
                 </CardTitle>
                 <CardDescription className="text-blue-700">
-                  開発者向けのテストページとデバッグツールへのクイックアクセス
+                  AWSリソースとの接続状態を確認
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {/* UI基本機能 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* システム診断 */}
                   <button
-                    onClick={() => router.push('/test')}
-                    className="p-3 bg-white rounded-lg border border-blue-200 hover:border-blue-400 hover:shadow-md transition-all text-left"
+                    onClick={() => router.push('/test/data/models-check')}
+                    className="p-4 bg-white rounded-lg border border-blue-200 hover:border-blue-400 hover:shadow-md transition-all text-left"
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-lg">🎨</span>
-                      <span className="font-medium text-sm text-blue-900">UI基本機能</span>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                        <span className="text-xl">📊</span>
+                      </div>
+                      <div>
+                        <div className="font-medium text-blue-900">システム診断</div>
+                        <div className="text-xs text-blue-700">Amplify接続状態の確認</div>
+                      </div>
                     </div>
-                    <p className="text-xs text-blue-700">会話UI、メッセージ表示</p>
+                    <p className="text-sm text-blue-800">
+                      Amplify Data、Cognito、AppSyncとの接続状態を診断します
+                    </p>
                   </button>
                   
-                  {/* データ統合 */}
+                  {/* API Health Check */}
                   <button
-                    onClick={() => router.push('/test/data')}
-                    className="p-3 bg-white rounded-lg border border-blue-200 hover:border-blue-400 hover:shadow-md transition-all text-left"
+                    onClick={() => window.open('/api/health', '_blank')}
+                    className="p-4 bg-white rounded-lg border border-green-200 hover:border-green-400 hover:shadow-md transition-all text-left"
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-lg">💾</span>
-                      <span className="font-medium text-sm text-blue-900">データ統合</span>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+                        <span className="text-xl">💚</span>
+                      </div>
+                      <div>
+                        <div className="font-medium text-green-900">API Health Check</div>
+                        <div className="text-xs text-green-700">APIエンドポイントの確認</div>
+                      </div>
                     </div>
-                    <p className="text-xs text-blue-700">Amplify Data, GraphQL</p>
+                    <p className="text-sm text-green-800">
+                      Next.js APIルートの動作状態を確認します
+                    </p>
                   </button>
-                  
-                  {/* エージェント統合 */}
-                  <button
-                    onClick={() => router.push('/test/agents')}
-                    className="p-3 bg-white rounded-lg border border-blue-200 hover:border-blue-400 hover:shadow-md transition-all text-left"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-lg">🤖</span>
-                      <span className="font-medium text-sm text-blue-900">エージェント</span>
-                    </div>
-                    <p className="text-xs text-blue-700">MAGI 3賢者テスト</p>
-                  </button>
-                  
-                  {/* 統合テスト */}
-                  <button
-                    onClick={() => router.push('/test/integration')}
-                    className="p-3 bg-white rounded-lg border border-blue-200 hover:border-blue-400 hover:shadow-md transition-all text-left"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-lg">🔗</span>
-                      <span className="font-medium text-sm text-blue-900">統合テスト</span>
-                    </div>
-                    <p className="text-xs text-blue-700">ストリーミング、トレース</p>
-                  </button>
-                  
-                  {/* MAGIストリーム */}
-                  <button
-                    onClick={() => router.push('/test/integration/magi-stream')}
-                    className="p-3 bg-white rounded-lg border border-green-200 hover:border-green-400 hover:shadow-md transition-all text-left"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-lg">🌊</span>
-                      <span className="font-medium text-sm text-green-900">MAGIストリーム</span>
-                    </div>
-                    <p className="text-xs text-green-700">リアルタイム実行テスト</p>
-                  </button>
-                  
-                  {/* MAGIトレース */}
-                  <button
-                    onClick={() => router.push('/test/integration/magi-trace')}
-                    className="p-3 bg-white rounded-lg border border-purple-200 hover:border-purple-400 hover:shadow-md transition-all text-left"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-lg">🔍</span>
-                      <span className="font-medium text-sm text-purple-900">MAGIトレース</span>
-                    </div>
-                    <p className="text-xs text-purple-700">推論過程の可視化</p>
-                  </button>
-                  
-                  {/* 本番環境テスト */}
-                  <button
-                    onClick={() => router.push('/test/integration/magi-production')}
-                    className="p-3 bg-white rounded-lg border border-orange-200 hover:border-orange-400 hover:shadow-md transition-all text-left"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-lg">🚀</span>
-                      <span className="font-medium text-sm text-orange-900">本番環境</span>
-                    </div>
-                    <p className="text-xs text-orange-700">Production統合テスト</p>
-                  </button>
-                  
-                  {/* HTMLテストページ */}
-                  <button
-                    onClick={() => window.open('/tests/fixtures/test-stream.html', '_blank')}
-                    className="p-3 bg-white rounded-lg border border-gray-200 hover:border-gray-400 hover:shadow-md transition-all text-left"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-lg">📄</span>
-                      <span className="font-medium text-sm text-gray-900">HTMLテスト</span>
-                    </div>
-                    <p className="text-xs text-gray-700">スタンドアロンテスト</p>
-                  </button>
-                </div>
-                
-                {/* クイックアクション */}
-                <div className="mt-4 pt-4 border-t border-blue-200">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-blue-900">クイックアクション:</span>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open('http://localhost:3000/api/health', '_blank')}
-                        className="text-xs"
-                      >
-                        API Health Check
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          console.log('Environment:', process.env.NODE_ENV);
-                          console.log('User:', user);
-                          alert('コンソールを確認してください');
-                        }}
-                        className="text-xs"
-                      >
-                        環境情報を表示
-                      </Button>
-                    </div>
-                  </div>
                 </div>
               </CardContent>
             </Card>
           </div>
         )}
         
-        {/* テスト環境セクション（簡易版） */}
+        {/* システムステータス（簡易版） */}
         {!showDebugPanel && (
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-semibold text-foreground">
-                🧪 テスト環境
+                📊 システムステータス
               </h3>
               <Button
                 variant="ghost"
@@ -361,102 +258,30 @@ export default function DashboardPage() {
                 onClick={() => setShowDebugPanel(true)}
                 className="text-sm text-blue-600 hover:text-blue-700"
               >
-                すべてのテストツールを表示 →
+                詳細を表示 →
               </Button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* UI基本機能テスト */}
-              <Card className="hover:shadow-md transition-shadow">
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <span className="text-lg">🎨</span>
-                    UI基本機能
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    会話UI、メッセージ表示の基本機能テスト
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => router.push('/test')}
-                    className="w-full"
-                  >
-                    テストページへ
-                  </Button>
-                </CardContent>
-              </Card>
-              
-              {/* データ統合テスト */}
-              <Card className="hover:shadow-md transition-shadow">
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <span className="text-lg">💾</span>
-                    データ統合
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Amplify Data、GraphQL APIの動作確認
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => router.push('/test/data')}
-                    className="w-full"
-                  >
-                    テストページへ
-                  </Button>
-                </CardContent>
-              </Card>
-              
-              {/* エージェント統合テスト */}
-              <Card className="hover:shadow-md transition-shadow">
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <span className="text-lg">🤖</span>
-                    エージェント統合
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    MAGI 3賢者エージェントの動作確認
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => router.push('/test/agents')}
-                    className="w-full"
-                  >
-                    テストページへ
-                  </Button>
-                </CardContent>
-              </Card>
-              
-              {/* 統合テスト */}
-              <Card className="hover:shadow-md transition-shadow">
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <span className="text-lg">🔗</span>
-                    統合テスト
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    ストリーミング、トレース、本番環境テスト
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => router.push('/test/integration')}
-                    className="w-full"
-                  >
-                    テストページへ
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
+            <Card className="hover:shadow-md transition-shadow">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <span className="text-lg">🔍</span>
+                  接続診断
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-3">
+                  AWSリソース（Amplify Data、Cognito、AppSync）との接続状態を確認
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => router.push('/test/data/models-check')}
+                  className="w-full"
+                >
+                  診断ページへ
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         )}
         
@@ -488,12 +313,16 @@ export default function DashboardPage() {
                     <span className="text-green-600 font-medium">✓ 完了</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">チャット機能:</span>
-                    <span className="text-yellow-600 font-medium">⏳ 開発中</span>
+                    <span className="text-muted-foreground">チャットUI:</span>
+                    <span className="text-green-600 font-medium">✓ 完了</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">エージェント設定:</span>
+                    <span className="text-green-600 font-medium">✓ 完了</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">エージェント連携:</span>
-                    <span className="text-yellow-600 font-medium">⏳ 開発中</span>
+                    <span className="text-yellow-600 font-medium">⏳ 次のステップ</span>
                   </div>
                 </div>
               </div>
