@@ -1,9 +1,0 @@
-{
-  "message": "新しいAI技術を導入すべきでしょうか？",
-  "conversationId": "test_conv_001",
-  "traceId": "test_trace_001",
-  "metadata": {
-    "userId": "test_user",
-    "sessionId": "test_session"
-  }
-}
