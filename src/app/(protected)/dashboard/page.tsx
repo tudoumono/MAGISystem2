@@ -137,7 +137,10 @@ export default function DashboardPage() {
         {/* 機能カード */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {/* チャット機能 */}
-          <Card className="hover:shadow-md transition-shadow cursor-pointer">
+          <Card 
+            className="hover:shadow-md transition-shadow cursor-pointer"
+            onClick={() => router.push('/chat')}
+          >
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <div className="w-4 h-4 bg-magi-solomon-500 rounded" />
@@ -151,8 +154,8 @@ export default function DashboardPage() {
               <p className="text-sm text-muted-foreground mb-4">
                 CASPAR、BALTHASAR、MELCHIORの3賢者とSOLOMON Judgeによる包括的な分析
               </p>
-              <Button variant="outline" size="sm" disabled>
-                近日公開
+              <Button variant="outline" size="sm">
+                チャットを開始
               </Button>
             </CardContent>
           </Card>
