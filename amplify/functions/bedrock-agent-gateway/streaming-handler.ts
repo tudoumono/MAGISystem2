@@ -14,6 +14,9 @@
  * - OpenTelemetryトレーシング
  */
 
+// Lambda Response Streaming用のグローバル型定義（ビルド時エラー回避）
+declare const awslambda: any;
+
 import { APIGatewayProxyEvent } from 'aws-lambda';
 import {
   BedrockAgentRuntimeClient,

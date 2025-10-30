@@ -1,22 +1,25 @@
 /**
  * Bedrock Multi-Agent Collaboration Gateway Function Resource
- * 
+ *
  * このファイルはAmazon Bedrock Multi-Agent Collaboration（2025年GA版）との統合を行う
  * カスタムLambda関数のリソース定義です。
- * 
+ *
  * 主要機能:
  * - SOLOMON Supervisor Agent（統括者）の実装
  * - 3賢者Sub-Agents（CASPAR、BALTHASAR、MELCHIOR）の実装と連携
  * - Inline AgentsとPayload Referencingの活用
  * - エージェントオーケストレーションと応答集約
- * 
+ * - Lambda Response Streamingによるリアルタイム応答配信
+ *
  * 学習ポイント:
  * - Amplify Gen2でのBedrock統合
  * - Multi-Agent Collaborationパターンの実装
  * - 2025年GA機能の活用方法
+ * - Lambda Response Streamingの実装（みのるん氏のアプローチ）
  */
 
 import { defineFunction } from '@aws-amplify/backend';
+import * as aws_lambda from 'aws-cdk-lib/aws-lambda';
 
 /**
  * Bedrock Multi-Agent Collaboration Gateway関数の定義
@@ -30,14 +33,13 @@ import { defineFunction } from '@aws-amplify/backend';
 export const bedrockAgentGateway = defineFunction({
   /**
    * ランタイム設定
-   * 
+   *
    * 学習ポイント:
-   * - entry: ストリーミングハンドラーを使用
+   * - entry: ストリーミングハンドラーを使用（awslambda型定義で互換性を確保）
    * - timeout: 600秒 - Multi-Agent Collaborationの実行時間を考慮
    * - memoryMB: 2048MB - Supervisor + Sub-Agentsの並列実行に必要なメモリ
-   * - invokeMode: RESPONSE_STREAM - Lambda Response Streamingを有効化
    */
-  entry: './streaming-handler.ts',  // ストリーミング対応ハンドラー
+  entry: './streaming-handler.ts',  // Lambda Response Streaming対応ハンドラー
   timeoutSeconds: 600, // 10分
   memoryMB: 2048,
   
@@ -97,8 +99,52 @@ export const bedrockAgentGateway = defineFunction({
 });
 
 /**
+ * Lambda Response Streaming対応の追加（みのるん氏のアプローチ）
+ *
+ * CDKを使ってLambda関数URLのストリーミングを直接設定します。
+ * これにより、Amplify Hostingのストリーミング制限を回避できます。
+ *
+ * 学習ポイント:
+ * - CfnUrlを使ったLambda関数URLの作成
+ * - invokeMode: 'RESPONSE_STREAM'でストリーミングを有効化
+ * - CORS設定でフロントエンドからのアクセスを許可
+ *
+ * 使用方法:
+ * backend.ts で以下のように呼び出します：
+ * ```
+ * const streamingUrl = addStreamingSupport(backend);
+ * ```
+ */
+export function addStreamingSupport(backend: any) {
+  const streamingFunctionUrl = new aws_lambda.CfnUrl(
+    backend.bedrockAgentGateway.resources.lambda.stack,
+    'MAGIStreamingFunctionUrl',
+    {
+      targetFunctionArn: backend.bedrockAgentGateway.resources.lambda.functionArn,
+      authType: 'AWS_IAM', // セキュリティ考慮：IAM認証を使用
+      invokeMode: 'RESPONSE_STREAM', // Lambda Response Streamingを有効化
+      cors: {
+        allowOrigins: ['*'], // 本番環境では適切なオリジンに制限してください
+        allowMethods: ['POST'],
+        allowHeaders: [
+          'content-type',
+          'authorization',
+          'accept',
+          'x-access-token',
+          'x-amz-date',
+          'x-amz-security-token',
+        ],
+        maxAge: 3600,
+      },
+    }
+  );
+
+  return streamingFunctionUrl;
+}
+
+/**
  * 必要なIAM権限（2025年GA版対応）:
- * 
+ *
  * Amazon Bedrock Multi-Agent Collaboration用の権限:
  * - bedrock:InvokeAgent
  * - bedrock:InvokeAgentWithResponseStream
@@ -106,24 +152,24 @@ export const bedrockAgentGateway = defineFunction({
  * - bedrock:GetAgentCollaboration
  * - bedrock:ListAgentCollaborations
  * - bedrock:InvokeMultiAgentCollaboration
- * 
+ *
  * Inline Agents用の権限:
  * - bedrock:CreateInlineAgent
  * - bedrock:InvokeInlineAgent
  * - bedrock:DeleteInlineAgent
- * 
+ *
  * Payload Referencing用の権限:
  * - bedrock:CreatePayloadReference
  * - bedrock:GetPayloadReference
  * - bedrock:DeletePayloadReference
- * 
+ *
  * 基本的なLambda権限:
  * - logs:CreateLogGroup
  * - logs:CreateLogStream
  * - logs:PutLogEvents
  * - xray:PutTraceSegments
  * - xray:PutTelemetryRecords
- * 
+ *
  * 注意: 実際の権限設定は、Human側でIAMユーザーに
  * AmazonBedrockFullAccess権限を追加する必要があります。
  */
