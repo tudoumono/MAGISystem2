@@ -21,7 +21,6 @@
     "amplify:generate": "npx ampx generate graphql-client-code --format modelgen --model-target typescript"
   },
   "dependencies": {
-    "@ai-sdk/amazon-bedrock": "^1.0.0",
     "@aws-amplify/adapter-nextjs": "^1.6.10",
     "@aws-amplify/backend": "^1.6.0",
     "@aws-amplify/backend-cli": "^1.4.0",
@@ -30,7 +29,6 @@
     "@aws-sdk/client-cloudwatch": "^3.705.0",
     "@aws-sdk/client-cloudwatch-logs": "^3.705.0",
     "@aws-sdk/client-lambda": "^3.918.0",
-    "@aws-sdk/credential-providers": "^3.0.0",
     "@opentelemetry/auto-instrumentations-node": "^0.66.0",
     "@opentelemetry/exporter-otlp-http": "^0.26.0",
     "@opentelemetry/id-generator-aws-xray": "^2.0.3",
@@ -39,7 +37,6 @@
     "@opentelemetry/winston-transport": "^0.18.0",
     "@tailwindcss/forms": "^0.5.10",
     "@tailwindcss/typography": "^0.5.19",
-    "ai": "^3.4.0",
     "aws-amplify": "^6.8.0",
     "aws-xray-sdk-core": "^3.9.0",
     "clsx": "^2.1.1",

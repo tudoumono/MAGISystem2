@@ -1,8 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // AgentCore Runtime用のstandalone出力設定
-  output: "standalone",
-
   // Next.js 15の新機能を活用した設定
   experimental: {
     // React 19の新機能を有効化（React Compilerは後で追加）
@@ -61,26 +58,6 @@ const nextConfig = {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
           },
-        ],
-      },
-      // AgentCore Runtime用のCORS設定
-      {
-        source: '/invocations',
-        headers: [
-          { key: 'Access-Control-Allow-Credentials', value: 'true' },
-          { key: 'Access-Control-Allow-Origin', value: '*' },
-          { key: 'Access-Control-Allow-Methods', value: 'GET,DELETE,PATCH,POST,PUT,OPTIONS' },
-          { 
-            key: 'Access-Control-Allow-Headers', 
-            value: 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, X-Amzn-Trace-Id, X-Amzn-Bedrock-AgentCore-Runtime-Session-Id' 
-          },
-        ],
-      },
-      {
-        source: '/ping',
-        headers: [
-          { key: 'Access-Control-Allow-Origin', value: '*' },
-          { key: 'Access-Control-Allow-Methods', value: 'GET, OPTIONS' },
         ],
       },
     ];
