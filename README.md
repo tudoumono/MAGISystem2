@@ -47,9 +47,7 @@ MAGI Decision Systemは、3賢者（CASPAR、BALTHASAR、MELCHIOR）による多
 - **State Management**: React Server Components + Client Components
 
 ### バックエンド・インフラ
-- **Frontend Hosting**: AWS Amplify Hosting
-- **Backend API**: Amazon Bedrock AgentCore Runtime (ストリーミング対応)
-- **Architecture**: フロントエンド・バックエンド分離構成
+- **Hosting**: AWS Amplify Hosting (SSR対応)
 - **Authentication**: AWS Amplify Auth (Amazon Cognito)
 - **Data Management**: AWS Amplify Data/AI Kit
 - **Database**: Amazon DynamoDB
@@ -177,23 +175,6 @@ npm run dev
 ```
 
 ブラウザで [http://localhost:3000](http://localhost:3000) を開いてアプリケーションを確認できます。
-
-### 🌊 Streaming対応バックエンドのセットアップ
-
-Amplify Hostingのストリーミング制限を回避するため、バックエンドAPIを別途デプロイします。
-
-詳細な手順は [**STREAMING_BACKEND_SETUP.md**](docs/STREAMING_BACKEND_SETUP.md) を参照してください。
-
-**概要**:
-1. バックエンドAPIをDockerコンテナ化
-2. ECRにプッシュ
-3. AgentCore Runtimeにデプロイ
-4. フロントエンドから接続
-
-```bash
-# バックエンドデプロイ
-./scripts/deploy-backend.sh
-```
 
 ## 🧪 開発・テスト
 
