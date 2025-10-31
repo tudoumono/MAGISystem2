@@ -84,6 +84,232 @@ interface MessageMetadataProps {
 }
 
 /**
+ * エージェントカラムコンポーネント
+ */
+interface AgentColumnProps {
+  agent: AgentResponse;
+  color: 'blue' | 'purple' | 'green';
+  isExpanded: boolean;
+  onToggle: () => void;
+  traceId?: string | undefined;
+}
+
+const AgentColumn: React.FC<AgentColumnProps> = ({
+  agent,
+  color,
+  isExpanded,
+  onToggle,
+  traceId
+}) => {
+  const colorClasses = {
+    blue: {
+      border: 'border-l-4 border-blue-500',
+      bg: 'bg-gray-50',
+      icon: '🔵',
+      name: 'CASPAR',
+      type: '保守型'
+    },
+    purple: {
+      border: 'border-l-4 border-purple-600',
+      bg: 'bg-gray-50',
+      icon: '🟣',
+      name: 'BALTHASAR',
+      type: '革新型'
+    },
+    green: {
+      border: 'border-l-4 border-green-500',
+      bg: 'bg-gray-50',
+      icon: '🟢',
+      name: 'MELCHIOR',
+      type: 'バランス型'
+    }
+  };
+
+  const colors = colorClasses[color];
+
+  return (
+    <div className={`flex flex-col ${colors.border} rounded-lg bg-white overflow-hidden h-[500px]`}>
+      {/* ヘッダー（固定） */}
+      <div className={`p-4 border-b border-gray-200 ${colors.bg} flex-shrink-0`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xl">{colors.icon}</span>
+            <div>
+              <div className="font-semibold text-sm text-gray-900">{colors.name}</div>
+              <div className="text-xs text-gray-600">{colors.type}</div>
+            </div>
+          </div>
+          <div className="font-semibold text-blue-600 text-sm">
+            {Math.round((agent.confidence || 0.8) * 100)}点
+          </div>
+        </div>
+      </div>
+
+      {/* スクロール可能なコンテンツ */}
+      <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+        {/* 思考プロセスセクション */}
+        <div className="mb-4 pb-4 border-b border-gray-200">
+          <button
+            onClick={onToggle}
+            className="flex items-center gap-2 text-xs text-gray-600 hover:text-gray-900 font-medium w-full text-left"
+          >
+            <span className={`transition-transform inline-block ${isExpanded ? 'rotate-0' : '-rotate-90'}`}>▼</span>
+            思考プロセスを表示
+          </button>
+          
+          {isExpanded && (
+            <div className="mt-3 bg-gray-50 border-l-3 border-gray-300 p-3 rounded text-[11px] text-gray-700 leading-relaxed max-h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
+              <div className="mb-2.5 pb-2.5 border-b border-gray-200 last:mb-0 last:pb-0 last:border-b-0">
+                <div className="font-semibold text-gray-900 mb-1">1. 質問の解析</div>
+                <div className="text-[10px] text-gray-600">質問内容を分析し、回答の方向性を決定</div>
+              </div>
+              <div className="mb-2.5 pb-2.5 border-b border-gray-200 last:mb-0 last:pb-0 last:border-b-0">
+                <div className="font-semibold text-gray-900 mb-1">2. 情報収集</div>
+                <div className="text-[10px] text-gray-600">{agent.reasoning || '関連情報を収集中...'}</div>
+              </div>
+              <div className="mb-2.5 pb-2.5 border-b border-gray-200 last:mb-0 last:pb-0 last:border-b-0">
+                <div className="font-semibold text-gray-900 mb-1">3. 分析と評価</div>
+                <div className="text-[10px] text-gray-600">収集した情報を{colors.type}の視点で分析</div>
+              </div>
+              <div>
+                <div className="font-semibold text-gray-900 mb-1">4. 結論の導出</div>
+                <div className="text-[10px] text-gray-600">判断: {agent.decision}</div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 回答セクション */}
+        <div>
+          <div className="flex gap-4 mb-3 border-b border-gray-200 pb-2.5">
+            <div className="text-xs text-gray-900 border-b-2 border-gray-900 pb-1 font-medium">⊙ 回答</div>
+            <div className="text-xs text-gray-600 pb-1">🖼 Images</div>
+          </div>
+          <div className="text-[11px] text-gray-600 mb-3">✓ 1ステップが完了しました ›</div>
+          <div className="text-sm text-gray-900 leading-relaxed whitespace-pre-wrap">
+            {agent.content}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * SOLOMON Judgeカードコンポーネント
+ */
+interface SolomonJudgeCardProps {
+  judgeResponse: JudgeResponse;
+  agentResponses: AgentResponse[];
+  isExpanded: boolean;
+  onToggle: () => void;
+  traceId?: string | undefined;
+}
+
+const SolomonJudgeCard: React.FC<SolomonJudgeCardProps> = ({
+  judgeResponse,
+  agentResponses,
+  isExpanded,
+  onToggle,
+  traceId
+}) => {
+  return (
+    <div className="border-l-4 border-amber-500 rounded-lg bg-gradient-to-br from-amber-50 to-yellow-50 overflow-hidden">
+      {/* ヘッダー（固定） */}
+      <div className="p-4 border-b border-amber-300 bg-yellow-50 flex items-center gap-2.5">
+        <span className="text-xl">🟡</span>
+        <div>
+          <div className="font-semibold text-sm text-gray-900">SOLOMON JUDGE</div>
+          <div className="text-xs text-gray-600">総合判定</div>
+        </div>
+      </div>
+
+      {/* コンテンツ */}
+      <div className="p-4">
+        {/* 思考プロセスセクション */}
+        <div className="mb-4 pb-4 border-b border-amber-300">
+          <button
+            onClick={onToggle}
+            className="flex items-center gap-2 text-xs text-gray-600 hover:text-gray-900 font-medium w-full text-left"
+          >
+            <span className={`transition-transform inline-block ${isExpanded ? 'rotate-0' : '-rotate-90'}`}>▼</span>
+            統合分析プロセスを表示
+          </button>
+          
+          {isExpanded && (
+            <div className="mt-3 bg-white border-l-3 border-amber-400 p-3 rounded text-[11px] text-gray-700 leading-relaxed">
+              <div className="mb-2.5 pb-2.5 border-b border-gray-200 last:mb-0 last:pb-0 last:border-b-0">
+                <div className="font-semibold text-gray-900 mb-1">1. 各賢者の分析評価</div>
+                <div className="text-[10px] text-gray-600">3賢者の回答を個別に評価し、重要度を判定</div>
+              </div>
+              <div className="mb-2.5 pb-2.5 border-b border-gray-200 last:mb-0 last:pb-0 last:border-b-0">
+                <div className="font-semibold text-gray-900 mb-1">2. 情報の相互検証</div>
+                <div className="text-[10px] text-gray-600">複数の視点で重複する情報を確認し、信頼性を評価</div>
+              </div>
+              <div className="mb-2.5 pb-2.5 border-b border-gray-200 last:mb-0 last:pb-0 last:border-b-0">
+                <div className="font-semibold text-gray-900 mb-1">3. 統合的価値判定</div>
+                <div className="text-[10px] text-gray-600">{judgeResponse.reasoning || '3つの視点を統合し、総合的な価値を算出'}</div>
+              </div>
+              <div>
+                <div className="font-semibold text-gray-900 mb-1">4. 最終判断と推奨</div>
+                <div className="text-[10px] text-gray-600">最終判断: {judgeResponse.finalDecision}</div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 分析結果 */}
+        <div className="space-y-4">
+          {/* 各賢者のスコア */}
+          {judgeResponse.scores && judgeResponse.scores.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-gray-900 mb-2">各賢者の評価</div>
+              <div className="space-y-2">
+                {judgeResponse.scores.map((score) => (
+                  <div key={score.agentId} className="bg-white p-2.5 rounded-md border border-amber-200">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px] font-medium text-gray-700">
+                        {score.agentId.toUpperCase()}
+                      </span>
+                      <span className="text-[11px] font-bold text-blue-600">
+                        {score.score}点
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-600 leading-relaxed">{score.reasoning}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 最終推奨 */}
+          <div className="bg-blue-50 p-3 rounded-md border border-blue-200">
+            <div className="text-xs font-semibold text-gray-900 mb-2">最終推奨</div>
+            <div className="text-[11px] text-gray-800 leading-relaxed whitespace-pre-wrap">
+              {judgeResponse.finalRecommendation || judgeResponse.summary}
+            </div>
+            <div className="mt-2 text-[11px]">
+              <div className="text-gray-600">
+                判断: <span className={`font-semibold ${
+                  judgeResponse.finalDecision === 'APPROVED' ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {judgeResponse.finalDecision}
+                </span>
+              </div>
+              <div className="text-gray-600 mt-1">
+                確信度: <span className="font-semibold text-blue-600">
+                  {Math.round((judgeResponse.confidence || 0.8) * 100)}%
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
  * 時刻フォーマット関数
  * 
  * 学習ポイント:
@@ -183,10 +409,10 @@ const UserMessage: React.FC<UserMessageProps> = ({
  * アシスタントメッセージコンポーネント
  * 
  * 設計理由:
- * - 左寄せ表示でアシスタントメッセージを識別
- * - 白色背景で視覚的区別
- * - エージェント応答とJudge評価の展開可能表示
- * - 段階的な情報開示によるUX向上
+ * - 3カラムレイアウトで3賢者を横並び表示
+ * - 各エージェントの思考プロセスを展開表示
+ * - SOLOMON Judgeを下部に配置
+ * - スクロール可能な各カラム
  */
 const AssistantMessage: React.FC<AssistantMessageProps> = ({
   content,
@@ -197,112 +423,87 @@ const AssistantMessage: React.FC<AssistantMessageProps> = ({
   onTraceView,
   className = ''
 }) => {
-  const [showAgentResponses, setShowAgentResponses] = useState(false);
-  const [showJudgeResponse, setShowJudgeResponse] = useState(false);
+  // 各エージェントの思考プロセス展開状態
+  const [expandedThinking, setExpandedThinking] = useState<{[key: string]: boolean}>({
+    caspar: false,
+    balthasar: false,
+    melchior: false,
+    solomon: false
+  });
 
   /**
-   * エージェント応答の表示切り替え
+   * 思考プロセスの展開切り替え
    */
-  const toggleAgentResponses = useCallback(() => {
-    setShowAgentResponses(prev => !prev);
+  const toggleThinking = useCallback((agentId: string) => {
+    setExpandedThinking(prev => ({
+      ...prev,
+      [agentId]: !prev[agentId]
+    }));
   }, []);
 
-  /**
-   * Judge応答の表示切り替え
-   */
-  const toggleJudgeResponse = useCallback(() => {
-    setShowJudgeResponse(prev => !prev);
-  }, []);
+  // エージェント応答を整理
+  const casparResponse = agentResponses?.find(r => r.agentId === 'caspar');
+  const balthasarResponse = agentResponses?.find(r => r.agentId === 'balthasar');
+  const melchiorResponse = agentResponses?.find(r => r.agentId === 'melchior');
 
   return (
-    <div className={`flex justify-start ${className}`}>
-      <div className="max-w-4xl w-full">
-        <Card className="bg-white border border-gray-200 p-4">
-          <div className="flex items-start space-x-3">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                <Bot className="w-4 h-4 text-gray-600" />
-              </div>
-            </div>
-            <div className="flex-1 min-w-0">
-              {/* メインコンテンツ */}
-              <div className="mb-3">
-                <p className="text-sm leading-relaxed text-gray-900 whitespace-pre-wrap">
-                  {content}
-                </p>
-              </div>
+    <div className={`w-full space-y-4 ${className}`}>
+      {/* 3カラムレイアウト: 3賢者 */}
+      {agentResponses && agentResponses.length > 0 && (
+        <div className="grid grid-cols-3 gap-4">
+          {/* MELCHIOR カラム */}
+          {melchiorResponse && (
+            <AgentColumn
+              agent={melchiorResponse}
+              color="green"
+              isExpanded={expandedThinking.melchior || false}
+              onToggle={() => toggleThinking('melchior')}
+              traceId={traceId}
+            />
+          )}
 
-              {/* エージェント応答セクション */}
-              {agentResponses && agentResponses.length > 0 && (
-                <div className="mb-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={toggleAgentResponses}
-                    className="flex items-center space-x-2 mb-2"
-                    aria-expanded={showAgentResponses}
-                    aria-label="3賢者の詳細回答を表示"
-                  >
-                    <span>3賢者の詳細回答</span>
-                    {showAgentResponses ? (
-                      <ChevronUp className="w-4 h-4" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4" />
-                    )}
-                  </Button>
-                  
-                  {showAgentResponses && (
-                    <div className="space-y-3 pl-4 border-l-2 border-gray-200">
-                      {agentResponses.map((response) => (
-                        <AgentResponsePanel
-                          key={response.agentId}
-                          response={response}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+          {/* CASPAR カラム */}
+          {casparResponse && (
+            <AgentColumn
+              agent={casparResponse}
+              color="blue"
+              isExpanded={expandedThinking.caspar || false}
+              onToggle={() => toggleThinking('caspar')}
+              traceId={traceId}
+            />
+          )}
 
-              {/* SOLOMON Judge評価セクション */}
-              {judgeResponse && (
-                <div className="mb-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={toggleJudgeResponse}
-                    className="flex items-center space-x-2 mb-2"
-                    aria-expanded={showJudgeResponse}
-                    aria-label="SOLOMON Judge評価を表示"
-                  >
-                    <span>SOLOMON Judge評価</span>
-                    {showJudgeResponse ? (
-                      <ChevronUp className="w-4 h-4" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4" />
-                    )}
-                  </Button>
-                  
-                  {showJudgeResponse && (
-                    <div className="pl-4 border-l-2 border-blue-200">
-                      <JudgeResponsePanel
-                        judgeResponse={judgeResponse}
-                        agentResponses={agentResponses || []}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
+          {/* BALTHASAR カラム */}
+          {balthasarResponse && (
+            <AgentColumn
+              agent={balthasarResponse}
+              color="purple"
+              isExpanded={expandedThinking.balthasar || false}
+              onToggle={() => toggleThinking('balthasar')}
+              traceId={traceId}
+            />
+          )}
+        </div>
+      )}
 
-              {/* メタデータ */}
-              <MessageMetadata
-                timestamp={typeof timestamp === 'string' ? timestamp : timestamp.toISOString()}
-                traceId={traceId}
-                onTraceView={onTraceView}
-              />
-            </div>
-          </div>
-        </Card>
+      {/* SOLOMON Judge評価 */}
+      {judgeResponse && (
+        <SolomonJudgeCard
+          judgeResponse={judgeResponse}
+          agentResponses={agentResponses || []}
+          isExpanded={expandedThinking.solomon || false}
+          onToggle={() => toggleThinking('solomon')}
+          traceId={traceId}
+        />
+      )}
+
+      {/* メタデータ */}
+      <div className="text-right">
+        <MessageMetadata
+          timestamp={typeof timestamp === 'string' ? timestamp : timestamp.toISOString()}
+          traceId={traceId}
+          onTraceView={onTraceView}
+        />
       </div>
     </div>
   );
