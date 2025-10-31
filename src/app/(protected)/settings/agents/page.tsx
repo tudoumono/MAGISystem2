@@ -47,9 +47,10 @@ export default function AgentSettingsPage() {
    * プリセットのコピー
    */
   const handleCopy = (preset: AgentPresetConfig) => {
+    // idを除外して新規作成として扱う
+    const { id, ...presetWithoutId } = preset;
     const copiedPreset: AgentPresetConfig = {
-      ...preset,
-      id: undefined, // 新規作成として扱う
+      ...presetWithoutId,
       name: `${preset.name}のコピー`,
       isDefault: false,
       isPublic: false,
