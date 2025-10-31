@@ -35,6 +35,7 @@ export default function ModelsCheckPage() {
                 const config = getAmplifyConfig();
                 const configValidation = validateAmplifyConfig(config);
                 console.log('🔍 Config Validation:', configValidation);
+                console.log('🔍 Full Config:', config);
 
                 // 3. amplify_outputs.json の存在確認（開発環境のみ）
                 // 本番環境ではサーバーサイドで自動注入されるため、クライアントからアクセスできない

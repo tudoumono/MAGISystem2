@@ -25,9 +25,12 @@ import React, { useState } from 'react';
 import { ConversationSidebar } from '@/components/sidebar/ConversationSidebar';
 import { ChatInterface } from '@/components/chat/ChatInterface';
 import { TracePanel } from '@/components/trace/TracePanel';
+import { PresetSelectorModal } from '@/components/chat/PresetSelectorModal';
 import { useConversations } from '@/hooks/useConversations';
+import { useAgentPresets } from '@/hooks/useAgentPresets';
 import { Button } from '@/components/ui/Button';
-import { ChevronLeft, ChevronRight, Bot } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Bot, Settings } from 'lucide-react';
+import type { AgentPresetConfig } from '@/types/agent-preset';
 
 export default function ChatPage() {
   // 会話管理
@@ -40,19 +43,38 @@ export default function ChatPage() {
     searchConversations
   } = useConversations();
 
+  // プリセット管理
+  const { presets } = useAgentPresets();
+
   // UI状態管理
   const [activeConversationId, setActiveConversationId] = useState<string>();
   const [selectedTraceId, setSelectedTraceId] = useState<string | null>(null);
   const [showTracePanel, setShowTracePanel] = useState(true);
+  const [showPresetSelector, setShowPresetSelector] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<AgentPresetConfig | null>(null);
 
   /**
    * 新規会話の作成
    */
   const handleCreateNew = async () => {
-    const newConversation = await createConversation({
+    const params: any = {
       title: `新しい会話 ${new Date().toLocaleTimeString()}`
-    });
+    };
+    
+    if (selectedPreset?.id) {
+      params.agentPresetId = selectedPreset.id;
+    }
+    
+    const newConversation = await createConversation(params);
     setActiveConversationId(newConversation.id);
+  };
+
+  /**
+   * プリセット選択
+   */
+  const handlePresetSelect = (preset: AgentPresetConfig) => {
+    setSelectedPreset(preset);
+    setShowPresetSelector(false);
   };
 
   /**
@@ -87,6 +109,15 @@ export default function ChatPage() {
 
   return (
     <div className="h-screen flex bg-gray-100">
+      {/* プリセット選択モーダル */}
+      <PresetSelectorModal
+        isOpen={showPresetSelector}
+        presets={presets}
+        selectedPreset={selectedPreset}
+        onSelect={handlePresetSelect}
+        onClose={() => setShowPresetSelector(false)}
+      />
+
       {/* 左サイドバー: 会話履歴 */}
       <div className="w-80 flex-shrink-0 border-r border-gray-200">
         <ConversationSidebar
@@ -145,6 +176,23 @@ export default function ChatPage() {
                   <h3 className="font-semibold text-green-900 mb-1">MELCHIOR</h3>
                   <p className="text-xs text-green-700">バランス型・科学的</p>
                 </div>
+              </div>
+
+              {/* プリセット選択 */}
+              <div className="mb-6">
+                <Button
+                  onClick={() => setShowPresetSelector(true)}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <Settings className="w-4 h-4" />
+                  {selectedPreset ? selectedPreset.name : 'プリセットを選択'}
+                </Button>
+                {selectedPreset && (
+                  <p className="text-sm text-gray-500 mt-2">
+                    {selectedPreset.description}
+                  </p>
+                )}
               </div>
 
               <Button
