@@ -2,8 +2,8 @@
  * Bedrock Agents Streaming API Route
  * 
  * Server-Sent Events (SSE)を使用してエージェントの応答をストリーミング配信します。
- * 各エージェントの思考プロセスと回答をリアルタイムで送信することで、
- * ユーザーに優れた体験を提供します。
+ * Lambda Response Streamingを使用して、Bedrock AgentCoreからの応答を
+ * リアルタイムで転送します。
  * 
  * エンドポイント: GET /api/bedrock-agents/stream
  * 
@@ -12,6 +12,10 @@
  * - conversationId: 会話ID
  * 
  * レスポンス形式: Server-Sent Events (text/event-stream)
+ * 
+ * アーキテクチャ:
+ * 1. 開発環境: モックデータでストリーミング
+ * 2. 本番環境: Lambda関数URLを使用してストリーミング
  */
 
 import { NextRequest } from 'next/server';
@@ -175,7 +179,46 @@ export async function GET(request: NextRequest) {
     return new Response('Missing required parameters', { status: 400 });
   }
 
-  // Server-Sent Eventsストリームを作成
+  // 本番環境: Lambda関数URLを使用
+  const lambdaUrl = process.env.BEDROCK_STREAMING_LAMBDA_URL;
+  
+  if (lambdaUrl && process.env.NODE_ENV === 'production') {
+    try {
+      console.log('Using Lambda Function URL for streaming');
+      
+      // Lambda関数URLにリクエストを転送
+      const response = await fetch(lambdaUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          question,
+          conversationId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Lambda request failed: ${response.statusText}`);
+      }
+
+      // ストリームを直接転送
+      return new Response(response.body, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
+      });
+    } catch (error) {
+      console.error('Lambda streaming error:', error);
+      // フォールバックとしてモックを使用
+    }
+  }
+
+  // 開発環境またはフォールバック: モックデータでストリーミング
+  console.log('Using mock data for streaming');
+  
   const stream = new ReadableStream({
     async start(controller) {
       try {
