@@ -31,7 +31,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { User, Bot, Clock, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { User, Bot, Clock, Eye, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { AgentResponsePanel } from '@/components/agents/AgentResponsePanel';
@@ -185,10 +185,22 @@ const AgentColumn: React.FC<AgentColumnProps> = ({
             <div className="text-xs text-gray-900 border-b-2 border-gray-900 pb-1 font-medium">⊙ 回答</div>
             <div className="text-xs text-gray-600 pb-1">🖼 Images</div>
           </div>
-          <div className="text-[11px] text-gray-600 mb-3">✓ 1ステップが完了しました ›</div>
-          <div className="text-sm text-gray-900 leading-relaxed whitespace-pre-wrap">
-            {agent.content}
-          </div>
+          {agent.content ? (
+            <>
+              <div className="text-[11px] text-gray-600 mb-3">✓ 1ステップが完了しました ›</div>
+              <div className="text-sm text-gray-900 leading-relaxed whitespace-pre-wrap">
+                {agent.content}
+                {!agent.decision && (
+                  <span className="inline-block w-2 h-4 ml-1 bg-gray-900 animate-pulse" />
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>回答を準備中...</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -445,6 +457,9 @@ const AssistantMessage: React.FC<AssistantMessageProps> = ({
   const casparResponse = agentResponses?.find(r => r.agentId === 'caspar');
   const balthasarResponse = agentResponses?.find(r => r.agentId === 'balthasar');
   const melchiorResponse = agentResponses?.find(r => r.agentId === 'melchior');
+
+  // ストリーミング中かどうかを判定
+  const isStreaming = agentResponses && agentResponses.some(r => !r.decision);
 
   return (
     <div className={`w-full space-y-4 ${className}`}>
