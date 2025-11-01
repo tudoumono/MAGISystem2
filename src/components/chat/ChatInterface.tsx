@@ -38,7 +38,8 @@ import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { useMessages } from '@/hooks/useMessages';
-import type { Message } from '@/types/domain';
+import { useStreamingAgent } from '@/hooks/useStreamingAgent';
+import type { Message, AgentResponse } from '@/types/domain';
 
 /**
  * コンポーネントのプロパティ型定義
@@ -368,9 +369,19 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     refreshMessages
   } = useMessages(conversationId);
 
+  // ストリーミングエージェントフックの使用
+  const {
+    streamingState,
+    startStreaming,
+    stopStreaming
+  } = useStreamingAgent();
+
   // 自動スクロール用のref
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  // ストリーミング中のメッセージを保持
+  const [streamingMessage, setStreamingMessage] = useState<any>(null);
 
   /**
    * 自動スクロール機能
@@ -406,16 +417,91 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   }, [isAgentExecuting, scrollToBottom]);
 
   /**
-   * メッセージ送信の処理
+   * ストリーミング状態が変わった時にメッセージを更新
+   */
+  useEffect(() => {
+    if (!streamingMessage) return;
+
+    // エージェント応答を配列に変換
+    const agentResponses = Object.values(streamingState.agentResponses)
+      .filter((response): response is Partial<AgentResponse> & { agentId: string; decision: any } => 
+        response !== undefined && response.agentId !== undefined && response.decision !== undefined
+      )
+      .map(response => ({
+        agentId: response.agentId as any,
+        content: response.content || '',
+        reasoning: response.reasoning || '',
+        decision: response.decision,
+        confidence: response.confidence || 0,
+        executionTime: response.executionTime
+      })) as AgentResponse[];
+
+    // ストリーミングメッセージを更新
+    setStreamingMessage((prev: any) => {
+      if (!prev) return null;
+      
+      return {
+        ...prev,
+        agentResponses: agentResponses.length > 0 ? agentResponses : (prev.agentResponses || null),
+        judgeResponse: streamingState.judgeResponse && streamingState.judgeResponse.finalDecision ? {
+          finalDecision: streamingState.judgeResponse.finalDecision as any,
+          votingResult: streamingState.judgeResponse.votingResult || { approved: 0, rejected: 0, abstained: 0 },
+          scores: streamingState.judgeResponse.scores || [],
+          summary: streamingState.judgeResponse.summary || '',
+          finalRecommendation: streamingState.judgeResponse.finalRecommendation || '',
+          reasoning: streamingState.judgeResponse.reasoning || '',
+          confidence: streamingState.judgeResponse.confidence || 0
+        } : (prev.judgeResponse || null),
+        content: streamingState.judgeResponse?.summary || prev.content
+      };
+    });
+
+    // ストリーミング完了時
+    if (!streamingState.isStreaming && streamingState.judgeResponse) {
+      // メッセージをデータベースに保存
+      // TODO: 実装
+      setStreamingMessage(null);
+    }
+
+    // 自動スクロール
+    setTimeout(() => scrollToBottom(), 100);
+  }, [streamingState, streamingMessage, scrollToBottom]);
+
+  /**
+   * メッセージ送信の処理（ストリーミング対応）
    */
   const handleSendMessage = useCallback(async (content: string) => {
     try {
-      await sendMessage({ content });
+      // ユーザーメッセージを即座に表示
+      const userMessage: any = {
+        id: crypto.randomUUID(),
+        conversationId,
+        role: 'user',
+        content,
+        createdAt: new Date().toISOString()
+      };
+
+      // ストリーミング用のアシスタントメッセージを作成
+      const assistantMessage: any = {
+        id: crypto.randomUUID(),
+        conversationId,
+        role: 'assistant',
+        content: '',
+        agentResponses: null,
+        judgeResponse: null,
+        createdAt: new Date().toISOString()
+      };
+
+      setStreamingMessage(assistantMessage);
+
+      // ストリーミング開始
+      await startStreaming(content, conversationId);
+
     } catch (error) {
       console.error('Failed to send message:', error);
-      // エラーは useMessages フック内で処理される
+      setStreamingMessage(null);
     }
-  }, [sendMessage]);
+  }, [conversationId, startStreaming]);
 
   /**
    * タイトル変更の処理
@@ -485,8 +571,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
               />
             ))}
             
-            {/* エージェント実行中インジケーター */}
-            {isAgentExecuting && <AgentExecutingIndicator />}
+            {/* ストリーミング中のメッセージ */}
+            {streamingMessage && (
+              <MessageBubble
+                key={streamingMessage.id}
+                message={streamingMessage}
+                onTraceView={onTraceView}
+              />
+            )}
             
             {/* 自動スクロール用の要素 */}
             <div ref={messagesEndRef} />
