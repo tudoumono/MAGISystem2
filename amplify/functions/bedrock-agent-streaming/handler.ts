@@ -187,9 +187,22 @@ function getAgentResponse(agentId: string, question: string) {
 export const handler = awslambda.streamifyResponse(
   async (event: any, responseStream: any, context: Context) => {
     try {
+      console.log('Streaming Lambda: Raw event', JSON.stringify(event));
+      
       // リクエストボディの解析
-      const body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
-      const question = body.question || body.message || '';
+      let body: any;
+      if (typeof event.body === 'string') {
+        try {
+          body = JSON.parse(event.body);
+        } catch (e) {
+          console.error('Failed to parse body:', e);
+          body = event; // イベント自体を使用
+        }
+      } else {
+        body = event.body || event;
+      }
+      
+      const question = body.question || body.message || 'テスト質問';
       
       console.log('Streaming Lambda: Request received', {
         question: question.substring(0, 100),
