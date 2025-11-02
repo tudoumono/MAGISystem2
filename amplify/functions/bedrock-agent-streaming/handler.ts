@@ -193,10 +193,16 @@ export const handler = awslambda.streamifyResponse(
       let body: any;
       if (typeof event.body === 'string') {
         try {
-          body = JSON.parse(event.body);
+          // エスケープされたJSONを処理
+          const cleanBody = event.body.replace(/\\\\/g, '\\').replace(/\\"/g, '"');
+          body = JSON.parse(cleanBody);
         } catch (e) {
-          console.error('Failed to parse body:', e);
-          body = event; // イベント自体を使用
+          console.error('Failed to parse body:', e, 'Raw body:', event.body);
+          // フォールバック: イベント全体から取得
+          body = {
+            question: event.question || 'テスト質問',
+            conversationId: event.conversationId || 'test'
+          };
         }
       } else {
         body = event.body || event;
