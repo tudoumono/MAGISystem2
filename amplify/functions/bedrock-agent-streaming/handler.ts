@@ -28,8 +28,8 @@ declare const awslambda: {
  * ストリーミングイベントの型定義
  */
 interface StreamEvent {
-  type: 'agent_start' | 'agent_thinking' | 'agent_chunk' | 'agent_complete' | 
-        'judge_start' | 'judge_chunk' | 'judge_complete' | 'error' | 'complete';
+  type: 'agent_start' | 'agent_thinking' | 'agent_chunk' | 'agent_complete' |
+  'judge_start' | 'judge_chunk' | 'judge_complete' | 'error' | 'complete';
   agentId?: string;
   data?: any;
   error?: string;
@@ -48,15 +48,25 @@ function sendEvent(httpStream: any, event: StreamEvent) {
  * 
  * Phase 3で実際のBedrock AgentCore統合に置き換え
  */
-async function* streamAgentExecution(question: string, httpStream: any) {
+async function streamAgentExecution(question: string, httpStream: any) {
+  console.log('streamAgentExecution: Starting execution for question:', question.substring(0, 50));
+  
   const agents = [
     { id: 'melchior', name: 'MELCHIOR', type: 'バランス型' },
     { id: 'caspar', name: 'CASPAR', type: '保守型' },
     { id: 'balthasar', name: 'BALTHASAR', type: '革新型' }
   ];
 
+  // 開始イベント送信
+  sendEvent(httpStream, {
+    type: 'agent_start',
+    data: { message: 'MAGI システム開始', totalAgents: agents.length }
+  });
+
   // 各エージェントを順次実行
   for (const agent of agents) {
+    console.log(`Processing agent: ${agent.name}`);
+    
     // エージェント開始
     sendEvent(httpStream, {
       type: 'agent_start',
@@ -64,39 +74,18 @@ async function* streamAgentExecution(question: string, httpStream: any) {
       data: { name: agent.name, type: agent.type }
     });
 
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // 短い処理時間でテスト
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // 思考プロセス（4ステップ）
-    const thinkingSteps = [
-      '質問の解析',
-      '情報収集',
-      '分析と評価',
-      '結論の導出'
-    ];
-
-    for (const step of thinkingSteps) {
-      sendEvent(httpStream, {
-        type: 'agent_thinking',
-        agentId: agent.id,
-        data: { text: `${step}を実行中...\n` }
-      });
-      await new Promise(resolve => setTimeout(resolve, 200));
-    }
-
-    // 回答のストリーミング（文字単位から単語単位に変更）
+    // エージェント応答を取得
     const response = getAgentResponse(agent.id, question);
-    const words = response.content.split('');
     
-    // 2-5文字ずつまとめて送信（チャンクサイズを大きく）
-    for (let i = 0; i < words.length; i += 3) {
-      const chunk = words.slice(i, i + 3).join('');
-      sendEvent(httpStream, {
-        type: 'agent_chunk',
-        agentId: agent.id,
-        data: { text: chunk }
-      });
-      await new Promise(resolve => setTimeout(resolve, 50));
-    }
+    // 応答を一度に送信（ストリーミングを簡素化）
+    sendEvent(httpStream, {
+      type: 'agent_chunk',
+      agentId: agent.id,
+      data: { text: response.content }
+    });
 
     // エージェント完了
     sendEvent(httpStream, {
@@ -109,30 +98,23 @@ async function* streamAgentExecution(question: string, httpStream: any) {
       }
     });
 
-    await new Promise(resolve => setTimeout(resolve, 500));
+    console.log(`Agent ${agent.name} completed`);
   }
 
-  // SOLOMON Judge開始
+  // SOLOMON Judge処理
+  console.log('Processing SOLOMON Judge');
   sendEvent(httpStream, {
     type: 'judge_start',
     data: { name: 'SOLOMON JUDGE' }
   });
 
-  await new Promise(resolve => setTimeout(resolve, 300));
+  await new Promise(resolve => setTimeout(resolve, 1000));
 
-  // SOLOMON Judgeの回答ストリーミング（単語単位に変更）
   const judgeSummary = '3賢者の判断を総合すると、適切な準備により実行可能です。';
-  const judgeWords = judgeSummary.split('');
-  
-  // 3-5文字ずつまとめて送信
-  for (let i = 0; i < judgeWords.length; i += 4) {
-    const chunk = judgeWords.slice(i, i + 4).join('');
-    sendEvent(httpStream, {
-      type: 'judge_chunk',
-      data: { text: chunk }
-    });
-    await new Promise(resolve => setTimeout(resolve, 80));
-  }
+  sendEvent(httpStream, {
+    type: 'judge_chunk',
+    data: { text: judgeSummary }
+  });
 
   // SOLOMON Judge完了
   sendEvent(httpStream, {
@@ -156,12 +138,14 @@ async function* streamAgentExecution(question: string, httpStream: any) {
     type: 'complete',
     data: { message: 'All agents completed successfully' }
   });
+  
+  console.log('streamAgentExecution: All processing completed');
 }
 
 /**
  * エージェント応答の取得（モック）
  */
-function getAgentResponse(agentId: string, question: string) {
+function getAgentResponse(agentId: string, _question: string) {
   const responses: Record<string, any> = {
     melchior: {
       content: 'データを総合的に分析した結果、適切な準備と段階的実装により成功可能と判断します。',
@@ -192,20 +176,22 @@ function getAgentResponse(agentId: string, question: string) {
  * awslambda.streamifyResponse()を使用してストリーミングレスポンスを実装
  */
 export const handler = awslambda.streamifyResponse(
-  async (event: any, responseStream: any, context: Context) => {
+  async (event: any, responseStream: any, _context: Context) => {
     let httpStream: any;
-    
+
     try {
       console.log('Streaming Lambda: Raw event', JSON.stringify(event));
-      
+
       // 1) 従来の方法でContent-Typeを設定（HttpResponseStream.fromが使えない場合のフォールバック）
       responseStream.setContentType('text/event-stream');
       httpStream = responseStream;
-      
+
+      console.log('DEBUG: About to send initial flush');
       // 2) 最初のバイトを早めに送る（フラッシュ用）
       const padding = ' '.repeat(256);
       httpStream.write(`: open ${padding}\n\n`);
-      
+      console.log('DEBUG: Initial flush sent');
+
       // リクエストボディの解析
       let body: any;
       if (typeof event.body === 'string') {
@@ -224,9 +210,9 @@ export const handler = awslambda.streamifyResponse(
       } else {
         body = event.body || event;
       }
-      
+
       const question = body.question || body.message || 'テスト質問';
-      
+
       console.log('Streaming Lambda: Request received', {
         question: question.substring(0, 100),
         conversationId: body.conversationId,
@@ -234,21 +220,25 @@ export const handler = awslambda.streamifyResponse(
       });
 
       // 3) エージェント実行をストリーミング
+      console.log('DEBUG: About to start streamAgentExecution');
       await streamAgentExecution(question, httpStream);
+      console.log('DEBUG: streamAgentExecution completed');
 
       // 4) ストリームを閉じる
+      console.log('DEBUG: Stream ended successfully');
       httpStream.end();
 
     } catch (error) {
       console.error('Streaming Lambda Error:', error);
-      
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace available');
+
       // エラーイベントを送信（httpStreamが初期化されていない場合はresponseStreamを使用）
       const stream = httpStream || responseStream;
       const errorData = `data: ${JSON.stringify({
         type: 'error',
         error: error instanceof Error ? error.message : 'Unknown error'
       })}\n\n`;
-      
+
       stream.write(errorData);
       stream.end();
     }
