@@ -198,20 +198,9 @@ export const handler = awslambda.streamifyResponse(
     try {
       console.log('Streaming Lambda: Raw event', JSON.stringify(event));
       
-      // 1) メタデータ付きのHttpResponseStreamに変換
-      const metadata = {
-        statusCode: 200,
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          "Connection": "keep-alive",
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "POST",
-          "Access-Control-Allow-Headers": "Content-Type"
-        }
-      };
-      
-      httpStream = awslambda.HttpResponseStream.from(responseStream, metadata);
+      // 1) 従来の方法でContent-Typeを設定（HttpResponseStream.fromが使えない場合のフォールバック）
+      responseStream.setContentType('text/event-stream');
+      httpStream = responseStream;
       
       // 2) 最初のバイトを早めに送る（フラッシュ用）
       const padding = ' '.repeat(256);
