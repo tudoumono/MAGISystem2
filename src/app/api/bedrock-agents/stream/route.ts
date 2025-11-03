@@ -194,8 +194,8 @@ export async function GET(request: NextRequest) {
     return new Response('Missing required parameters', { status: 400 });
   }
 
-  // 本番環境: Lambda関数URLを使用
-  const lambdaUrl = process.env.BEDROCK_STREAMING_LAMBDA_URL;
+  // 本番環境: Python Lambda関数URLを使用
+  const lambdaUrl = process.env.MAGI_PYTHON_AGENTS_LAMBDA_URL || process.env.BEDROCK_STREAMING_LAMBDA_URL;
   
   if (lambdaUrl && process.env.NODE_ENV === 'production') {
     try {

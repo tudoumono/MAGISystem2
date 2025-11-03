@@ -2,6 +2,7 @@ import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { bedrockAgentStreaming } from './functions/bedrock-agent-streaming/resource';
+import { magiPythonAgents } from './functions/magi-python-agents/resource';
 
 /**
  * Amplify Gen2 Backend Configuration
@@ -29,6 +30,7 @@ const backend = defineBackend({
   auth,
   data,
   bedrockAgentStreaming,
+  magiPythonAgents,
 });
 
 // Lambda関数URLとResponse Streamingを有効化
