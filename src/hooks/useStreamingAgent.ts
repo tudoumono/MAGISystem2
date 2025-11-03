@@ -95,25 +95,33 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
     try {
       // SSEエンドポイントに接続
       const url = new URL('/api/bedrock-agents/stream', window.location.origin);
-      url.searchParams.set('question', question);
-      url.searchParams.set('conversationId', conversationId);
+      url.searchParams.set('question', encodeURIComponent(question));
+      url.searchParams.set('conversationId', encodeURIComponent(conversationId));
 
+      console.log('Starting EventSource connection to:', url.toString());
       const eventSource = new EventSource(url.toString());
       eventSourceRef.current = eventSource;
 
       // メッセージイベントのハンドリング
       eventSource.onmessage = (event) => {
         try {
+          console.log('Received SSE event:', event.data);
           const streamEvent: StreamEvent = JSON.parse(event.data);
           handleStreamEvent(streamEvent);
         } catch (error) {
-          console.error('Failed to parse stream event:', error);
+          console.error('Failed to parse stream event:', error, 'Raw data:', event.data);
         }
+      };
+
+      // 接続開始ログ
+      eventSource.onopen = () => {
+        console.log('EventSource connection opened');
       };
 
       // エラーハンドリング
       eventSource.onerror = (error) => {
         console.error('EventSource error:', error);
+        console.error('EventSource readyState:', eventSource.readyState);
         setStreamingState(prev => ({
           ...prev,
           isStreaming: false,
