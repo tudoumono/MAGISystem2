@@ -200,7 +200,10 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
                 }
               }
             };
-            console.log(`Agent ${event.agentId} chunk update:`, newContent.length, 'chars');
+            // ログを削減（パフォーマンス向上）
+            if (newContent.length % 10 === 0) {
+              console.log(`Agent ${event.agentId} chunk update:`, newContent.length, 'chars');
+            }
             return newState;
           });
         }
