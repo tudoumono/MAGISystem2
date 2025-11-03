@@ -144,24 +144,30 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
    * ストリーミングイベントの処理
    */
   const handleStreamEvent = useCallback((event: StreamEvent) => {
+    console.log('Processing stream event:', event.type, event.agentId, event.data);
     switch (event.type) {
       case 'agent_start':
         // エージェント開始
         if (event.agentId) {
           const agentId = event.agentId;
-          setStreamingState(prev => ({
-            ...prev,
-            currentAgent: agentId,
-            agentResponses: {
-              ...prev.agentResponses,
-              [agentId]: {
-                agentId: agentId as any,
-                content: '',
-                reasoning: '',
-                confidence: 0
+          console.log('Agent started:', agentId);
+          setStreamingState(prev => {
+            const newState = {
+              ...prev,
+              currentAgent: agentId,
+              agentResponses: {
+                ...prev.agentResponses,
+                [agentId]: {
+                  agentId: agentId as any,
+                  content: '',
+                  reasoning: '',
+                  confidence: 0
+                }
               }
-            }
-          }));
+            };
+            console.log('Updated state for agent_start:', newState);
+            return newState;
+          });
         }
         break;
 
@@ -181,16 +187,23 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
 
       case 'agent_chunk':
         // エージェント応答のチャンク
-        setStreamingState(prev => ({
-          ...prev,
-          agentResponses: {
-            ...prev.agentResponses,
-            [event.agentId!]: {
-              ...prev.agentResponses[event.agentId!],
-              content: (prev.agentResponses[event.agentId!]?.content || '') + event.data.text
-            }
-          }
-        }));
+        if (event.agentId) {
+          setStreamingState(prev => {
+            const newContent = (prev.agentResponses[event.agentId!]?.content || '') + event.data.text;
+            const newState = {
+              ...prev,
+              agentResponses: {
+                ...prev.agentResponses,
+                [event.agentId!]: {
+                  ...prev.agentResponses[event.agentId!],
+                  content: newContent
+                }
+              }
+            };
+            console.log(`Agent ${event.agentId} chunk update:`, newContent.length, 'chars');
+            return newState;
+          });
+        }
         break;
 
       case 'agent_complete':
