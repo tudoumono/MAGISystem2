@@ -31,10 +31,20 @@ const backend = defineBackend({
   bedrockAgentStreaming,
 });
 
-// Lambda関数URLを有効化（ストリーミング用）
-// Note: デプロイ後にAWS CLIで以下のコマンドを実行してストリーミングを有効化:
+// Lambda関数URLとResponse Streamingを有効化
+// Note: Amplify Gen2では手動設定が必要。デプロイ後に以下のコマンドを実行:
+//
+// 1. Function URLを作成:
+// aws lambda create-function-url-config \
+//   --function-name amplify-d34f7t08qc7jiy-ma-bedrockagentstreaminglam-PJ8OPi3YSqwc \
+//   --auth-type NONE \
+//   --cors '{"AllowCredentials":false,"AllowHeaders":["*"],"AllowMethods":["POST"],"AllowOrigins":["*"],"MaxAge":86400}' \
+//   --region ap-northeast-1
+//
+// 2. Response Streamingを有効化:
 // aws lambda update-function-configuration \
-//   --function-name <function-name> \
-//   --invoke-mode RESPONSE_STREAM
+//   --function-name amplify-d34f7t08qc7jiy-ma-bedrockagentstreaminglam-PJ8OPi3YSqwc \
+//   --invoke-mode RESPONSE_STREAM \
+//   --region ap-northeast-1
 
 export default backend;
