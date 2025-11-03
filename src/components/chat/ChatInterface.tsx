@@ -420,10 +420,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
    * ストリーミング状態が変わった時にメッセージを更新
    */
   useEffect(() => {
-    console.log('StreamingState changed:', streamingState);
-    console.log('Current streamingMessage:', streamingMessage);
-    
-    if (!streamingMessage) return;
+    // デバッグログを削減（無限ループ防止）
+    if (!streamingMessage) {
+      console.log('No streaming message, skipping update');
+      return;
+    }
 
     // エージェント応答を配列に変換
     const agentResponses = Object.values(streamingState.agentResponses)
@@ -471,7 +472,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
     // 自動スクロール
     setTimeout(() => scrollToBottom(), 100);
-  }, [streamingState, streamingMessage, scrollToBottom]);
+  }, [streamingState, scrollToBottom]); // streamingMessageを依存配列から削除
 
   /**
    * メッセージ送信の処理（ストリーミング対応）
