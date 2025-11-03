@@ -426,38 +426,43 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       return;
     }
 
-    // エージェント応答を配列に変換
+    // エージェント応答を配列に変換（ストリーミング中も含む）
     const agentResponses = Object.values(streamingState.agentResponses)
-      .filter((response): response is Partial<AgentResponse> & { agentId: string; decision: any } => 
-        response !== undefined && response.agentId !== undefined && response.decision !== undefined
+      .filter((response): response is Partial<AgentResponse> & { agentId: string } => 
+        response !== undefined && response.agentId !== undefined
       )
       .map(response => ({
         agentId: response.agentId as any,
         content: response.content || '',
         reasoning: response.reasoning || '',
-        decision: response.decision,
+        decision: response.decision || 'PENDING',
         confidence: response.confidence || 0,
-        executionTime: response.executionTime
+        executionTime: response.executionTime || 0
       })) as AgentResponse[];
+
+    console.log('Agent responses for UI:', agentResponses.length, 'agents');
 
     // ストリーミングメッセージを更新
     setStreamingMessage((prev: any) => {
       if (!prev) return null;
       
-      return {
+      const updatedMessage = {
         ...prev,
-        agentResponses: agentResponses.length > 0 ? agentResponses : (prev.agentResponses || null),
-        judgeResponse: streamingState.judgeResponse && streamingState.judgeResponse.finalDecision ? {
-          finalDecision: streamingState.judgeResponse.finalDecision as any,
+        agentResponses: agentResponses.length > 0 ? agentResponses : prev.agentResponses,
+        judgeResponse: streamingState.judgeResponse ? {
+          finalDecision: streamingState.judgeResponse.finalDecision || 'PENDING',
           votingResult: streamingState.judgeResponse.votingResult || { approved: 0, rejected: 0, abstained: 0 },
           scores: streamingState.judgeResponse.scores || [],
           summary: streamingState.judgeResponse.summary || '',
           finalRecommendation: streamingState.judgeResponse.finalRecommendation || '',
           reasoning: streamingState.judgeResponse.reasoning || '',
           confidence: streamingState.judgeResponse.confidence || 0
-        } : (prev.judgeResponse || null),
+        } : prev.judgeResponse,
         content: streamingState.judgeResponse?.summary || prev.content
       };
+      
+      console.log('Updated streaming message:', updatedMessage);
+      return updatedMessage;
     });
 
     // ストリーミング完了時
