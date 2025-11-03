@@ -460,10 +460,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     });
 
     // ストリーミング完了時
-    if (!streamingState.isStreaming && streamingState.judgeResponse) {
+    if (!streamingState.isStreaming && streamingState.judgeResponse && streamingMessage) {
+      console.log('Streaming completed, keeping message visible');
       // メッセージをデータベースに保存
       // TODO: 実装
-      setStreamingMessage(null);
+      
+      // 注意: setStreamingMessage(null) は呼ばない
+      // ストリーミングメッセージは表示し続ける
     }
 
     // 自動スクロール
@@ -475,6 +478,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
    */
   const handleSendMessage = useCallback(async (content: string) => {
     try {
+      // 前のストリーミングメッセージをクリア
+      setStreamingMessage(null);
+      
       // ユーザーメッセージを即座に表示
       const userMessage: any = {
         id: crypto.randomUUID(),
