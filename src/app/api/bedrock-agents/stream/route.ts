@@ -168,6 +168,21 @@ function getAgentResponse(agentId: string, question: string) {
 }
 
 /**
+ * OPTIONS /api/bedrock-agents/stream - CORS プリフライトリクエスト対応
+ */
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Accept',
+      'Access-Control-Max-Age': '86400',
+    },
+  });
+}
+
+/**
  * GET /api/bedrock-agents/stream
  */
 export async function GET(request: NextRequest) {
@@ -208,6 +223,11 @@ export async function GET(request: NextRequest) {
           'Content-Type': 'text/event-stream',
           'Cache-Control': 'no-cache',
           'Connection': 'keep-alive',
+          // CORS設定を追加
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Accept',
+          'Access-Control-Expose-Headers': 'Content-Type',
         },
       });
     } catch (error) {
@@ -249,6 +269,11 @@ export async function GET(request: NextRequest) {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
+      // CORS設定を追加
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Accept',
+      'Access-Control-Expose-Headers': 'Content-Type',
     },
   });
 }
