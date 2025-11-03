@@ -420,6 +420,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
    * ストリーミング状態が変わった時にメッセージを更新
    */
   useEffect(() => {
+    console.log('StreamingState changed:', streamingState);
+    console.log('Current streamingMessage:', streamingMessage);
+    
     if (!streamingMessage) return;
 
     // エージェント応答を配列に変換
@@ -492,10 +495,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         createdAt: new Date().toISOString()
       };
 
+      console.log('Creating streaming message:', assistantMessage);
       setStreamingMessage(assistantMessage);
 
       // ストリーミング開始
+      console.log('Starting streaming...');
       await startStreaming(content, conversationId);
+      console.log('Streaming started');
 
     } catch (error) {
       console.error('Failed to send message:', error);
