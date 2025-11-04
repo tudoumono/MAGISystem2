@@ -4,6 +4,7 @@ const nextConfig = {
   experimental: {
     // React 19の新機能を有効化（React Compilerは後で追加）
     // reactCompiler: true,
+    // Note: instrumentation.tsはNext.js 15.5.6でデフォルトで有効
   },
 
   // TypeScript設定の最適化
@@ -33,7 +34,6 @@ const nextConfig = {
         'aws-sdk': false,
         '@aws-sdk/client-cloudwatch': false,
         '@aws-sdk/client-cloudwatch-logs': false,
-        'aws-xray-sdk-core': false,
         '@opentelemetry/instrumentation-aws-sdk': false,
       };
     }
