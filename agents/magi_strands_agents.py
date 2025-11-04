@@ -54,20 +54,26 @@ class MAGIStrandsSystem:
     - SOLOMON: 統括者として最終判断
     """
     
-    def __init__(self):
-        """MAGI システムを初期化"""
+    def __init__(self, tavily_api_key: Optional[str] = None):
+        """
+        MAGI システムを初期化
+        
+        Args:
+            tavily_api_key: ユーザーのTavily APIキー（オプション）
+        """
         self.agents = {}
         self.execution_stats = {
             "total_decisions": 0,
             "total_execution_time": 0,
             "agent_stats": {}
         }
+        self.tavily_api_key = tavily_api_key
         
         # エージェント設定を定義
         self.agent_configs = self._define_agent_configs()
         
         # エージェントを初期化
-        self._initialize_agents()
+        self._initialize_agents(tavily_api_key)
     
     def _define_agent_configs(self) -> Dict[AgentType, MAGIAgentConfig]:
         """エージェント設定を定義"""
@@ -204,24 +210,46 @@ class MAGIStrandsSystem:
             )
         }
     
-    def _initialize_agents(self):
-        """Strands Agentsを初期化"""
+    def _initialize_agents(self, tavily_api_key: Optional[str] = None):
+        """
+        Strands Agentsを初期化
+        
+        Args:
+            tavily_api_key: ユーザーのTavily APIキー（オプション）
+        """
         print("🤖 Initializing MAGI Strands Agents...")
+        
+        # Web検索ツールの設定
+        tools = []
+        if tavily_api_key:
+            # APIキーを環境変数に設定
+            import os
+            os.environ['TAVILY_API_KEY'] = tavily_api_key
+            tools = ['tavily_search']
+            print("   🔍 Web search enabled with Tavily")
+        else:
+            print("   ⚠️  Web search disabled (no API key provided)")
         
         for agent_type, config in self.agent_configs.items():
             try:
-                # Strands Agent作成（モデル指定）
-                agent = Agent(model=config.model)
+                # Strands Agent作成（モデル指定 + ツール）
+                agent = Agent(
+                    model=config.model,
+                    tools=tools,  # Web検索ツールを追加
+                    system_prompt=config.system_prompt
+                )
                 
                 # エージェント情報を保存
                 self.agents[agent_type] = {
                     "agent": agent,
                     "config": config,
                     "execution_count": 0,
-                    "total_execution_time": 0
+                    "total_execution_time": 0,
+                    "web_search_enabled": bool(tavily_api_key)
                 }
                 
-                print(f"   ✅ {config.name} initialized with model: {config.model}")
+                tools_info = "with web search" if tavily_api_key else "without web search"
+                print(f"   ✅ {config.name} initialized {tools_info}")
                 
             except Exception as e:
                 print(f"   ❌ Failed to initialize {config.name}: {e}")
@@ -334,17 +362,32 @@ class MAGIStrandsSystem:
         
         agent = agent_info["agent"]
         config = agent_info["config"]
+        web_search_enabled = agent_info.get("web_search_enabled", False)
         
         start_time = time.time()
         
         try:
             # システムプロンプト + 質問を組み合わせ
-            full_prompt = f"{config.system_prompt}\n\n## 質問\n{question}\n\n上記の質問について、あなたの視点から分析し、指定されたJSON形式で回答してください。"
+            web_search_note = ""
+            if not web_search_enabled:
+                web_search_note = "\n\n注意: Web検索機能は無効です。既存の知識のみで回答してください。"
+            
+            full_prompt = f"{config.system_prompt}{web_search_note}\n\n## 質問\n{question}\n\n上記の質問について、あなたの視点から分析し、指定されたJSON形式で回答してください。"
             
             print(f"   🤖 Consulting {config.name}...")
             
-            # Strands Agent呼び出し
-            result = agent(full_prompt)
+            # Strands Agent呼び出し（エラーハンドリング強化）
+            try:
+                result = agent(full_prompt)
+            except Exception as tool_error:
+                # ツール実行エラー（Web検索失敗など）をキャッチ
+                error_msg = str(tool_error)
+                if 'TAVILY_API_KEY' in error_msg or 'tavily' in error_msg.lower():
+                    print(f"   ⚠️  {config.name}: Web search failed, continuing without it")
+                    # Web検索なしで再試行
+                    result = agent(f"{config.system_prompt}\n\n注意: Web検索は利用できません。既存の知識で回答してください。\n\n## 質問\n{question}\n\n上記の質問について、あなたの視点から分析し、指定されたJSON形式で回答してください。")
+                else:
+                    raise tool_error
             
             execution_time = format_execution_time(start_time)
             
@@ -362,13 +405,21 @@ class MAGIStrandsSystem:
             
         except Exception as e:
             execution_time = format_execution_time(start_time)
-            print(f"   ❌ {config.name} error: {e}")
+            error_msg = str(e)
+            
+            # エラーの種類に応じたメッセージ
+            if 'TAVILY_API_KEY' in error_msg or 'tavily' in error_msg.lower():
+                print(f"   ⚠️  {config.name}: Web search unavailable, using existing knowledge")
+                reasoning = "Web検索が利用できないため、既存の知識で判断"
+            else:
+                print(f"   ❌ {config.name} error: {e}")
+                reasoning = "実行エラーによる自動否決"
             
             return AgentResponse(
                 agent_id=sage_type,
                 decision=DecisionType.REJECTED,
-                content=f"エラー: {str(e)}",
-                reasoning="実行エラーによる自動否決",
+                content=f"エラー: {error_msg}",
+                reasoning=reasoning,
                 confidence=0.0,
                 execution_time=execution_time,
                 timestamp=datetime.now()

@@ -41,12 +41,23 @@ def send_event(event_type: str, agent_id: str = None, data: Dict = None):
 class MAGILambdaSystem:
     """Lambda用MAGI System"""
     
-    def __init__(self):
+    def __init__(self, tavily_api_key: Optional[str] = None):
         self.agents = {}
+        self.tavily_api_key = tavily_api_key
         self._initialize_agents()
     
     def _initialize_agents(self):
         """エージェントを初期化"""
+        # Web検索ツールの設定
+        tools = []
+        if self.tavily_api_key:
+            import os
+            os.environ['TAVILY_API_KEY'] = self.tavily_api_key
+            tools = ['tavily_search']
+            print("🔍 Web search enabled")
+        else:
+            print("⚠️  Web search disabled (no API key)")
+        
         configs = {
             AgentType.CASPAR: {
                 "name": "CASPAR",
@@ -118,10 +129,15 @@ class MAGILambdaSystem:
         
         for agent_type, config in configs.items():
             try:
-                agent = Agent(model=config["model"])
+                agent = Agent(
+                    model=config["model"],
+                    tools=tools,  # Web検索ツールを追加
+                    system_prompt=config["prompt"]
+                )
                 self.agents[agent_type] = {
                     "agent": agent,
-                    "config": config
+                    "config": config,
+                    "web_search_enabled": bool(self.tavily_api_key)
                 }
             except Exception as e:
                 print(f"Failed to initialize {config['name']}: {e}")
@@ -262,9 +278,10 @@ def lambda_handler(event, context):
             body = json.loads(body)
         
         question = body.get('question', 'テスト質問')
+        tavily_api_key = body.get('tavilyApiKey')  # ユーザーのAPIキー
         
-        # MAGI システム初期化
-        magi = MAGILambdaSystem()
+        # MAGI システム初期化（APIキー付き）
+        magi = MAGILambdaSystem(tavily_api_key=tavily_api_key)
         
         # ストリーミング実行
         asyncio.run(magi.process_streaming(question))
