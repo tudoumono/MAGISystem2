@@ -8,6 +8,23 @@ const schema = a.schema({
       name: a.string(),
       preferences: a.json(),
       conversations: a.hasMany('Conversation', 'userId'),
+      settings: a.hasOne('UserSettings', 'userId'),
+    })
+    .authorization((allow) => [
+      allow.owner(),
+    ]),
+
+  UserSettings: a
+    .model({
+      id: a.id().required(),
+      userId: a.id().required(),
+      tavilyApiKey: a.string(), // 暗号化推奨
+      serperApiKey: a.string(), // フォールバック用
+      enableWebSearch: a.boolean().default(false),
+      searchProvider: a.enum(['tavily', 'serper']).default('tavily'),
+      createdAt: a.datetime().required(),
+      updatedAt: a.datetime().required(),
+      user: a.belongsTo('User', 'userId'),
     })
     .authorization((allow) => [
       allow.owner(),

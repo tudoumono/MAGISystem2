@@ -510,6 +510,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       console.log('Creating streaming message:', assistantMessage);
       setStreamingMessage(assistantMessage);
 
+      // ユーザー設定を取得してAPIキーを渡す
+      // TODO: useUserSettings hookを使用してAPIキーを取得
+      // const { settings } = useUserSettings();
+      // const tavilyApiKey = settings?.enableWebSearch ? settings.tavilyApiKey : undefined;
+
       // ストリーミング開始
       console.log('Starting streaming...');
       await startStreaming(content, conversationId);

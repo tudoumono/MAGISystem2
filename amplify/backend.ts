@@ -11,19 +11,19 @@ import { magiPythonAgents } from './functions/magi-python-agents/resource';
  *
  * 構成要素:
  * - auth: Cognito認証設定
- * - data: DynamoDB + GraphQL API設定
+ * - data: DynamoDB + GraphQL API設定（UserSettings含む）
  * - bedrockAgentStreaming: Bedrock Agent Streaming Lambda関数
+ * - magiPythonAgents: Strands Agents統合Lambda関数（Web検索対応）
  *
- * バックエンドAPI:
- * - Next.js API Routes (/api/*) を使用
- * - Amplify Hostingが自動的にLambda関数として最適化
- * - Lambda Response Streamingによるリアルタイム配信
+ * Web検索統合:
+ * - Strands AgentsのネイティブTavilyツール使用
+ * - ユーザーごとのAPIキー管理
+ * - エラー時の自動フォールバック
  *
  * 学習ポイント:
  * - Amplify Gen2でのリソース統合
- * - 基本的なバックエンド設定
- * - 認証とデータの統合
- * - Next.js API RoutesとAmplifyの統合
+ * - Strands Agents + Tavily統合
+ * - ユーザー設定管理
  * - Lambda Response Streamingの実装
  */
 const backend = defineBackend({
