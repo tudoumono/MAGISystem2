@@ -38,6 +38,15 @@ interface AgentConfig {
   systemPrompt: string;
 }
 
+interface AgentRuntimeConfig {
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+  systemPrompt?: string;
+  enabled?: boolean;
+}
+
 const AGENT_CONFIGS: AgentConfig[] = [
   {
     id: 'melchior',
@@ -124,14 +133,40 @@ function sendEvent(
 async function consultAgent(
   agent: AgentConfig,
   question: string,
-  stream: any
+  stream: any,
+  customConfig?: AgentRuntimeConfig
 ): Promise<any> {
-  console.log(`Consulting ${agent.name}...`);
+  // カスタム設定があればそれを使用、なければデフォルト
+  const modelId = customConfig?.model || MODEL_ID;
+  const temperature = customConfig?.temperature ?? 0.7;
+  const maxTokens = customConfig?.maxTokens ?? 1000;
+  const topP = customConfig?.topP ?? 0.9;
+  const systemPrompt = customConfig?.systemPrompt || agent.systemPrompt;
+  const enabled = customConfig?.enabled ?? true;
+
+  console.log(`Consulting ${agent.name}...`, {
+    model: modelId,
+    temperature,
+    maxTokens,
+    enabled,
+  });
+
+  // エージェントが無効の場合はスキップ
+  if (!enabled) {
+    console.log(`Agent ${agent.name} is disabled, skipping...`);
+    return {
+      decision: 'ABSTAINED',
+      confidence: 0.0,
+      reasoning: 'エージェントが無効化されています',
+    };
+  }
 
   // エージェント開始イベント
   sendEvent(stream, 'agent_start', agent.id, {
     name: agent.name,
     type: agent.type,
+    model: modelId,
+    temperature,
   });
 
   const startTime = Date.now();
@@ -139,13 +174,14 @@ async function consultAgent(
   try {
     // Bedrock呼び出し（AWS公式ドキュメント準拠）
     const command = new InvokeModelWithResponseStreamCommand({
-      modelId: MODEL_ID,
+      modelId: modelId,
       contentType: 'application/json',
       body: JSON.stringify({
         anthropic_version: 'bedrock-2023-05-31',
-        max_tokens: 1000,
-        temperature: 0.7,
-        system: agent.systemPrompt,
+        max_tokens: maxTokens,
+        temperature: temperature,
+        top_p: topP,
+        system: systemPrompt,
         messages: [
           {
             role: 'user',
@@ -204,6 +240,19 @@ async function consultAgent(
     return parsed;
   } catch (error) {
     console.error(`Error consulting ${agent.name}:`, error);
+
+    // モデルが利用不可の場合のフォールバック
+    if (error instanceof Error && error.name === 'ValidationException') {
+      console.warn(`Model ${modelId} not available, falling back to default`);
+      
+      // デフォルトモデルで再試行
+      if (modelId !== TEST_MODEL) {
+        return consultAgent(agent, question, stream, {
+          ...customConfig,
+          model: TEST_MODEL,
+        });
+      }
+    }
 
     // エラー時のフォールバック
     sendEvent(stream, 'agent_complete', agent.id, {
@@ -388,19 +437,27 @@ export const handler = awslambda.streamifyResponse(
       }
 
       const question = body.question || body.message || 'テスト質問';
+      const agentConfigs = body.agentConfigs || {};
 
       console.log('Processing question:', question.substring(0, 100));
+      console.log('Agent configs received:', Object.keys(agentConfigs));
 
       // システム開始イベント
       sendEvent(httpStream, 'system_start', undefined, {
-        message: `MAGI システム開始 (モデル: ${MODEL_ID}) - 並列実行`,
+        message: `MAGI システム開始 - 並列実行`,
         totalAgents: AGENT_CONFIGS.length,
+        customConfigs: Object.keys(agentConfigs).length > 0,
       });
 
-      // 3賢者を並列実行
+      // 3賢者を並列実行（カスタム設定を渡す）
       console.log('Starting parallel agent execution...');
       const agentPromises = AGENT_CONFIGS.map((agent) =>
-        consultAgent(agent, question, httpStream)
+        consultAgent(
+          agent,
+          question,
+          httpStream,
+          agentConfigs[agent.id] // カスタム設定を渡す
+        )
       );
       const agentResponses = await Promise.all(agentPromises);
       console.log('All agents completed');
