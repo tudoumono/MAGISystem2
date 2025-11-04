@@ -175,7 +175,7 @@ export async function OPTIONS() {
     status: 200,
     headers: {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Accept',
       'Access-Control-Max-Age': '86400',
     },
@@ -183,7 +183,34 @@ export async function OPTIONS() {
 }
 
 /**
- * GET /api/bedrock-agents/stream
+ * POST /api/bedrock-agents/stream
+ * 
+ * エージェント設定を含むリクエストボディを受け取る
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { question, conversationId, agentConfigs } = body;
+
+    if (!question || !conversationId) {
+      return new Response('Missing required parameters', { status: 400 });
+    }
+
+    console.log('POST /api/bedrock-agents/stream', {
+      question: question.substring(0, 50),
+      conversationId,
+      hasAgentConfigs: !!agentConfigs,
+    });
+
+    return await handleStreamRequest(question, conversationId, agentConfigs);
+  } catch (error) {
+    console.error('POST request error:', error);
+    return new Response('Invalid request body', { status: 400 });
+  }
+}
+
+/**
+ * GET /api/bedrock-agents/stream (後方互換性のため維持)
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -194,14 +221,33 @@ export async function GET(request: NextRequest) {
     return new Response('Missing required parameters', { status: 400 });
   }
 
+  console.log('GET /api/bedrock-agents/stream', {
+    question: question.substring(0, 50),
+    conversationId,
+  });
+
+  return await handleStreamRequest(question, conversationId);
+}
+
+/**
+ * ストリーミングリクエストの共通処理
+ */
+async function handleStreamRequest(
+  question: string,
+  conversationId: string,
+  agentConfigs?: any
+) {
+
   // 本番環境: Python Lambda関数URLを使用
   const lambdaUrl = process.env.MAGI_PYTHON_AGENTS_LAMBDA_URL || process.env.BEDROCK_STREAMING_LAMBDA_URL;
   
   if (lambdaUrl && process.env.NODE_ENV === 'production') {
     try {
-      console.log('Using Lambda Function URL for streaming');
+      console.log('Using Lambda Function URL for streaming', {
+        hasAgentConfigs: !!agentConfigs,
+      });
       
-      // Lambda関数URLにリクエストを転送
+      // Lambda関数URLにリクエストを転送（エージェント設定を含む）
       const response = await fetch(lambdaUrl, {
         method: 'POST',
         headers: {
@@ -210,6 +256,7 @@ export async function GET(request: NextRequest) {
         body: JSON.stringify({
           question,
           conversationId,
+          agentConfigs, // エージェント設定を送信
         }),
       });
 
@@ -225,7 +272,7 @@ export async function GET(request: NextRequest) {
           'Connection': 'keep-alive',
           // CORS設定を追加
           'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type, Accept',
           'Access-Control-Expose-Headers': 'Content-Type',
         },
@@ -237,7 +284,15 @@ export async function GET(request: NextRequest) {
   }
 
   // 開発環境またはフォールバック: モックデータでストリーミング
-  console.log('Using mock data for streaming');
+  console.log('Using mock data for streaming', {
+    hasAgentConfigs: !!agentConfigs,
+    models: agentConfigs ? {
+      caspar: agentConfigs.caspar?.model,
+      balthasar: agentConfigs.balthasar?.model,
+      melchior: agentConfigs.melchior?.model,
+      solomon: agentConfigs.solomon?.model,
+    } : null,
+  });
   
   const stream = new ReadableStream({
     async start(controller) {
@@ -271,7 +326,7 @@ export async function GET(request: NextRequest) {
       'Connection': 'keep-alive',
       // CORS設定を追加
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Accept',
       'Access-Control-Expose-Headers': 'Content-Type',
     },
