@@ -105,16 +105,21 @@ class MAGIAgentCore:
         
         self.execution_stats["total_requests"] += 1
         
+        # エラー情報を収集するリスト
+        execution_errors = []
+        
         try:
             print(f"🧠 MAGI Decision Process Started")
             print(f"   Question: {request.question}")
             print(f"   Trace ID: {trace_id}")
             
             # Step 1: 3賢者による並列分析
-            sage_responses = await self._consult_three_sages(request.question, trace_id)
+            sage_responses, sage_errors = await self._consult_three_sages(request.question, trace_id)
+            execution_errors.extend(sage_errors)
             
             # Step 2: SOLOMON Judgeによる統合評価
-            judge_response = await self._solomon_judgment(sage_responses, request.question, trace_id)
+            judge_response, judge_errors = await self._solomon_judgment(sage_responses, request.question, trace_id)
+            execution_errors.extend(judge_errors)
             
             # Step 3: 結果の統合
             end_time = datetime.now()
@@ -139,6 +144,10 @@ class MAGIAgentCore:
                     )
                     sage_responses.append(dummy_response)
             
+            # エラー情報の分析
+            has_errors = len(execution_errors) > 0
+            degraded_mode = has_errors and len(sage_responses) < 3
+            
             response = MAGIDecisionResponse(
                 request_id=f"magi_{int(start_time.timestamp())}",
                 trace_id=trace_id,
@@ -146,6 +155,9 @@ class MAGIAgentCore:
                 judge_response=judge_response,
                 total_execution_time=total_execution_time,
                 trace_steps=[],  # 簡略化
+                errors=execution_errors,
+                has_errors=has_errors,
+                degraded_mode=degraded_mode,
                 timestamp=start_time,
                 version="1.0-agentcore"
             )
@@ -154,9 +166,15 @@ class MAGIAgentCore:
             self.execution_stats["successful_requests"] += 1
             self.execution_stats["total_execution_time"] += total_execution_time
             
+            # ログ出力
             print(f"✅ MAGI Decision Complete ({total_execution_time}ms)")
             print(f"   Final Decision: {judge_response.final_decision.value}")
             print(f"   Voting: {judge_response.voting_result.approved}可決 / {judge_response.voting_result.rejected}否決")
+            
+            if has_errors:
+                print(f"   ⚠️  Errors encountered: {len(execution_errors)}")
+                if degraded_mode:
+                    print(f"   🔄 Running in degraded mode (partial results)")
             
             return response
             
@@ -165,30 +183,56 @@ class MAGIAgentCore:
             print(f"❌ MAGI Decision Failed: {e}")
             raise
     
-    async def _consult_three_sages(self, question: str, trace_id: str) -> list[AgentResponse]:
-        """3賢者による並列分析"""
+    async def _consult_three_sages(self, question: str, trace_id: str) -> tuple[list[AgentResponse], list]:
+        """
+        3賢者による並列分析
+        
+        Returns:
+            tuple: (エージェント応答リスト, エラー情報リスト)
+        """
+        from shared.types import ExecutionError
+        
         print(f"🔮 Consulting Three Sages...")
         
         sage_types = [AgentType.CASPAR, AgentType.BALTHASAR, AgentType.MELCHIOR]
         tasks = []
+        errors = []
         
         for sage_type in sage_types:
             if self.agents.get(sage_type):
                 task = self._consult_single_sage(sage_type, question, trace_id)
-                tasks.append(task)
+                tasks.append((sage_type, task))
             else:
                 print(f"   ⚠️  {sage_type.value} not available")
+                errors.append(ExecutionError(
+                    agent_id=sage_type,
+                    error_type="AgentNotAvailable",
+                    error_message=f"{sage_type.value} agent not initialized",
+                    retry_count=0,
+                    recovered=False
+                ))
         
         # 並列実行
         if tasks:
-            responses = await asyncio.gather(*tasks, return_exceptions=True)
+            results = await asyncio.gather(*[task for _, task in tasks], return_exceptions=True)
             
-            # 成功した応答のみを収集
+            # 成功した応答とエラーを分類
             valid_responses = []
-            for i, response in enumerate(responses):
-                if isinstance(response, Exception):
-                    sage_type = sage_types[i]
-                    print(f"   ❌ {sage_type.value} failed: {response}")
+            for i, result in enumerate(results):
+                sage_type = tasks[i][0]
+                
+                if isinstance(result, Exception):
+                    print(f"   ❌ {sage_type.value} failed: {result}")
+                    
+                    # エラー情報を記録
+                    errors.append(ExecutionError(
+                        agent_id=sage_type,
+                        error_type=type(result).__name__,
+                        error_message=str(result),
+                        retry_count=0,  # リトライ回数は_consult_single_sage内で管理
+                        recovered=False
+                    ))
+                    
                     # エラー時のフォールバック応答
                     fallback_response = AgentResponse(
                         agent_id=sage_type,
@@ -201,56 +245,87 @@ class MAGIAgentCore:
                     )
                     valid_responses.append(fallback_response)
                 else:
-                    valid_responses.append(response)
+                    valid_responses.append(result)
             
-            return valid_responses
+            return valid_responses, errors
         else:
             print("   ❌ No sages available")
-            return []
+            return [], errors
     
-    async def _consult_single_sage(self, sage_type: AgentType, question: str, trace_id: str) -> AgentResponse:
-        """個別の賢者に相談"""
+    async def _consult_single_sage(self, sage_type: AgentType, question: str, trace_id: str, max_retries: int = 2) -> AgentResponse:
+        """
+        個別の賢者に相談（リトライ機構付き）
+        
+        Args:
+            sage_type: エージェントタイプ
+            question: 質問内容
+            trace_id: トレースID
+            max_retries: 最大リトライ回数（デフォルト: 2）
+            
+        Returns:
+            AgentResponse: エージェントの応答
+        """
         agent = self.agents.get(sage_type)
         if not agent:
             raise Exception(f"{sage_type.value} not initialized")
         
-        start_time = datetime.now()
+        last_error = None
         
-        try:
-            # システムプロンプト + 質問を組み合わせ
-            system_prompt = get_agent_prompt(sage_type.value)
-            full_prompt = f"{system_prompt}\n\n## 質問\n{question}\n\n上記の質問について、あなたの視点から分析し、指定されたJSON形式で回答してください。"
+        # リトライループ
+        for attempt in range(max_retries + 1):
+            start_time = datetime.now()
             
-            print(f"   🤖 Consulting {sage_type.value.upper()}...")
-            
-            # Strands Agent呼び出し
-            result = agent(full_prompt)
-            
-            end_time = datetime.now()
-            execution_time = int((end_time - start_time).total_seconds() * 1000)
-            
-            # レスポンス解析
-            response_text = str(result)
-            parsed_response = self._parse_sage_response(response_text, sage_type, execution_time)
-            
-            print(f"   ✅ {sage_type.value.upper()}: {parsed_response.decision.value} (confidence: {parsed_response.confidence:.2f})")
-            
-            return parsed_response
-            
-        except Exception as e:
-            end_time = datetime.now()
-            execution_time = int((end_time - start_time).total_seconds() * 1000)
-            print(f"   ❌ {sage_type.value.upper()} error: {e}")
-            
-            return AgentResponse(
-                agent_id=sage_type,
-                decision=DecisionType.REJECTED,
-                content=f"エラー: {str(e)}",
-                reasoning="実行エラーによる自動否決",
-                confidence=0.0,
-                execution_time=execution_time,
-                timestamp=datetime.now()
-            )
+            try:
+                # リトライ時のログ
+                if attempt > 0:
+                    print(f"   🔄 Retrying {sage_type.value.upper()} (attempt {attempt + 1}/{max_retries + 1})...")
+                else:
+                    print(f"   🤖 Consulting {sage_type.value.upper()}...")
+                
+                # システムプロンプト + 質問を組み合わせ
+                system_prompt = get_agent_prompt(sage_type.value)
+                full_prompt = f"{system_prompt}\n\n## 質問\n{question}\n\n上記の質問について、あなたの視点から分析し、指定されたJSON形式で回答してください。"
+                
+                # Strands Agent呼び出し
+                result = agent(full_prompt)
+                
+                end_time = datetime.now()
+                execution_time = int((end_time - start_time).total_seconds() * 1000)
+                
+                # レスポンス解析
+                response_text = str(result)
+                parsed_response = self._parse_sage_response(response_text, sage_type, execution_time)
+                
+                # 成功ログ
+                retry_info = f" (after {attempt} retries)" if attempt > 0 else ""
+                print(f"   ✅ {sage_type.value.upper()}: {parsed_response.decision.value} (confidence: {parsed_response.confidence:.2f}){retry_info}")
+                
+                return parsed_response
+                
+            except Exception as e:
+                end_time = datetime.now()
+                execution_time = int((end_time - start_time).total_seconds() * 1000)
+                last_error = e
+                
+                # 最後のリトライでない場合は継続
+                if attempt < max_retries:
+                    print(f"   ⚠️  {sage_type.value.upper()} error (attempt {attempt + 1}): {e}")
+                    # 指数バックオフ（1秒、2秒）
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                else:
+                    # 最終的に失敗
+                    print(f"   ❌ {sage_type.value.upper()} failed after {max_retries + 1} attempts: {e}")
+                    
+                    return AgentResponse(
+                        agent_id=sage_type,
+                        decision=DecisionType.REJECTED,
+                        content=f"エラー: {str(last_error)}",
+                        reasoning=f"{max_retries + 1}回の試行後も実行エラーが継続したため自動否決",
+                        confidence=0.0,
+                        execution_time=execution_time,
+                        timestamp=datetime.now()
+                    )
     
     def _parse_sage_response(self, response_text: str, agent_id: AgentType, execution_time: int) -> AgentResponse:
         """賢者の応答を解析"""
@@ -303,20 +378,51 @@ class MAGIAgentCore:
             timestamp=datetime.now()
         )
     
-    async def _solomon_judgment(self, sage_responses: list[AgentResponse], question: str, trace_id: str) -> JudgeResponse:
-        """SOLOMON Judgeによる統合評価"""
+    async def _solomon_judgment(self, sage_responses: list[AgentResponse], question: str, trace_id: str, max_retries: int = 2) -> tuple[JudgeResponse, list]:
+        """
+        SOLOMON Judgeによる統合評価（リトライ機構付き）
+        
+        Args:
+            sage_responses: 3賢者の応答リスト
+            question: 元の質問
+            trace_id: トレースID
+            max_retries: 最大リトライ回数（デフォルト: 2）
+            
+        Returns:
+            tuple: (統合評価結果, エラー情報リスト)
+        """
+        from shared.types import ExecutionError
+        
         print(f"⚖️  SOLOMON Judge Evaluation...")
         
+        errors = []
         solomon_agent = self.agents.get(AgentType.SOLOMON)
+        
         if not solomon_agent:
-            return self._create_fallback_judgment(sage_responses)
+            print(f"   ⚠️  SOLOMON not available, using fallback judgment")
+            errors.append(ExecutionError(
+                agent_id=AgentType.SOLOMON,
+                error_type="AgentNotAvailable",
+                error_message="SOLOMON agent not initialized",
+                retry_count=0,
+                recovered=False
+            ))
+            return self._create_fallback_judgment(sage_responses), errors
         
-        start_time = datetime.now()
+        last_error = None
         
-        try:
-            # 3賢者の結果をまとめたプロンプト作成
-            sage_summary = self._create_sage_summary(sage_responses)
-            solomon_prompt = f"""
+        # リトライループ
+        for attempt in range(max_retries + 1):
+            start_time = datetime.now()
+            
+            try:
+                # リトライ時のログ
+                if attempt > 0:
+                    print(f"   🔄 Retrying SOLOMON (attempt {attempt + 1}/{max_retries + 1})...")
+                
+                # 3賢者の結果をまとめたプロンプト作成
+                sage_summary = self._create_sage_summary(sage_responses)
+                solomon_prompt = f"""
 {get_agent_prompt('solomon')}
 
 ## 元の質問
@@ -327,23 +433,56 @@ class MAGIAgentCore:
 
 上記の3賢者の判断を評価し、統合判断を行ってください。指定されたJSON形式で回答してください。
 """
-            
-            # SOLOMON Agent呼び出し
-            result = solomon_agent(solomon_prompt)
-            end_time = datetime.now()
-            execution_time = int((end_time - start_time).total_seconds() * 1000)
-            
-            # レスポンス解析
-            response_text = str(result)
-            judge_response = self._parse_solomon_response(response_text, sage_responses, execution_time)
-            
-            print(f"   ✅ SOLOMON: {judge_response.final_decision.value} (confidence: {judge_response.confidence:.2f})")
-            
-            return judge_response
-            
-        except Exception as e:
-            print(f"   ❌ SOLOMON error: {e}")
-            return self._create_fallback_judgment(sage_responses)
+                
+                # SOLOMON Agent呼び出し
+                result = solomon_agent(solomon_prompt)
+                end_time = datetime.now()
+                execution_time = int((end_time - start_time).total_seconds() * 1000)
+                
+                # レスポンス解析
+                response_text = str(result)
+                judge_response = self._parse_solomon_response(response_text, sage_responses, execution_time)
+                
+                # 成功ログ
+                retry_info = f" (after {attempt} retries)" if attempt > 0 else ""
+                print(f"   ✅ SOLOMON: {judge_response.final_decision.value} (confidence: {judge_response.confidence:.2f}){retry_info}")
+                
+                # リトライで回復した場合はエラー情報に記録
+                if attempt > 0:
+                    errors.append(ExecutionError(
+                        agent_id=AgentType.SOLOMON,
+                        error_type="TemporaryFailure",
+                        error_message=f"Recovered after {attempt} retries",
+                        retry_count=attempt,
+                        recovered=True
+                    ))
+                
+                return judge_response, errors
+                
+            except Exception as e:
+                last_error = e
+                
+                # 最後のリトライでない場合は継続
+                if attempt < max_retries:
+                    print(f"   ⚠️  SOLOMON error (attempt {attempt + 1}): {e}")
+                    # 指数バックオフ（1秒、2秒）
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                else:
+                    # 最終的に失敗 - フォールバック判断を使用
+                    print(f"   ❌ SOLOMON failed after {max_retries + 1} attempts: {e}")
+                    print(f"   🔄 Using fallback judgment based on sage votes")
+                    
+                    # エラー情報を記録
+                    errors.append(ExecutionError(
+                        agent_id=AgentType.SOLOMON,
+                        error_type=type(last_error).__name__,
+                        error_message=str(last_error),
+                        retry_count=max_retries,
+                        recovered=False
+                    ))
+                    
+                    return self._create_fallback_judgment(sage_responses), errors
     
     def _create_sage_summary(self, sage_responses: list[AgentResponse]) -> str:
         """3賢者の結果要約を作成"""
