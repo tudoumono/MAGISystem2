@@ -21,7 +21,9 @@ const schema = a.schema({
       tavilyApiKey: a.string(), // 暗号化推奨
       serperApiKey: a.string(), // フォールバック用
       enableWebSearch: a.boolean().default(false),
-      searchProvider: a.enum(['tavily', 'serper']),
+      // enum型の.default()は非対応のため、string型を使用
+      // アプリケーション層でバリデーションを実施
+      searchProvider: a.string().default('tavily'),
       createdAt: a.datetime().required(),
       updatedAt: a.datetime().required(),
       user: a.belongsTo('User', 'userId'),
