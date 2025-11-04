@@ -1,8 +1,7 @@
 import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
-import { bedrockAgentStreaming } from './functions/bedrock-agent-streaming/resource';
-import { magiPythonAgents } from './functions/magi-python-agents/resource';
+import { magiStrandsAgents } from './functions/magi-strands-agents/resource';
 
 /**
  * Amplify Gen2 Backend Configuration
@@ -29,34 +28,19 @@ import { magiPythonAgents } from './functions/magi-python-agents/resource';
 const backend = defineBackend({
   auth,
   data,
-  bedrockAgentStreaming,
-  magiPythonAgents,
+  magiStrandsAgents,
 });
 
 // Bedrockへのアクセス権限を付与
-backend.bedrockAgentStreaming.resources.lambda.addToRolePolicy(
-  new (await import('aws-cdk-lib/aws-iam')).PolicyStatement({
-    actions: [
-      'bedrock:InvokeModel',
-      'bedrock:InvokeModelWithResponseStream',
-      'bedrock:InvokeAgent',
-    ],
-    resources: [
-      'arn:aws:bedrock:ap-northeast-1::foundation-model/anthropic.claude-*',
-      'arn:aws:bedrock:ap-northeast-1:*:agent/*',
-      'arn:aws:bedrock:ap-northeast-1:*:agent-alias/*',
-    ],
-  })
-);
-
-backend.magiPythonAgents.resources.lambda.addToRolePolicy(
+backend.magiStrandsAgents.resources.lambda.addToRolePolicy(
   new (await import('aws-cdk-lib/aws-iam')).PolicyStatement({
     actions: [
       'bedrock:InvokeModel',
       'bedrock:InvokeModelWithResponseStream',
     ],
     resources: [
-      'arn:aws:bedrock:ap-northeast-1::foundation-model/anthropic.claude-*',
+      'arn:aws:bedrock:ap-northeast-1::foundation-model/*',
+      'arn:aws:bedrock:us-east-1::foundation-model/*',
     ],
   })
 );
@@ -66,14 +50,14 @@ backend.magiPythonAgents.resources.lambda.addToRolePolicy(
 //
 // 1. Function URLを作成:
 // aws lambda create-function-url-config \
-//   --function-name amplify-d34f7t08qc7jiy-ma-bedrockagentstreaminglam-PJ8OPi3YSqwc \
+//   --function-name <function-name> \
 //   --auth-type NONE \
 //   --cors '{"AllowCredentials":false,"AllowHeaders":["*"],"AllowMethods":["POST"],"AllowOrigins":["*"],"MaxAge":86400}' \
 //   --region ap-northeast-1
 //
 // 2. Response Streamingを有効化:
 // aws lambda update-function-configuration \
-//   --function-name amplify-d34f7t08qc7jiy-ma-bedrockagentstreaminglam-PJ8OPi3YSqwc \
+//   --function-name <function-name> \
 //   --invoke-mode RESPONSE_STREAM \
 //   --region ap-northeast-1
 
