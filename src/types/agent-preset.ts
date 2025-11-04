@@ -16,11 +16,33 @@ export type AgentType = 'caspar' | 'balthasar' | 'melchior' | 'solomon';
  * 利用可能なBedrockモデル
  */
 export type BedrockModel = 
+  // Claude 4系（最新）
+  | 'anthropic.claude-opus-4-1-20250805-v1:0'
+  | 'anthropic.claude-sonnet-4-20250514-v1:0'
+  | 'anthropic.claude-sonnet-4-5-20250929-v1:0'
+  | 'anthropic.claude-haiku-4-5-20251001-v1:0'
+  | 'anthropic.claude-3-7-sonnet-20250219-v1:0'
+  // Claude 3.5系
   | 'anthropic.claude-3-5-sonnet-20241022-v2:0'
   | 'anthropic.claude-3-5-sonnet-20240620-v1:0'
+  | 'anthropic.claude-3-5-haiku-20241022-v1:0'
+  // Claude 3系
   | 'anthropic.claude-3-opus-20240229-v1:0'
   | 'anthropic.claude-3-sonnet-20240229-v1:0'
-  | 'anthropic.claude-3-haiku-20240307-v1:0';
+  | 'anthropic.claude-3-haiku-20240307-v1:0'
+  // Amazon Nova系
+  | 'amazon.nova-premier-v1:0'
+  | 'amazon.nova-pro-v1:0'
+  | 'amazon.nova-lite-v1:0'
+  | 'amazon.nova-micro-v1:0'
+  // Meta Llama系
+  | 'meta.llama4-scout-17b-instruct-v1:0'
+  | 'meta.llama3-3-70b-instruct-v1:0'
+  | 'meta.llama3-2-90b-instruct-v1:0'
+  // その他
+  | 'deepseek.r1-v1:0'
+  | 'cohere.command-r-plus-v1:0'
+  | 'mistral.pixtral-large-2502-v1:0';
 
 /**
  * 個別エージェントの設定
@@ -89,7 +111,7 @@ export const DEFAULT_MAGI_PRESET: AgentPresetConfig = {
 2. 理由: 判断の根拠を簡潔に説明
 3. 詳細分析: リスク、コスト、実装計画
 4. 確信度: 0.0-1.0の数値`,
-      model: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+      model: 'anthropic.claude-3-7-sonnet-20250219-v1:0',
       temperature: 0.3,
       maxTokens: 2000,
       topP: 0.9,
@@ -118,7 +140,7 @@ export const DEFAULT_MAGI_PRESET: AgentPresetConfig = {
 2. 理由: 判断の根拠を簡潔に説明
 3. 詳細分析: 革新性、倫理性、ユーザー価値
 4. 確信度: 0.0-1.0の数値`,
-      model: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+      model: 'amazon.nova-pro-v1:0',
       temperature: 0.7,
       maxTokens: 2000,
       topP: 0.95,
@@ -147,7 +169,7 @@ export const DEFAULT_MAGI_PRESET: AgentPresetConfig = {
 2. 理由: 判断の根拠を簡潔に説明
 3. 詳細分析: データ分析、論理的評価、比較検討
 4. 確信度: 0.0-1.0の数値`,
-      model: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+      model: 'anthropic.claude-sonnet-4-5-20250929-v1:0',
       temperature: 0.5,
       maxTokens: 2000,
       topP: 0.92,
@@ -177,7 +199,7 @@ export const DEFAULT_MAGI_PRESET: AgentPresetConfig = {
 3. 各賢者のスコア: 0-100点 + 理由
 4. 統合判断: 最終的な推奨事項
 5. 確信度: 0.0-1.0の数値`,
-      model: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+      model: 'anthropic.claude-opus-4-1-20250805-v1:0',
       temperature: 0.4,
       maxTokens: 3000,
       topP: 0.9,
@@ -189,30 +211,148 @@ export const DEFAULT_MAGI_PRESET: AgentPresetConfig = {
 /**
  * 利用可能なBedrockモデルのリスト
  */
-export const AVAILABLE_MODELS: Array<{ value: BedrockModel; label: string; description: string }> = [
+export const AVAILABLE_MODELS: Array<{ 
+  value: BedrockModel; 
+  label: string; 
+  description: string;
+  provider: string;
+  tier: 'premium' | 'standard' | 'economy';
+}> = [
+  // === Claude 4系（最新・推奨） ===
+  {
+    value: 'anthropic.claude-opus-4-1-20250805-v1:0',
+    label: 'Claude Opus 4.1 ⭐',
+    description: '最高性能。複雑な推論・評価に最適',
+    provider: 'Anthropic',
+    tier: 'premium',
+  },
+  {
+    value: 'anthropic.claude-sonnet-4-5-20250929-v1:0',
+    label: 'Claude Sonnet 4.5 🔥',
+    description: '高速かつ高品質。推奨バランス型',
+    provider: 'Anthropic',
+    tier: 'standard',
+  },
+  {
+    value: 'anthropic.claude-haiku-4-5-20251001-v1:0',
+    label: 'Claude Haiku 4.5 ⚡',
+    description: '高速・低コスト。リアルタイム向け',
+    provider: 'Anthropic',
+    tier: 'economy',
+  },
+  {
+    value: 'anthropic.claude-3-7-sonnet-20250219-v1:0',
+    label: 'Claude 3.7 Sonnet',
+    description: '最新改善版。安定性重視',
+    provider: 'Anthropic',
+    tier: 'standard',
+  },
+  
+  // === Claude 3.5系 ===
   {
     value: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
-    label: 'Claude 3.5 Sonnet v2 (最新)',
-    description: '最新版。バランスの取れた性能とコスト',
+    label: 'Claude 3.5 Sonnet v2',
+    description: 'バランス型。実績あり',
+    provider: 'Anthropic',
+    tier: 'standard',
   },
   {
-    value: 'anthropic.claude-3-5-sonnet-20240620-v1:0',
-    label: 'Claude 3.5 Sonnet v1',
-    description: '前バージョン。安定性重視',
+    value: 'anthropic.claude-3-5-haiku-20241022-v1:0',
+    label: 'Claude 3.5 Haiku',
+    description: '高速。テキスト専用',
+    provider: 'Anthropic',
+    tier: 'economy',
   },
+  
+  // === Claude 3系（レガシー） ===
   {
     value: 'anthropic.claude-3-opus-20240229-v1:0',
     label: 'Claude 3 Opus',
-    description: '最高性能。複雑なタスクに最適',
-  },
-  {
-    value: 'anthropic.claude-3-sonnet-20240229-v1:0',
-    label: 'Claude 3 Sonnet',
-    description: 'バランス型。一般的な用途に最適',
+    description: '旧最高性能モデル',
+    provider: 'Anthropic',
+    tier: 'premium',
   },
   {
     value: 'anthropic.claude-3-haiku-20240307-v1:0',
     label: 'Claude 3 Haiku',
-    description: '高速・低コスト。シンプルなタスクに最適',
+    description: '旧高速モデル',
+    provider: 'Anthropic',
+    tier: 'economy',
+  },
+  
+  // === Amazon Nova系（マルチモーダル） ===
+  {
+    value: 'amazon.nova-premier-v1:0',
+    label: 'Nova Premier 🎬',
+    description: 'マルチモーダル最高性能（画像・動画対応）',
+    provider: 'Amazon',
+    tier: 'premium',
+  },
+  {
+    value: 'amazon.nova-pro-v1:0',
+    label: 'Nova Pro 📸',
+    description: 'マルチモーダル・バランス型',
+    provider: 'Amazon',
+    tier: 'standard',
+  },
+  {
+    value: 'amazon.nova-lite-v1:0',
+    label: 'Nova Lite',
+    description: 'マルチモーダル・軽量',
+    provider: 'Amazon',
+    tier: 'economy',
+  },
+  {
+    value: 'amazon.nova-micro-v1:0',
+    label: 'Nova Micro',
+    description: '超軽量・最小コスト',
+    provider: 'Amazon',
+    tier: 'economy',
+  },
+  
+  // === Meta Llama系（オープンソース） ===
+  {
+    value: 'meta.llama4-scout-17b-instruct-v1:0',
+    label: 'Llama 4 Scout 17B',
+    description: '最新Llama 4。マルチモーダル対応',
+    provider: 'Meta',
+    tier: 'standard',
+  },
+  {
+    value: 'meta.llama3-3-70b-instruct-v1:0',
+    label: 'Llama 3.3 70B',
+    description: 'オープンソース最高峰',
+    provider: 'Meta',
+    tier: 'standard',
+  },
+  {
+    value: 'meta.llama3-2-90b-instruct-v1:0',
+    label: 'Llama 3.2 90B',
+    description: '大規模マルチモーダル',
+    provider: 'Meta',
+    tier: 'premium',
+  },
+  
+  // === その他（特化型） ===
+  {
+    value: 'deepseek.r1-v1:0',
+    label: 'DeepSeek R1 🧠',
+    description: '推論特化。Chain-of-Thought強化',
+    provider: 'DeepSeek',
+    tier: 'standard',
+  },
+  {
+    value: 'cohere.command-r-plus-v1:0',
+    label: 'Command R+ 📚',
+    description: 'RAG・検索特化。引用追跡',
+    provider: 'Cohere',
+    tier: 'standard',
+  },
+  {
+    value: 'mistral.pixtral-large-2502-v1:0',
+    label: 'Pixtral Large',
+    description: 'マルチモーダル。画像理解',
+    provider: 'Mistral',
+    tier: 'standard',
   },
 ];
