@@ -17,7 +17,8 @@
     
     // 型安全性を最大化する設定
     "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
+    // exactOptionalPropertyTypesを無効化（OpenTelemetry SDK互換性のため）
+    // "exactOptionalPropertyTypes": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
