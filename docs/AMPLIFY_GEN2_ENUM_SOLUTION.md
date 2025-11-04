@@ -2,13 +2,25 @@
 
 ## 🔍 問題の詳細
 
-### 1. Enum型の`.default()`メソッド非対応
+### 重要な確認事項
+
+**Amplify Gen 2はenum型自体はサポートしています。**
+
 ```typescript
-// ❌ エラー: Property 'default' does not exist on type 'EnumType'
+// ✅ これは動作する
+role: a.enum(['user', 'assistant']),
+
+// ❌ これはエラー: Property 'default' does not exist on type 'EnumType'
 searchProvider: a.enum(['tavily', 'serper']).default('tavily'),
 ```
 
-Amplify Gen 2のenum型は`.default()`メソッドをサポートしていません。
+### 1. Enum型の`.default()`メソッド非対応
+
+Amplify Gen 2のenum型は**`.default()`メソッドをサポートしていません**。
+
+- enum型自体は使用可能
+- しかし、デフォルト値を設定する`.default()`メソッドは存在しない
+- これが今回のビルドエラーの原因
 
 ### 2. UserSettingsモデルの型生成問題
 - `UserSettings`モデルは定義されているが、TypeScript型として認識されない
