@@ -26,6 +26,7 @@
     "@aws-amplify/backend-cli": "^1.4.0",
     "@aws-amplify/ui-react": "^6.5.0",
     "@aws-sdk/client-bedrock-agent-runtime": "^3.918.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.922.0",
     "@aws-sdk/client-cloudwatch": "^3.705.0",
     "@aws-sdk/client-cloudwatch-logs": "^3.705.0",
     "@aws-sdk/client-lambda": "^3.918.0",
