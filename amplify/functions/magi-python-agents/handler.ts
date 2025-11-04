@@ -137,11 +137,10 @@ async function consultAgent(
   const startTime = Date.now();
 
   try {
-    // Bedrock呼び出し
+    // Bedrock呼び出し（AWS公式ドキュメント準拠）
     const command = new InvokeModelWithResponseStreamCommand({
       modelId: MODEL_ID,
       contentType: 'application/json',
-      accept: 'application/json',
       body: JSON.stringify({
         anthropic_version: 'bedrock-2023-05-31',
         max_tokens: 1000,
@@ -150,7 +149,7 @@ async function consultAgent(
         messages: [
           {
             role: 'user',
-            content: question,
+            content: [{ type: 'text', text: question }],
           },
         ],
       }),
@@ -288,7 +287,6 @@ ${agentResponses
     const command = new InvokeModelWithResponseStreamCommand({
       modelId: MODEL_ID,
       contentType: 'application/json',
-      accept: 'application/json',
       body: JSON.stringify({
         anthropic_version: 'bedrock-2023-05-31',
         max_tokens: 1500,
@@ -296,7 +294,7 @@ ${agentResponses
         messages: [
           {
             role: 'user',
-            content: judgePrompt,
+            content: [{ type: 'text', text: judgePrompt }],
           },
         ],
       }),
@@ -329,14 +327,19 @@ ${agentResponses
     sendEvent(stream, 'judge_complete', undefined, {
       finalDecision: approved > rejected ? 'APPROVED' : 'REJECTED',
       votingResult: { approved, rejected, abstained: 0 },
-      scores: agentResponses.map((r, i) => ({
-        agentId: AGENT_CONFIGS[i].id,
-        score: Math.round(r.confidence * 100),
-        reasoning: r.reasoning,
-      })),
+      scores: agentResponses.map((r, i) => {
+        const agentConfig = AGENT_CONFIGS[i];
+        return {
+          agentId: agentConfig?.id || `agent-${i}`,
+          score: Math.round(r.confidence * 100),
+          reasoning: r.reasoning,
+        };
+      }),
       finalRecommendation: fullText.substring(0, 200),
       reasoning: fullText,
-      confidence: agentResponses.reduce((sum, r) => sum + r.confidence, 0) / agentResponses.length,
+      confidence:
+        agentResponses.reduce((sum, r) => sum + r.confidence, 0) /
+        agentResponses.length,
     });
   } catch (error) {
     console.error('Error in SOLOMON Judge:', error);
@@ -390,16 +393,17 @@ export const handler = awslambda.streamifyResponse(
 
       // システム開始イベント
       sendEvent(httpStream, 'system_start', undefined, {
-        message: `MAGI システム開始 (モデル: ${MODEL_ID})`,
+        message: `MAGI システム開始 (モデル: ${MODEL_ID}) - 並列実行`,
         totalAgents: AGENT_CONFIGS.length,
       });
 
-      // 3賢者を順次実行
-      const agentResponses: any[] = [];
-      for (const agent of AGENT_CONFIGS) {
-        const response = await consultAgent(agent, question, httpStream);
-        agentResponses.push(response);
-      }
+      // 3賢者を並列実行
+      console.log('Starting parallel agent execution...');
+      const agentPromises = AGENT_CONFIGS.map((agent) =>
+        consultAgent(agent, question, httpStream)
+      );
+      const agentResponses = await Promise.all(agentPromises);
+      console.log('All agents completed');
 
       // SOLOMON Judge実行
       await executeSolomonJudge(agentResponses, question, httpStream);
