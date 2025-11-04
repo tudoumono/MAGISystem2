@@ -33,6 +33,34 @@ const backend = defineBackend({
   magiPythonAgents,
 });
 
+// Bedrockへのアクセス権限を付与
+backend.bedrockAgentStreaming.resources.lambda.addToRolePolicy(
+  new (await import('aws-cdk-lib/aws-iam')).PolicyStatement({
+    actions: [
+      'bedrock:InvokeModel',
+      'bedrock:InvokeModelWithResponseStream',
+      'bedrock:InvokeAgent',
+    ],
+    resources: [
+      'arn:aws:bedrock:ap-northeast-1::foundation-model/anthropic.claude-*',
+      'arn:aws:bedrock:ap-northeast-1:*:agent/*',
+      'arn:aws:bedrock:ap-northeast-1:*:agent-alias/*',
+    ],
+  })
+);
+
+backend.magiPythonAgents.resources.lambda.addToRolePolicy(
+  new (await import('aws-cdk-lib/aws-iam')).PolicyStatement({
+    actions: [
+      'bedrock:InvokeModel',
+      'bedrock:InvokeModelWithResponseStream',
+    ],
+    resources: [
+      'arn:aws:bedrock:ap-northeast-1::foundation-model/anthropic.claude-*',
+    ],
+  })
+);
+
 // Lambda関数URLとResponse Streamingを有効化
 // Note: Amplify Gen2では手動設定が必要。デプロイ後に以下のコマンドを実行:
 //
