@@ -121,7 +121,12 @@ function parseMessageData(message: any): any {
  */
 interface SendMessageParams {
   content: string;
-  agentConfig?: any[]; // AgentConfig[]
+  agentConfigs?: {
+    caspar?: any;
+    balthasar?: any;
+    melchior?: any;
+    solomon?: any;
+  };
 }
 
 /**
@@ -279,7 +284,7 @@ export function useMessages(conversationId: string): UseMessagesReturn {
 
       // 3. エージェント実行を開始（実際の実装では外部APIを呼び出し）
       // TODO: Phase 3で実装 - 現在はモックデータを使用
-      const mockAgentResponse = await simulateAgentExecution(params.content);
+      const mockAgentResponse = await simulateAgentExecution(params.content, params.agentConfigs);
 
       // 4. エージェント応答でアシスタントメッセージを更新
       console.log('Creating assistant message with data:', {
@@ -514,9 +519,14 @@ export function useMessages(conversationId: string): UseMessagesReturn {
  * - リアルな応答時間と結果を生成
  * - 様々なシナリオ（成功、エラー、意見分裂）をサポート
  */
-async function simulateAgentExecution(question: string): Promise<AskResponse> {
+async function simulateAgentExecution(question: string, agentConfigs?: any): Promise<AskResponse> {
   // リアルな応答時間をシミュレート
   await new Promise(resolve => setTimeout(resolve, 1500));
+  
+  // エージェント設定をログ出力（デバッグ用）
+  if (agentConfigs) {
+    console.log('Agent configs for execution:', agentConfigs);
+  }
 
   return {
     conversationId: 'current-conversation',
