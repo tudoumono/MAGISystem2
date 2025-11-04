@@ -11,19 +11,18 @@ import { magiStrandsAgents } from './functions/magi-strands-agents/resource';
  * 構成要素:
  * - auth: Cognito認証設定
  * - data: DynamoDB + GraphQL API設定（UserSettings含む）
- * - bedrockAgentStreaming: Bedrock Agent Streaming Lambda関数
- * - magiPythonAgents: Strands Agents統合Lambda関数（Web検索対応）
+ * - magiStrandsAgents: Strands Agents統合Lambda関数
  *
- * Web検索統合:
- * - Strands AgentsのネイティブTavilyツール使用
- * - ユーザーごとのAPIキー管理
- * - エラー時の自動フォールバック
+ * アーキテクチャ:
+ * - AgentCore Runtime: agents/magi_agent.py（本番環境）
+ * - Strands Agents: 全エージェント統合実装
+ * - エラーハンドリング: リトライ機構と段階的機能縮退
  *
  * 学習ポイント:
  * - Amplify Gen2でのリソース統合
- * - Strands Agents + Tavily統合
- * - ユーザー設定管理
+ * - Strands Agents SDK使用
  * - Lambda Response Streamingの実装
+ * - エラーハンドリングとリトライ機構
  */
 const backend = defineBackend({
   auth,

@@ -1,8 +1,0 @@
-{
-  "name": "magi-python-agents",
-  "version": "1.0.0",
-  "type": "module",
-  "dependencies": {
-    "@aws-sdk/client-bedrock-runtime": "^3.918.0"
-  }
-}
