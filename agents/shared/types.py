@@ -158,6 +158,18 @@ class MAGIDecisionRequest(BaseModel):
         return v.strip()
 
 
+class ExecutionError(BaseModel):
+    """
+    実行エラー情報
+    """
+    agent_id: Optional[AgentType] = Field(None, description="エラーが発生したエージェント")
+    error_type: str = Field(..., description="エラータイプ")
+    error_message: str = Field(..., description="エラーメッセージ")
+    retry_count: int = Field(default=0, ge=0, description="リトライ回数")
+    timestamp: datetime = Field(default_factory=datetime.now, description="エラー発生時刻")
+    recovered: bool = Field(default=False, description="リトライで回復したか")
+
+
 class MAGIDecisionResponse(BaseModel):
     """
     MAGI意思決定システムからの応答
@@ -172,6 +184,11 @@ class MAGIDecisionResponse(BaseModel):
     # 実行情報
     total_execution_time: int = Field(..., ge=0, description="総実行時間（ミリ秒）")
     trace_steps: List[TraceStep] = Field(default_factory=list, description="実行トレース")
+    
+    # エラー情報（新規追加）
+    errors: List[ExecutionError] = Field(default_factory=list, description="実行中のエラー情報")
+    has_errors: bool = Field(default=False, description="エラーが発生したか")
+    degraded_mode: bool = Field(default=False, description="段階的機能縮退モードか")
     
     # メタデータ
     timestamp: datetime = Field(default_factory=datetime.now, description="応答生成時刻")
