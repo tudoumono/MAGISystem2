@@ -37,9 +37,12 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { MessageBubble } from '@/components/chat/MessageBubble';
+import { PresetSelector } from '@/components/chat/PresetSelector';
 import { useMessages } from '@/hooks/useMessages';
 import { useStreamingAgent } from '@/hooks/useStreamingAgent';
+import { useAgentPresets } from '@/hooks/useAgentPresets';
 import type { Message, AgentResponse } from '@/types/domain';
+import type { AgentRuntimeConfig } from '@/types/magi-request';
 
 /**
  * コンポーネントのプロパティ型定義
@@ -376,6 +379,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     stopStreaming
   } = useStreamingAgent();
 
+  // プリセット管理フックの使用
+  const { presets, getPreset } = useAgentPresets();
+  
+  // 現在のプリセット（デフォルトまたはユーザー選択）
+  const [currentPresetId, setCurrentPresetId] = useState<string>('default-magi');
+  const currentPreset = getPreset(currentPresetId) || presets[0];
+
   // 自動スクロール用のref
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -510,14 +520,47 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       console.log('Creating streaming message:', assistantMessage);
       setStreamingMessage(assistantMessage);
 
-      // ユーザー設定を取得してAPIキーを渡す
-      // TODO: useUserSettings hookを使用してAPIキーを取得
-      // const { settings } = useUserSettings();
-      // const tavilyApiKey = settings?.enableWebSearch ? settings.tavilyApiKey : undefined;
+      // プリセット設定をエージェント設定に変換
+      const agentConfigs = currentPreset ? {
+        caspar: {
+          model: currentPreset.configs.caspar.model,
+          temperature: currentPreset.configs.caspar.temperature,
+          maxTokens: currentPreset.configs.caspar.maxTokens,
+          topP: currentPreset.configs.caspar.topP,
+          systemPrompt: currentPreset.configs.caspar.systemPrompt,
+          enabled: currentPreset.configs.caspar.enabled,
+        },
+        balthasar: {
+          model: currentPreset.configs.balthasar.model,
+          temperature: currentPreset.configs.balthasar.temperature,
+          maxTokens: currentPreset.configs.balthasar.maxTokens,
+          topP: currentPreset.configs.balthasar.topP,
+          systemPrompt: currentPreset.configs.balthasar.systemPrompt,
+          enabled: currentPreset.configs.balthasar.enabled,
+        },
+        melchior: {
+          model: currentPreset.configs.melchior.model,
+          temperature: currentPreset.configs.melchior.temperature,
+          maxTokens: currentPreset.configs.melchior.maxTokens,
+          topP: currentPreset.configs.melchior.topP,
+          systemPrompt: currentPreset.configs.melchior.systemPrompt,
+          enabled: currentPreset.configs.melchior.enabled,
+        },
+        solomon: {
+          model: currentPreset.configs.solomon.model,
+          temperature: currentPreset.configs.solomon.temperature,
+          maxTokens: currentPreset.configs.solomon.maxTokens,
+          topP: currentPreset.configs.solomon.topP,
+          systemPrompt: currentPreset.configs.solomon.systemPrompt,
+          enabled: currentPreset.configs.solomon.enabled,
+        },
+      } : undefined;
 
-      // ストリーミング開始
+      console.log('Sending message with agent configs:', agentConfigs);
+
+      // ストリーミング開始（プリセット設定を渡す）
       console.log('Starting streaming...');
-      await startStreaming(content, conversationId);
+      await startStreaming(content, conversationId, agentConfigs);
       console.log('Streaming started');
 
     } catch (error) {
@@ -569,6 +612,15 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         messageCount={messages.length}
         onTitleChange={onTitleChange ? handleTitleChange : undefined}
       />
+
+      {/* プリセット選択 */}
+      {presets.length > 0 && (
+        <PresetSelector
+          presets={presets}
+          currentPresetId={currentPresetId}
+          onPresetChange={setCurrentPresetId}
+        />
+      )}
 
       {/* メッセージ一覧 */}
       <div

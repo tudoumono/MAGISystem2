@@ -49,7 +49,7 @@ interface StreamingState {
  */
 interface UseStreamingAgentReturn {
   streamingState: StreamingState;
-  startStreaming: (question: string, conversationId: string) => Promise<void>;
+  startStreaming: (question: string, conversationId: string, agentConfigs?: any) => Promise<void>;
   stopStreaming: () => void;
 }
 
@@ -71,7 +71,7 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
   /**
    * ストリーミングの開始
    */
-  const startStreaming = useCallback(async (question: string, conversationId: string) => {
+  const startStreaming = useCallback(async (question: string, conversationId: string, agentConfigs?: any) => {
     // 既存のストリーミングを停止
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
@@ -93,42 +93,61 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
     });
 
     try {
-      // SSEエンドポイントに接続
-      const url = new URL('/api/bedrock-agents/stream', window.location.origin);
-      url.searchParams.set('question', encodeURIComponent(question));
-      url.searchParams.set('conversationId', encodeURIComponent(conversationId));
+      // POSTリクエストでエージェント設定を送信
+      const response = await fetch('/api/bedrock-agents/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          question,
+          conversationId,
+          agentConfigs, // プリセット設定を送信
+        }),
+        signal: abortControllerRef.current.signal,
+      });
 
-      console.log('Starting EventSource connection to:', url.toString());
-      const eventSource = new EventSource(url.toString());
-      eventSourceRef.current = eventSource;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-      // メッセージイベントのハンドリング
-      eventSource.onmessage = (event) => {
-        try {
-          console.log('Received SSE event:', event.data);
-          const streamEvent: StreamEvent = JSON.parse(event.data);
-          handleStreamEvent(streamEvent);
-        } catch (error) {
-          console.error('Failed to parse stream event:', error, 'Raw data:', event.data);
+      // レスポンスボディをストリームとして読み取る
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('Response body is not readable');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      // ストリームを読み取る
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          console.log('Stream complete');
+          break;
         }
-      };
 
-      // 接続開始ログ
-      eventSource.onopen = () => {
-        console.log('EventSource connection opened');
-      };
+        // チャンクをデコード
+        buffer += decoder.decode(value, { stream: true });
+        
+        // 改行で分割してイベントを処理
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // 最後の不完全な行を保持
 
-      // エラーハンドリング
-      eventSource.onerror = (error) => {
-        console.error('EventSource error:', error);
-        console.error('EventSource readyState:', eventSource.readyState);
-        setStreamingState(prev => ({
-          ...prev,
-          isStreaming: false,
-          error: new Error('ストリーミング接続エラー')
-        }));
-        eventSource.close();
-      };
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = line.slice(6); // 'data: ' を削除
+              const streamEvent: StreamEvent = JSON.parse(data);
+              handleStreamEvent(streamEvent);
+            } catch (error) {
+              console.error('Failed to parse stream event:', error, 'Raw data:', line);
+            }
+          }
+        }
+      }
 
     } catch (error) {
       console.error('Failed to start streaming:', error);
