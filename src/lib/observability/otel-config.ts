@@ -17,15 +17,16 @@
  */
 
 import { NodeSDK } from '@opentelemetry/sdk-node';
-// import { Resource } from '@opentelemetry/resources';
-// import { SEMRESATTRS_SERVICE_NAME, SEMRESATTRS_SERVICE_VERSION, SEMRESATTRS_DEPLOYMENT_ENVIRONMENT, SEMRESATTRS_CLOUD_PROVIDER, SEMRESATTRS_CLOUD_REGION } from '@opentelemetry/semantic-conventions';
+import { resourceFromAttributes } from '@opentelemetry/resources';
+import {
+  SEMRESATTRS_SERVICE_NAME,
+  SEMRESATTRS_SERVICE_VERSION,
+  SEMRESATTRS_DEPLOYMENT_ENVIRONMENT
+} from '@opentelemetry/semantic-conventions';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { AWSXRayPropagator } from '@opentelemetry/propagator-aws-xray';
 import { AWSXRayIdGenerator } from '@opentelemetry/id-generator-aws-xray';
-import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-otlp-http';
-import { OTLPMetricExporter } from '@opentelemetry/exporter-otlp-http';
-import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
+import { BatchSpanProcessor, ConsoleSpanExporter } from '@opentelemetry/sdk-trace-base';
 
 /**
  * OTEL Environment Configuration
@@ -56,43 +57,19 @@ const getOTELConfig = (): OTELConfig => ({
 });
 
 /**
- * AWS X-Ray Trace Exporter Configuration
- * 
- * AWS X-RayとCloudWatchにトレースデータを送信するためのエクスポーター設定。
- * AgentCoreからのトレースIDと相関させるための重要な設定です。
+ * Trace Exporter Configuration
+ *
+ * 開発環境ではコンソールに出力し、本番環境ではX-Rayに送信します。
+ * （現在はコンソールエクスポーターのみ実装）
  */
 const createTraceExporter = (config: OTELConfig) => {
-  // AWS X-Ray用のOTLPエクスポーター
-  const otlpExporter = new OTLPTraceExporter({
-    url: config.traceExporterEndpoint || `https://otlp.${config.awsRegion}.amazonaws.com/v1/traces`,
-    headers: {
-      'x-aws-region': config.awsRegion,
-      // AgentCoreとの相関のためのヘッダー
-      'x-amzn-trace-id': '', // 実行時に動的に設定
-    },
-  });
-
-  return otlpExporter;
-};
-
-/**
- * CloudWatch Metrics Exporter Configuration
- * 
- * CloudWatchにカスタムメトリクスを送信するための設定。
- * エージェント実行時間、成功率、エラー率などを監視できます。
- */
-const createMetricsExporter = (config: OTELConfig) => {
-  return new OTLPMetricExporter({
-    url: config.metricsExporterEndpoint || `https://otlp.${config.awsRegion}.amazonaws.com/v1/metrics`,
-    headers: {
-      'x-aws-region': config.awsRegion,
-    },
-  });
+  // 開発環境ではコンソールエクスポーターを使用
+  return new ConsoleSpanExporter();
 };
 
 /**
  * OpenTelemetry SDK Initialization
- * 
+ *
  * Next.js アプリケーション用のOpenTelemetry SDKを初期化します。
  * この設定により、フロントエンドからの全てのリクエストがトレースされ、
  * AgentCoreでの実行と相関付けられます。
@@ -103,14 +80,45 @@ export const initializeOTEL = (): NodeSDK | null => {
     return null;
   }
 
-  // 一時的にOTELを無効化（ビルドエラー回避）
-  console.log('🔍 OpenTelemetry is temporarily disabled for build');
-  return null;
+  const config = getOTELConfig();
 
-  // 一時的にNodeSDK初期化をコメントアウト（ビルドエラー回避）
-  // const config = getOTELConfig();
-  // const sdk = new NodeSDK({ ... });
-  // return sdk;
+  // リソース設定
+  const resource = resourceFromAttributes({
+    [SEMRESATTRS_SERVICE_NAME]: config.serviceName,
+    [SEMRESATTRS_SERVICE_VERSION]: config.serviceVersion,
+    [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: config.environment,
+  });
+
+  // トレースエクスポーター設定（現在はコンソールのみ）
+  const traceExporter = createTraceExporter(config);
+
+  // NodeSDK初期化
+  const sdk = new NodeSDK({
+    resource,
+    spanProcessor: new BatchSpanProcessor(traceExporter),
+    instrumentations: [
+      getNodeAutoInstrumentations({
+        // HTTP/HTTPSリクエストの自動計装
+        '@opentelemetry/instrumentation-http': {
+          enabled: true,
+        },
+        // その他の自動計装を有効化
+        '@opentelemetry/instrumentation-fs': {
+          enabled: false, // ファイルシステムは無効化（パフォーマンスのため）
+        },
+      }),
+    ],
+    textMapPropagator: new AWSXRayPropagator(),
+    idGenerator: new AWSXRayIdGenerator(),
+  });
+
+  console.log('🔍 OpenTelemetry SDK initialized:', {
+    serviceName: config.serviceName,
+    environment: config.environment,
+    samplingRate: config.samplingRate,
+  });
+
+  return sdk;
 };
 
 /**

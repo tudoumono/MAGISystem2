@@ -1,27 +1,26 @@
 /**
  * AWS X-Ray Integration for MAGI Decision UI
- * 
- * このファイルはAWS X-Rayとの統合機能を提供します。
- * 分散トレーシング、セグメント管理、サブセグメント作成などの機能を含みます。
- * 
+ *
+ * このファイルはOpenTelemetry APIを使用したAWS X-Ray統合機能を提供します。
+ * 分散トレーシング、スパン管理、サブスパン作成などの機能を含みます。
+ *
  * 主要機能:
- * - X-Rayセグメントの作成と管理
+ * - OpenTelemetryスパンの作成と管理
  * - AgentCoreとのトレース相関
- * - カスタムサブセグメントの追加
+ * - カスタムスパンの追加
  * - エラートレーシング
- * 
+ *
  * 学習ポイント:
- * - AWS X-Rayの分散トレーシング概念
- * - セグメントとサブセグメントの使い分け
+ * - OpenTelemetryによるAWS X-Rayの分散トレーシング概念
+ * - スパンとサブスパンの使い分け
  * - トレースIDの伝播メカニズム
  */
 
-import AWSXRay from 'aws-xray-sdk-core';
-import { Segment, Subsegment } from 'aws-xray-sdk-core';
+import { trace, context, SpanStatusCode, Span } from '@opentelemetry/api';
 
 /**
  * X-Ray Configuration
- * 
+ *
  * AWS X-Rayの設定を管理します。
  * 環境に応じて適切な設定を適用します。
  */
@@ -29,25 +28,18 @@ interface XRayConfig {
   serviceName: string;
   enabled: boolean;
   samplingRate: number;
-  captureAWS: boolean;
-  captureHTTPS: boolean;
-  capturePromises: boolean;
 }
 
 const getXRayConfig = (): XRayConfig => ({
   serviceName: process.env.XRAY_SERVICE_NAME || 'magi-decision-ui',
   enabled: process.env.XRAY_ENABLED !== 'false',
   samplingRate: parseFloat(process.env.XRAY_SAMPLING_RATE || '0.1'),
-  captureAWS: process.env.XRAY_CAPTURE_AWS !== 'false',
-  captureHTTPS: process.env.XRAY_CAPTURE_HTTPS !== 'false',
-  capturePromises: process.env.XRAY_CAPTURE_PROMISES !== 'false',
 });
 
 /**
- * Initialize X-Ray SDK
- * 
- * X-Ray SDKを初期化します。
- * AWS SDKの自動計装も含まれます。
+ * Initialize X-Ray Integration
+ *
+ * OpenTelemetry経由でX-Ray統合を初期化します。
  */
 export const initializeXRay = (): void => {
   const config = getXRayConfig();
@@ -57,57 +49,7 @@ export const initializeXRay = (): void => {
     return;
   }
 
-  // X-Ray設定
-  AWSXRay.config([
-    AWSXRay.plugins.ECSPlugin,
-    AWSXRay.plugins.EC2Plugin,
-  ]);
-
-  // AWS SDKの自動計装
-  if (config.captureAWS) {
-    const AWS = require('aws-sdk');
-    AWSXRay.captureAWS(AWS);
-  }
-
-  // HTTPSリクエストの自動計装
-  if (config.captureHTTPS) {
-    AWSXRay.captureHTTPsGlobal(require('https'));
-    AWSXRay.captureHTTPsGlobal(require('http'));
-  }
-
-  // Promiseの自動計装
-  if (config.capturePromises) {
-    AWSXRay.capturePromise();
-  }
-
-  // サンプリングルールの設定
-  AWSXRay.middleware.setSamplingRules({
-    version: 2,
-    default: {
-      fixed_target: 1,
-      rate: config.samplingRate,
-    },
-    rules: [
-      {
-        description: 'MAGI Agent Execution',
-        service_name: config.serviceName,
-        http_method: 'POST',
-        url_path: '/api/agents/*',
-        fixed_target: 2,
-        rate: 0.5, // エージェント実行は50%サンプリング
-      },
-      {
-        description: 'SOLOMON Evaluation',
-        service_name: config.serviceName,
-        http_method: 'POST',
-        url_path: '/api/solomon/*',
-        fixed_target: 2,
-        rate: 0.8, // SOLOMON評価は80%サンプリング
-      },
-    ],
-  });
-
-  console.log('🔍 X-Ray tracing initialized:', {
+  console.log('🔍 X-Ray tracing initialized via OpenTelemetry:', {
     serviceName: config.serviceName,
     samplingRate: config.samplingRate,
   });
@@ -115,7 +57,7 @@ export const initializeXRay = (): void => {
 
 /**
  * MAGI Trace Context
- * 
+ *
  * MAGIシステム固有のトレースコンテキスト情報。
  * エージェント実行とSOLOMON評価の詳細を追跡します。
  */
@@ -131,12 +73,13 @@ export interface MAGITraceContext {
 
 /**
  * MAGI Trace Manager
- * 
+ *
  * MAGIシステム専用のトレース管理クラス。
  * エージェント実行とSOLOMON評価の詳細なトレーシングを提供します。
  */
 export class MAGITraceManager {
   private readonly serviceName: string;
+  private readonly tracer = trace.getTracer('magi-decision-ui');
 
   constructor() {
     this.serviceName = getXRayConfig().serviceName;
@@ -144,200 +87,175 @@ export class MAGITraceManager {
 
   /**
    * Create Agent Execution Trace
-   * 
-   * エージェント実行用のトレースセグメントを作成します。
+   *
+   * エージェント実行用のトレーススパンを作成します。
    * 3賢者の並列実行を適切にトレースします。
    */
   async traceAgentExecution<T>(
-    context: MAGITraceContext,
+    traceContext: MAGITraceContext,
     agentId: string,
     operation: () => Promise<T>
   ): Promise<T> {
-    const segmentName = `${this.serviceName}-agent-${agentId}`;
-    
-    return AWSXRay.captureAsyncFunc(segmentName, async (subsegment) => {
-      if (!subsegment) {
-        return operation();
-      }
+    const spanName = `agent-execution-${agentId}`;
 
-      // セグメントにMAGI固有の情報を追加
-      subsegment.addAnnotation('agentId', agentId);
-      subsegment.addAnnotation('conversationId', context.conversationId);
-      subsegment.addAnnotation('messageId', context.messageId);
-      subsegment.addAnnotation('executionMode', context.executionMode);
-      
-      if (context.sessionId) {
-        subsegment.addAnnotation('sessionId', context.sessionId);
-      }
-      
-      if (context.userId) {
-        subsegment.addAnnotation('userId', context.userId);
-      }
-
-      // メタデータの追加
-      subsegment.addMetadata('magi', {
-        agentType: this.getAgentType(agentId),
-        agentDescription: this.getAgentDescription(agentId),
-        totalAgents: context.agentIds.length,
-        solomonEnabled: context.solomonEnabled,
-      });
-
+    return this.tracer.startActiveSpan(spanName, async (span: Span) => {
       try {
+        // スパンにMAGI固有の属性を追加
+        span.setAttribute('agent.id', agentId);
+        span.setAttribute('conversation.id', traceContext.conversationId);
+        span.setAttribute('message.id', traceContext.messageId);
+        span.setAttribute('execution.mode', traceContext.executionMode);
+        span.setAttribute('agent.type', this.getAgentType(agentId));
+        span.setAttribute('agent.description', this.getAgentDescription(agentId));
+        span.setAttribute('total.agents', traceContext.agentIds.length);
+        span.setAttribute('solomon.enabled', traceContext.solomonEnabled);
+
+        if (traceContext.sessionId) {
+          span.setAttribute('session.id', traceContext.sessionId);
+        }
+
+        if (traceContext.userId) {
+          span.setAttribute('user.id', traceContext.userId);
+        }
+
         const startTime = Date.now();
         const result = await operation();
         const endTime = Date.now();
 
         // 成功メトリクスの追加
-        subsegment.addMetadata('execution', {
-          success: true,
-          duration: endTime - startTime,
-          timestamp: new Date().toISOString(),
-        });
+        span.setAttribute('execution.success', true);
+        span.setAttribute('execution.duration', endTime - startTime);
+        span.setStatus({ code: SpanStatusCode.OK });
 
         return result;
       } catch (error) {
         // エラー情報の追加
-        subsegment.addError(error as Error);
-        subsegment.addMetadata('execution', {
-          success: false,
-          error: {
-            name: (error as Error).name,
-            message: (error as Error).message,
-          },
-          timestamp: new Date().toISOString(),
+        span.recordException(error as Error);
+        span.setAttribute('execution.success', false);
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: (error as Error).message
         });
 
         throw error;
+      } finally {
+        span.end();
       }
     });
   }
 
   /**
    * Create SOLOMON Evaluation Trace
-   * 
-   * SOLOMON Judge評価用のトレースセグメントを作成します。
+   *
+   * SOLOMON Judge評価用のトレーススパンを作成します。
    * 3賢者の回答統合プロセスを詳細にトレースします。
    */
   async traceSolomonEvaluation<T>(
-    context: MAGITraceContext,
+    traceContext: MAGITraceContext,
     agentResponses: any[],
     operation: () => Promise<T>
   ): Promise<T> {
-    const segmentName = `${this.serviceName}-solomon-judge`;
-    
-    return AWSXRay.captureAsyncFunc(segmentName, async (subsegment) => {
-      if (!subsegment) {
-        return operation();
-      }
+    const spanName = 'solomon-judge-evaluation';
 
-      // SOLOMON固有の情報を追加
-      subsegment.addAnnotation('component', 'solomon-judge');
-      subsegment.addAnnotation('conversationId', context.conversationId);
-      subsegment.addAnnotation('messageId', context.messageId);
-      subsegment.addAnnotation('agentResponseCount', agentResponses.length);
-
-      // 3賢者の回答サマリーを追加
-      const responseSummary = agentResponses.map(response => ({
-        agentId: response.agentId,
-        decision: response.decision,
-        confidence: response.confidence,
-      }));
-
-      subsegment.addMetadata('solomon', {
-        agentResponses: responseSummary,
-        evaluationMode: 'consensus_with_scoring',
-        votingSystem: 'majority_with_confidence',
-      });
-
+    return this.tracer.startActiveSpan(spanName, async (span: Span) => {
       try {
+        // SOLOMON固有の属性を追加
+        span.setAttribute('component', 'solomon-judge');
+        span.setAttribute('conversation.id', traceContext.conversationId);
+        span.setAttribute('message.id', traceContext.messageId);
+        span.setAttribute('agent.response.count', agentResponses.length);
+        span.setAttribute('evaluation.mode', 'consensus_with_scoring');
+        span.setAttribute('voting.system', 'majority_with_confidence');
+
+        // 3賢者の回答サマリーを追加
+        agentResponses.forEach((response, index) => {
+          span.setAttribute(`response.${index}.agent_id`, response.agentId || 'unknown');
+          span.setAttribute(`response.${index}.decision`, response.decision || 'unknown');
+          span.setAttribute(`response.${index}.confidence`, response.confidence || 0);
+        });
+
         const startTime = Date.now();
         const result = await operation();
         const endTime = Date.now();
 
         // SOLOMON評価結果の追加
-        subsegment.addMetadata('evaluation', {
-          success: true,
-          duration: endTime - startTime,
-          result: result,
-          timestamp: new Date().toISOString(),
-        });
+        span.setAttribute('evaluation.success', true);
+        span.setAttribute('evaluation.duration', endTime - startTime);
+        span.setStatus({ code: SpanStatusCode.OK });
 
         return result;
       } catch (error) {
-        subsegment.addError(error as Error);
-        subsegment.addMetadata('evaluation', {
-          success: false,
-          error: {
-            name: (error as Error).name,
-            message: (error as Error).message,
-          },
-          timestamp: new Date().toISOString(),
+        span.recordException(error as Error);
+        span.setAttribute('evaluation.success', false);
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: (error as Error).message
         });
 
         throw error;
+      } finally {
+        span.end();
       }
     });
   }
 
   /**
    * Create Conversation Trace
-   * 
-   * 会話全体のトレースセグメントを作成します。
+   *
+   * 会話全体のトレーススパンを作成します。
    * ユーザーの質問から最終回答までの全プロセスを追跡します。
    */
   async traceConversation<T>(
-    context: MAGITraceContext,
+    traceContext: MAGITraceContext,
     userMessage: string,
     operation: () => Promise<T>
   ): Promise<T> {
-    const segmentName = `${this.serviceName}-conversation`;
-    
-    return AWSXRay.captureAsyncFunc(segmentName, async (subsegment) => {
-      if (!subsegment) {
-        return operation();
-      }
+    const spanName = 'conversation';
 
-      // 会話レベルの情報を追加
-      subsegment.addAnnotation('conversationId', context.conversationId);
-      subsegment.addAnnotation('messageId', context.messageId);
-      subsegment.addAnnotation('totalAgents', context.agentIds.length);
-      
-      if (context.userId) {
-        subsegment.addAnnotation('userId', context.userId);
-      }
-
-      // 会話メタデータの追加
-      subsegment.addMetadata('conversation', {
-        userMessage: userMessage.substring(0, 200), // 最初の200文字のみ
-        agentIds: context.agentIds,
-        executionMode: context.executionMode,
-        solomonEnabled: context.solomonEnabled,
-        messageLength: userMessage.length,
-      });
-
+    return this.tracer.startActiveSpan(spanName, async (span: Span) => {
       try {
+        // 会話レベルの属性を追加
+        span.setAttribute('conversation.id', traceContext.conversationId);
+        span.setAttribute('message.id', traceContext.messageId);
+        span.setAttribute('total.agents', traceContext.agentIds.length);
+        span.setAttribute('message.length', userMessage.length);
+        span.setAttribute('execution.mode', traceContext.executionMode);
+        span.setAttribute('solomon.enabled', traceContext.solomonEnabled);
+
+        // ユーザーメッセージの最初の200文字のみを保存
+        span.setAttribute('user.message', userMessage.substring(0, 200));
+
+        if (traceContext.userId) {
+          span.setAttribute('user.id', traceContext.userId);
+        }
+
         const startTime = Date.now();
         const result = await operation();
         const endTime = Date.now();
 
-        subsegment.addMetadata('result', {
-          success: true,
-          totalDuration: endTime - startTime,
-          timestamp: new Date().toISOString(),
-        });
+        span.setAttribute('conversation.success', true);
+        span.setAttribute('conversation.duration', endTime - startTime);
+        span.setStatus({ code: SpanStatusCode.OK });
 
         return result;
       } catch (error) {
-        subsegment.addError(error as Error);
+        span.recordException(error as Error);
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: (error as Error).message
+        });
+
         throw error;
+      } finally {
+        span.end();
       }
     });
   }
 
   /**
    * Add Custom Subsegment
-   * 
-   * カスタムサブセグメントを追加します。
+   *
+   * カスタムサブスパンを追加します。
    * 特定の処理ステップを詳細にトレースする際に使用します。
    */
   async addCustomSubsegment<T>(
@@ -345,29 +263,33 @@ export class MAGITraceManager {
     operation: () => Promise<T>,
     metadata?: Record<string, any>
   ): Promise<T> {
-    return AWSXRay.captureAsyncFunc(name, async (subsegment) => {
-      if (!subsegment) {
-        return operation();
-      }
-
-      if (metadata) {
-        subsegment.addMetadata('custom', metadata);
-      }
-
+    return this.tracer.startActiveSpan(name, async (span: Span) => {
       try {
+        if (metadata) {
+          Object.entries(metadata).forEach(([key, value]) => {
+            span.setAttribute(`custom.${key}`, JSON.stringify(value));
+          });
+        }
+
         const result = await operation();
-        subsegment.addMetadata('result', { success: true });
+        span.setStatus({ code: SpanStatusCode.OK });
         return result;
       } catch (error) {
-        subsegment.addError(error as Error);
+        span.recordException(error as Error);
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: (error as Error).message
+        });
         throw error;
+      } finally {
+        span.end();
       }
     });
   }
 
   /**
    * Get Agent Type
-   * 
+   *
    * エージェントIDから種別を取得します。
    */
   private getAgentType(agentId: string): string {
@@ -377,13 +299,13 @@ export class MAGITraceManager {
       'melchior': 'balanced',
       'solomon': 'judge',
     };
-    
+
     return agentTypes[agentId] || 'unknown';
   }
 
   /**
    * Get Agent Description
-   * 
+   *
    * エージェントIDから説明を取得します。
    */
   private getAgentDescription(agentId: string): string {
@@ -393,109 +315,121 @@ export class MAGITraceManager {
       'melchior': 'Balanced and scientific perspective',
       'solomon': 'Judge and integrator of all perspectives',
     };
-    
+
     return descriptions[agentId] || 'Unknown agent';
   }
 }
 
 /**
  * X-Ray Utilities
- * 
+ *
  * X-Ray操作のためのユーティリティ関数群。
  */
 export class XRayUtils {
   /**
    * Get Current Trace ID
-   * 
+   *
    * 現在のトレースIDを取得します。
    * フロントエンドでの表示やログ相関に使用します。
    */
   static getCurrentTraceId(): string | null {
-    // 一時的に無効化（ビルドエラー回避）
-    return null;
-    // const segment = AWSXRay.getSegment();
-    // if (!segment) return null;
-    // return (segment as any).trace_id;
+    const span = trace.getActiveSpan();
+    if (!span) return null;
+
+    const spanContext = span.spanContext();
+    return spanContext.traceId;
   }
 
   /**
-   * Get Current Segment ID
-   * 
-   * 現在のセグメントIDを取得します。
+   * Get Current Span ID
+   *
+   * 現在のスパンIDを取得します。
    */
-  static getCurrentSegmentId(): string | null {
-    const segment = AWSXRay.getSegment();
-    if (!segment) return null;
-    
-    return segment.id;
+  static getCurrentSpanId(): string | null {
+    const span = trace.getActiveSpan();
+    if (!span) return null;
+
+    const spanContext = span.spanContext();
+    return spanContext.spanId;
   }
 
   /**
    * Create Trace Header
-   * 
+   *
    * X-Amzn-Trace-Idヘッダーを作成します。
    * AgentCore APIへのリクエスト時に使用します。
    */
   static createTraceHeader(sessionId?: string): string {
-    const segment = AWSXRay.getSegment();
-    if (!segment) {
-      // セグメントが存在しない場合は新しいトレースIDを生成
+    const span = trace.getActiveSpan();
+
+    if (!span) {
+      // スパンが存在しない場合は新しいトレースIDを生成
       const timestamp = Math.floor(Date.now() / 1000).toString(16);
       const randomId = Math.random().toString(16).substring(2, 18).padStart(16, '0');
       const traceId = `1-${timestamp}-${randomId}`;
-      
+
       let header = `Root=${traceId};Sampled=1`;
       if (sessionId) {
         header += `;session-id=${sessionId}`;
       }
-      
+
       return header;
     }
 
-    // 既存のセグメントからトレースヘッダーを生成（一時的に無効化）
-    return 'Root=1-00000000-000000000000000000000000;Parent=0000000000000000;Sampled=1';
-    // let header = `Root=${(segment as any).trace_id};Parent=${(segment as any).id};Sampled=1`;
-    // if (sessionId) {
-    //   header += `;session-id=${sessionId}`;
-    // }
-    // return header;
+    // 既存のスパンからトレースヘッダーを生成
+    const spanContext = span.spanContext();
+    const traceId = spanContext.traceId;
+    const spanId = spanContext.spanId;
+
+    // X-Ray形式のトレースIDに変換（1-timestamp-uniqueid）
+    const timestamp = Math.floor(Date.now() / 1000).toString(16);
+    const xrayTraceId = `1-${timestamp}-${traceId.substring(0, 24)}`;
+
+    let header = `Root=${xrayTraceId};Parent=${spanId};Sampled=1`;
+    if (sessionId) {
+      header += `;session-id=${sessionId}`;
+    }
+
+    return header;
   }
 
   /**
    * Add Custom Annotation
-   * 
-   * 現在のセグメントにカスタムアノテーションを追加します。
+   *
+   * 現在のスパンにカスタム属性を追加します。
    */
   static addAnnotation(key: string, value: string | number | boolean): void {
-    const segment = AWSXRay.getSegment();
-    if (segment) {
-      segment.addAnnotation(key, value);
+    const span = trace.getActiveSpan();
+    if (span) {
+      span.setAttribute(key, value);
     }
   }
 
   /**
    * Add Custom Metadata
-   * 
-   * 現在のセグメントにカスタムメタデータを追加します。
+   *
+   * 現在のスパンにカスタムメタデータを追加します。
    */
   static addMetadata(namespace: string, data: Record<string, any>): void {
-    const segment = AWSXRay.getSegment();
-    if (segment) {
-      segment.addMetadata(namespace, data);
+    const span = trace.getActiveSpan();
+    if (span) {
+      Object.entries(data).forEach(([key, value]) => {
+        span.setAttribute(`${namespace}.${key}`, JSON.stringify(value));
+      });
     }
   }
 }
 
 /**
  * Singleton instance for global use
- * 
+ *
  * アプリケーション全体で使用するシングルトンインスタンス。
  */
 export const magiTraceManager = new MAGITraceManager();
 
 /**
  * Convenience functions for common operations
- * 
+ *
  * よく使用される操作のための便利関数。
  */
 export const traceAgentExecution = magiTraceManager.traceAgentExecution.bind(magiTraceManager);
