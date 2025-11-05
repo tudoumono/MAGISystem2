@@ -339,8 +339,8 @@ logger.info("テスト開始")
 ## 参考資料
 
 - [AWS Lambda Python SDK](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/lambda.html)
-- [Lambda Response Streaming](https://docs.aws.amazon.com/lambda/latest/dg/configuration-response-streaming.html)
 - [AWS Bedrock Models](https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html)
+- [参考記事: Amplify HostingでBedrock AgentCoreを使う](https://qiita.com/moritalous/items/ea695f8a328585e1313b)
 
 ---
 

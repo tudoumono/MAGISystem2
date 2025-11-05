@@ -44,20 +44,9 @@ backend.magiStrandsAgents.resources.lambda.addToRolePolicy(
   })
 );
 
-// Lambda関数URLとResponse Streamingを有効化
-// Note: Amplify Gen2では手動設定が必要。デプロイ後に以下のコマンドを実行:
-//
-// 1. Function URLを作成:
-// aws lambda create-function-url-config \
-//   --function-name <function-name> \
-//   --auth-type NONE \
-//   --cors '{"AllowCredentials":false,"AllowHeaders":["*"],"AllowMethods":["POST"],"AllowOrigins":["*"],"MaxAge":86400}' \
-//   --region ap-northeast-1
-//
-// 2. Response Streamingを有効化:
-// aws lambda update-function-configuration \
-//   --function-name <function-name> \
-//   --invoke-mode RESPONSE_STREAM \
-//   --region ap-northeast-1
+// Note: このLambda関数は参考記事のアーキテクチャでは使用されません
+// 参考記事: https://qiita.com/moritalous/items/ea695f8a328585e1313b
+// 実装方針: AgentCore Runtime内でNext.jsバックエンドを作成し、
+//          そこから既存のPython magi_agent.pyを呼び出す
 
 export default backend;
