@@ -1,144 +1,58 @@
-# MAGI Decision System 学習ガイド
+# 学習リソース
 
-## 📚 学習ドキュメント一覧
+## 📚 概要
 
-このディレクトリには、MAGI Decision Systemの実装を通じて学習できる技術の詳細ガイドが含まれています。各ドキュメントは実際のソースコードと連携し、理論と実践を組み合わせた学習体験を提供します。
+MAGI Decision Systemの開発に必要な技術の学習リソースです。
 
-## 🎯 学習の進め方
+## 📖 ドキュメント
 
-### 推奨学習順序
+### Python環境管理
 
-1. **[TypeScript設計パターン（ドメイン駆動設計）](./01-typescript-domain-driven-design.md)**
-   - ドメインモデリングの基礎
-   - 型安全な設計パターン
-   - ビジネスロジックの表現方法
+- **[uv-python-management.md](./uv-python-management.md)** - uvによるPython環境管理
 
-2. **[Next.js App Router](./02-nextjs-app-router.md)**
-   - 最新のReactフレームワーク
-   - Server Componentsの活用
-   - パフォーマンス最適化
+## 🎯 推奨学習パス
 
-3. **[AWS Amplify Gen2](./03-aws-amplify-gen2.md)**
-   - TypeScriptファーストのバックエンド
-   - 認証とデータ管理
-   - Lambda関数統合
+### 1. AgentCore Runtime理解
 
-4. **[Tailwind CSS Design System](./04-tailwind-design-system.md)**
-   - ユーティリティファーストCSS
-   - 一貫したデザインシステム
-   - レスポンシブデザイン
+まずは参考記事を読んで、全体像を把握してください：
 
-5. **[モックデータ活用パターン](./05-mock-data-patterns.md)**
-   - フロントエンドファースト開発
-   - リアルなテストデータ設計
-   - 段階的な実装戦略
+**[Amplify HostingでBedrock AgentCoreを使う](https://qiita.com/moritalous/items/ea695f8a328585e1313b)**
 
-## 📁 各ドキュメントの特徴
+### 2. Strands Agents学習
 
-### 🏗️ 実装重視のアプローチ
+公式ドキュメントでStrands Agentsの基本を学んでください：
 
-各学習ガイドは以下の構成で統一されています：
+- [Strands Agents公式ドキュメント](https://strandsagents.com/latest/)
+- [AWS公式ブログ](https://aws.amazon.com/blogs/opensource/introducing-strands-agents-1-0-production-ready-multi-agent-orchestration-made-simple/)
 
-- **学習目標**: 何を学ぶかを明確化
-- **関連ソースコード**: 実際のファイルとの対応
-- **実装パターン解説**: コード例と設計理由
-- **学習ポイント**: 重要な概念の強調
-- **実践的な使用例**: 実際の開発での活用方法
-- **学習の進め方**: 段階的な習得方法
-- **実習課題**: 理解を深めるための課題
+### 3. 実装確認
 
-### 🔗 相互連携
+実際のコードを確認して理解を深めてください：
 
-各技術は独立して学習できますが、相互に連携して全体システムを構成します：
+- `agents/magi_agent.py` - メインエージェント実装
+- `agents/shared/prompts.py` - システムプロンプト
+- `agents/tests/test_magi.py` - ストリーミングテスト
 
-```
-TypeScript DDD ←→ Next.js App Router
-     ↕                    ↕
-AWS Amplify Gen2 ←→ Tailwind CSS
-     ↕                    ↕
-    Mock Data Patterns ←→ UI Components
-```
+### 4. デバッグ実践
 
-## 🎨 学習効果を最大化するポイント
+デバッグガイドを参考に、実際に動かしてみてください：
 
-### 1. **実際のコードを読む**
-各ドキュメントで紹介されているファイルを実際に開いて、コードを読みながら学習してください。
+- [agents/DEBUG_GUIDE.md](../../agents/DEBUG_GUIDE.md)
 
-### 2. **段階的な理解**
-一度にすべてを理解しようとせず、Phase 1 → Phase 2 → Phase 3の順で段階的に学習してください。
+## 🔗 外部リソース
 
-### 3. **実習課題に取り組む**
-各ドキュメントの最後にある実習課題に取り組むことで、理解を深めることができます。
+### AWS関連
+- [Amazon Bedrock Documentation](https://docs.aws.amazon.com/bedrock/)
+- [AWS Amplify Gen2 Documentation](https://docs.amplify.aws/)
 
-### 4. **実際に動かす**
-開発サーバーを起動し、実際にアプリケーションを動かしながら学習してください。
+### フレームワーク
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Strands Agents](https://strandsagents.com/)
 
-## 🔍 技術別詳細情報
-
-### TypeScript設計パターン（ドメイン駆動設計）
-- **主要ファイル**: `src/types/domain.ts`, `src/types/api.ts`
-- **学習内容**: エンティティ、バリューオブジェクト、ドメインサービス
-- **実践例**: MAGIエージェントのモデリング
-
-### Next.js App Router
-- **主要ファイル**: `src/app/layout.tsx`, `src/app/page.tsx`
-- **学習内容**: Server Components、Metadata API、ファイルベースルーティング
-- **実践例**: レスポンシブなホームページ実装
-
-### AWS Amplify Gen2
-- **主要ファイル**: `amplify/backend.ts`, `amplify/auth/resource.ts`, `amplify/data/resource.ts`
-- **学習内容**: TypeScriptベース設定、認証システム、データモデリング
-- **実践例**: 完全なバックエンドインフラ構築
-
-### Tailwind CSS Design System
-- **主要ファイル**: `tailwind.config.ts`, `src/app/globals.css`
-- **学習内容**: カスタムテーマ、コンポーネントクラス、レスポンシブデザイン
-- **実践例**: MAGIテーマカラーシステム
-
-### モックデータ活用パターン
-- **主要ファイル**: `src/lib/mock/data.ts`
-- **学習内容**: シナリオベーステスト、リアルなデータ生成、段階的統合
-- **実践例**: エージェント応答のシミュレーション
-
-## 🎯 学習成果の測定
-
-各技術の学習完了の目安：
-
-### ✅ 基本レベル
-- 各技術の基本概念を理解している
-- 提供されているコード例を読んで理解できる
-- 簡単な修正や拡張ができる
-
-### ✅ 中級レベル
-- 設計原則を理解し、適用できる
-- 新しい機能を一から実装できる
-- 他の技術との連携を理解している
-
-### ✅ 上級レベル
-- 最適化やパフォーマンス改善ができる
-- 複雑な要件に対応した設計ができる
-- 他の開発者に技術を教えることができる
-
-## 🚀 次のステップ
-
-学習ドキュメントを完了したら、以下のステップに進むことをお勧めします：
-
-1. **実際の機能実装**: Task 2以降の実装に挑戦
-2. **カスタマイズ**: 独自の機能やデザインの追加
-3. **本格運用**: 実際のAWSデプロイとCI/CD設定
-4. **コミュニティ貢献**: 学習内容の共有や改善提案
-
-## 📞 サポート
-
-学習中に質問や問題が発生した場合：
-
-1. **コード内のコメント**: 詳細な説明が記載されています
-2. **README.md**: プロジェクト全体の概要と設定方法
-3. **GitHub Issues**: 技術的な質問や改善提案
-4. **実習課題**: 段階的な理解を深めるための練習
+### Python
+- [Python Documentation](https://docs.python.org/3/)
+- [uv Documentation](https://docs.astral.sh/uv/)
 
 ---
 
-**Happy Learning!** 🎉
-
-MAGI Decision Systemの実装を通じて、最新のフルスタック開発技術を効率的に学習し、実践的なスキルを身につけましょう。
+学習を進める中で疑問があれば、GitHubのIssuesで質問してください。
