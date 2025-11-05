@@ -10,12 +10,12 @@ AgentCore Runtimeのストリーミングレスポンスを受信し、
     python test_streaming_classification.py
 
 出力ファイル:
-    - streaming_output/caspar_stream.txt
-    - streaming_output/balthasar_stream.txt
-    - streaming_output/melchior_stream.txt
-    - streaming_output/solomon_stream.txt
-    - streaming_output/full_stream.json (全イベント)
-    - streaming_output/summary.txt (サマリー)
+    - agents/tests/streaming_output/caspar_stream.txt
+    - agents/tests/streaming_output/balthasar_stream.txt
+    - agents/tests/streaming_output/melchior_stream.txt
+    - agents/tests/streaming_output/solomon_stream.txt
+    - agents/tests/streaming_output/full_stream.json (全イベント)
+    - agents/tests/streaming_output/summary.txt (サマリー)
 """
 
 import asyncio
@@ -70,8 +70,8 @@ class StreamingClassificationTester:
         )
         self.client = boto3.client('bedrock-agentcore', config=config)
         
-        # 出力ディレクトリ
-        self.output_dir = Path("streaming_output")
+        # 出力ディレクトリ（testsディレクトリ内に配置）
+        self.output_dir = Path(__file__).parent / "streaming_output"
         self.output_dir.mkdir(exist_ok=True)
         
         # ストリーム収集用

@@ -1,32 +1,55 @@
-# ⚠️ このディレクトリのドキュメントは古い情報です
+# アーキテクチャドキュメント
 
-## 理由
+## 📚 概要
 
-このディレクトリのドキュメントは、Lambda関数やAPI Gatewayを使用する**古いアーキテクチャ**に基づいています。
+MAGI Decision Systemのアーキテクチャ設計に関するドキュメントです。
 
-現在のプロジェクトは[参考記事](https://qiita.com/moritalous/items/ea695f8a328585e1313b)のアーキテクチャを**完全準拠**で実装します。
+## 📖 ドキュメント
 
-## 正しいアーキテクチャドキュメント
+### [ARCHITECTURE.md](../ARCHITECTURE.md)
 
-最新のアーキテクチャ情報は以下を参照してください：
+システム全体のアーキテクチャ設計書です。以下の内容を含みます：
 
-- **[docs/ARCHITECTURE.md](../ARCHITECTURE.md)** - 最新のアーキテクチャ設計書
-- **[.kiro/specs/consolidated-magi-system/spec.md](../../.kiro/specs/consolidated-magi-system/spec.md)** - 実装仕様
-- **[.kiro/steering/tech.md](../../.kiro/steering/tech.md)** - 技術ガイドライン
+- **参考記事**: [Amplify HostingでBedrock AgentCoreを使う](https://qiita.com/moritalous/items/ea695f8a328585e1313b)
+- **システム構成**: AgentCore Runtime（1つのDockerコンテナ）
+- **技術スタック**: Next.js + Python + Strands Agents
+- **通信フロー**: フロントエンド → AgentCore Runtime → Bedrock
+- **設計判断**: なぜこのアーキテクチャを選択したか
 
-## 現在のアーキテクチャ（正しい）
+## 🎯 重要なポイント
+
+### AgentCore Runtimeは1つのDockerコンテナ
 
 ```
-Amplify Hosting (Next.js Frontend)
-    ↓ useChat() → /invocations
-AgentCore Runtime (1つのDockerコンテナ)
-    ├─ Next.jsバックエンド（ポート8080）
-    └─ Python magi_agent.py（子プロセス）
+┌─────────────────────────────────────────────────────────────┐
+│     Bedrock AgentCore Runtime (1つのDockerコンテナ)          │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  Next.js Backend (新規作成)                           │  │
+│  │  - ポート8080でHTTPリクエスト受信                      │  │
+│  │  - POST /invocations                                  │  │
+│  │  - GET /ping                                          │  │
+│  │  ↓ spawn('python', ['magi_agent.py'])                │  │
+│  └───────────────────────────────────────────────────────┘  │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  Python Agents (既存)                                 │  │
+│  │  - 同一コンテナ内で子プロセスとして実行                │  │
+│  │  - magi_agent.py                                      │  │
+│  │  - Strands Agents 1.0                                 │  │
+│  │  - CASPAR / BALTHASAR / MELCHIOR / SOLOMON           │  │
+│  └───────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## このディレクトリの扱い
+### 使用しないパターン
 
-このディレクトリ（`docs/architecture/`）は**参考資料**として残していますが、
-**実装には使用しないでください**。
+❌ **Lambda Response Streaming** - 複雑で未実証
+❌ **Amplify defineFunction()** - ストリーミング非対応
+❌ **独自のストリーミング実装** - 車輪の再発明
 
-新しい実装は必ず上記の最新ドキュメントを参照してください。
+### 採用するパターン
+
+✅ **参考記事完全準拠** - 実証済みのアーキテクチャ
+
+---
+
+詳細は [ARCHITECTURE.md](../ARCHITECTURE.md) を参照してください。
