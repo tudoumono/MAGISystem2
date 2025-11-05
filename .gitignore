@@ -278,3 +278,16 @@ agents/Dockerfile
 
 # Archive directory (deprecated implementations)
 agents/archive/
+
+# ============================================================================
+# Test Output Files
+# 
+# テスト実行時に生成される出力ファイルを除外
+# summary.txtのみ動作確認の証拠として保持
+# ============================================================================
+
+# Streaming test outputs
+agents/tests/streaming_output/*.txt
+agents/tests/streaming_output/*.json
+!agents/tests/streaming_output/summary.txt
+streaming_output/
