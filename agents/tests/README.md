@@ -71,7 +71,7 @@ CASPAR、BALTHASAR、MELCHIORのイベントが交互に表示される場合が
 
 ## 出力ファイル
 
-テスト実行後、`streaming_output/`ディレクトリに以下のファイルが生成されます：
+テスト実行後、`agents/tests/streaming_output/`ディレクトリに以下のファイルが生成されます：
 
 - `caspar_stream.txt` - CASPAR（保守的）の思考プロセス
 - `balthasar_stream.txt` - BALTHASAR（革新的）の思考プロセス

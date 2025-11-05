@@ -34,12 +34,17 @@
 
 ```
 agents/
-├── magi_agent.py              # メインエージェント実装
+├── magi_agent.py              # メインエージェント実装（AgentCore Runtime版）
 ├── requirements.txt           # Python依存関係
 ├── .bedrock_agentcore.yaml   # AgentCore Runtime設定
+├── shared/                    # 共通モジュール
+│   ├── prompts.py            # システムプロンプト管理
+│   ├── types.py              # 型定義
+│   └── utils.py              # ユーティリティ関数
 ├── tests/
 │   ├── test_magi.py          # ストリーミングテスト
 │   └── README.md             # テスト実行ガイド
+├── scripts/                   # 開発用スクリプト
 ├── DEBUG_GUIDE.md            # デバッグガイド
 └── README.md                 # このファイル
 ```
