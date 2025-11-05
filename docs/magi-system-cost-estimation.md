@@ -14,15 +14,20 @@ MAGIシステム（エヴァンゲリオン風多視点分析システム）の�
 
 ## システム構成
 
+⚠️ **注意**: この費用見積もりは古いアーキテクチャに基づいています。
+現在のアーキテクチャは[docs/ARCHITECTURE.md](./ARCHITECTURE.md)を参照してください。
+
 ```
-ユーザー → CloudFront → Amplify → API Gateway → Lambda
-                                      ↓
-                              AgentCore Runtime → ECR
-                                      ↓
-                              Bedrock (Claude 3) × 4回
-                              (CASPAR + BALTHASAR + MELCHIOR + SOLOMON)
-                                      ↓
-                              DynamoDB ← AppSync ← リアルタイム更新
+ユーザー → Amplify Hosting (Next.js Frontend)
+                ↓ useChat() → /invocations
+         AgentCore Runtime (1つのDockerコンテナ)
+         ├─ Next.jsバックエンド（ポート8080）
+         └─ Python magi_agent.py（子プロセス）
+                ↓
+         Bedrock (Claude 3) × 4回
+         (CASPAR + BALTHASAR + MELCHIOR + SOLOMON)
+                ↓
+         DynamoDB ← AppSync ← リアルタイム更新
 ```
 
 ## 詳細費用見積もり

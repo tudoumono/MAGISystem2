@@ -80,11 +80,12 @@ aws lambda get-function --function-name magi-python-agents --region ap-northeast
 4. Networkタブを確認
 
 **確認項目**:
-- [ ] POSTリクエストが`/api/bedrock-agents/stream`に送信される
-- [ ] リクエストボディに`agentConfigs`が含まれる
-- [ ] `agentConfigs.caspar.model`が選択したモデルになっている
+- [ ] POSTリクエストがAgentCore Runtime `/invocations`エンドポイントに送信される
+- [ ] リクエストボディに`question`が含まれる
 - [ ] ストリーミングレスポンスが返ってくる
 - [ ] エージェント応答が表示される
+- [ ] 3賢者（CASPAR/BALTHASAR/MELCHIOR）の応答が並列表示される
+- [ ] SOLOMON Judgeの最終判断が表示される
 
 **リクエストボディ例**:
 ```json
