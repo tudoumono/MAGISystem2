@@ -14,7 +14,7 @@ from typing import Any, Dict
 # パスを追加
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from magi_strands_agents import MAGIStrandsSystem
+from magi_agent_strands import MAGIStrandsAgent
 from shared.types import MAGIDecisionRequest
 
 
@@ -48,7 +48,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         print(f"Agent Configs: {len(agent_configs)} agents")
         
         # MAGI システムを初期化
-        magi = MAGIStrandsSystem()
+        magi = MAGIStrandsAgent()
         
         # リクエストを作成
         request = MAGIDecisionRequest(
@@ -58,40 +58,16 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         # 非同期実行
         loop = asyncio.get_event_loop()
-        response = loop.run_until_complete(magi.decide(request))
+        response = loop.run_until_complete(magi.process_decision(request))
         
-        # レスポンスを作成
+        # レスポンスを作成（magi_agent_strandsの形式に合わせる）
         result = {
-            'statusCode': 200,
+            'statusCode': response.get('statusCode', 200),
             'headers': {
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*',
             },
-            'body': json.dumps({
-                'success': True,
-                'data': {
-                    'finalDecision': response.judge_response.final_decision.value,
-                    'votingResult': {
-                        'approved': response.judge_response.voting_result.approved,
-                        'rejected': response.judge_response.voting_result.rejected,
-                        'abstained': response.judge_response.voting_result.abstained,
-                    },
-                    'agentResponses': [
-                        {
-                            'agentId': r.agent_id.value,
-                            'decision': r.decision.value,
-                            'reasoning': r.reasoning,
-                            'confidence': r.confidence,
-                            'executionTime': r.execution_time,
-                        }
-                        for r in response.agent_responses
-                    ],
-                    'summary': response.judge_response.summary,
-                    'recommendation': response.judge_response.final_recommendation,
-                    'totalExecutionTime': response.total_execution_time,
-                },
-                'traceId': response.trace_id,
-            }, ensure_ascii=False)
+            'body': json.dumps(response.get('body', response), ensure_ascii=False)
         }
         
         print(f"✅ MAGI Decision Complete")
