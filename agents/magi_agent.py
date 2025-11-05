@@ -1,705 +1,685 @@
 #!/usr/bin/env python3
 """
-MAGI Agent - AgentCore Runtime Implementation
+MAGI Agent - Strands Agents統合版
 
-BedrockAgentCoreAppを使用したMAGI Decision Systemの基本実装。
-AWS公式のAgentCore Runtimeアーキテクチャに準拠した単一エージェント版。
-
-学習ポイント:
-- BedrockAgentCoreAppの基本使用方法
-- AgentCore Runtime統合パターン
-- エントリーポイント関数の実装
-- Strands Agentsとの統合
+Strands Agentsフレームワークを使用した3賢者システムの実装。
+Amazon Bedrockと統合し、実際のLLM推論を実行します。
 """
 
 import json
 import asyncio
-from typing import Dict, Any, Optional
+import os
+from typing import Dict, Any
 from datetime import datetime
 
 # AgentCore Runtime統合
 from bedrock_agentcore import BedrockAgentCoreApp
 
-# Strands Agents統合
+# Strands Agents
 from strands import Agent
 
-# 共通型定義のインポート
-from shared.types import (
-    AgentType, DecisionType, AgentResponse, 
-    MAGIDecisionRequest, MAGIDecisionResponse,
-    JudgeResponse, VotingResult, AgentScore
-)
-from shared.prompts import get_agent_prompt
-from shared.utils import generate_trace_id, format_execution_time
+# アプリケーション初期化
+app = BedrockAgentCoreApp()
+
+# デバッグモード設定（環境変数で制御）
+DEBUG_STREAMING = os.getenv('DEBUG_STREAMING', 'false').lower() == 'true'
+
+print("✅ MAGI Strands Agent initialized successfully")
+if DEBUG_STREAMING:
+    print("🐛 DEBUG_STREAMING enabled - All streaming events will be logged to console")
 
 
-class MAGIAgentCore:
-    """
-    MAGI Agent - AgentCore Runtime統合版
-    
-    BedrockAgentCoreAppとStrands Agentsを統合した
-    基本的なMAGI Decision Systemの実装。
-    
-    特徴:
-    - AgentCore Runtime対応
-    - 8時間実行対応
-    - 自動セッション管理
-    - 統合監視・ログ
-    """
+# 3賢者のシステムプロンプト
+CASPAR_PROMPT = """あなたはCASPAR（カスパー）です。
+保守的で現実的な視点を持つ賢者として、以下の特性で判断してください：
+
+【人格特性】
+- 実行可能性を最重視
+- リスクを慎重に評価
+- 既存の実績やデータを重視
+- 段階的なアプローチを好む
+
+【判断基準】
+1. 技術的実現可能性
+2. コスト対効果
+3. リスクの大きさ
+4. 既存システムとの互換性
+5. 実装の複雑さ
+
+【出力形式】
+以下のJSON形式で回答してください：
+{
+  "decision": "APPROVED" | "REJECTED" | "ABSTAINED",
+  "reasoning": "判断理由（200文字以内）",
+  "confidence": 0.0-1.0
+}"""
+
+BALTHASAR_PROMPT = """あなたはBALTHASAR（バルタザール）です。
+革新的で感情的な視点を持つ賢者として、以下の特性で判断してください：
+
+【人格特性】
+- 創造性と革新性を重視
+- 倫理的・人道的側面を考慮
+- 長期的なビジョンを持つ
+- 変革を恐れない
+
+【判断基準】
+1. 革新性・創造性
+2. 倫理的影響
+3. 人々への影響
+4. 長期的価値
+5. 社会的意義
+
+【出力形式】
+以下のJSON形式で回答してください：
+{
+  "decision": "APPROVED" | "REJECTED" | "ABSTAINED",
+  "reasoning": "判断理由（200文字以内）",
+  "confidence": 0.0-1.0
+}"""
+
+MELCHIOR_PROMPT = """あなたはMELCHIOR（メルキオール）です。
+バランス型で科学的な視点を持つ賢者として、以下の特性で判断してください：
+
+【人格特性】
+- データと論理を重視
+- 客観的な分析
+- 多角的な視点
+- バランスの取れた判断
+
+【判断基準】
+1. データの信頼性
+2. 論理的整合性
+3. 多面的な影響
+4. 持続可能性
+5. 総合的なバランス
+
+【出力形式】
+以下のJSON形式で回答してください：
+{
+  "decision": "APPROVED" | "REJECTED" | "ABSTAINED",
+  "reasoning": "判断理由（200文字以内）",
+  "confidence": 0.0-1.0
+}"""
+
+SOLOMON_PROMPT = """あなたはSOLOMON（ソロモン）です。
+3賢者（CASPAR、BALTHASAR、MELCHIOR）の判断を統合評価する統括AIとして、
+最終的な意思決定を行います。
+
+【役割】
+- 3賢者の判断を公平に評価
+- 各賢者の視点の強みと弱みを分析
+- 総合的な判断を下す
+- 0-100点でスコアリング
+
+【評価基準】
+1. 論理的整合性
+2. 実現可能性
+3. リスクとリターンのバランス
+4. 倫理的配慮
+5. 長期的影響
+
+【入力】
+3賢者の判断結果：
+{sage_responses}
+
+【出力形式】
+以下のJSON形式で回答してください：
+{
+  "final_decision": "APPROVED" | "REJECTED",
+  "reasoning": "統合判断の理由（300文字以内）",
+  "confidence": 0.0-1.0,
+  "sage_scores": {
+    "caspar": 0-100,
+    "balthasar": 0-100,
+    "melchior": 0-100
+  }
+}"""
+
+
+class MAGIStrandsAgent:
+    """MAGI Strands Agent - 3賢者システム"""
     
     def __init__(self):
-        """MAGI AgentCoreを初期化"""
-        self.app = BedrockAgentCoreApp()
+        """初期化"""
+        # 3賢者のエージェント作成
+        self.caspar = Agent(
+            name="CASPAR",
+            model="anthropic.claude-3-5-sonnet-20240620-v1:0",
+            system_prompt=CASPAR_PROMPT
+        )
         
-        # Strands Agentsの初期化
-        self.agents = {}
-        self._initialize_agents()
+        self.balthasar = Agent(
+            name="BALTHASAR",
+            model="anthropic.claude-3-5-sonnet-20240620-v1:0",
+            system_prompt=BALTHASAR_PROMPT
+        )
         
-        # 実行統計
-        self.execution_stats = {
-            "total_requests": 0,
-            "successful_requests": 0,
-            "failed_requests": 0,
-            "total_execution_time": 0
-        }
+        self.melchior = Agent(
+            name="MELCHIOR",
+            model="anthropic.claude-3-5-sonnet-20240620-v1:0",
+            system_prompt=MELCHIOR_PROMPT
+        )
+        
+        # SOLOMON Judge（統括AI）
+        # 注: system_promptは実行時に3賢者の結果を含めて動的に生成
+        self.solomon = Agent(
+            name="SOLOMON",
+            model="anthropic.claude-3-5-sonnet-20240620-v1:0"
+        )
+        
+        print("✅ 3賢者 + SOLOMON Judge 初期化完了")
     
-    def _initialize_agents(self):
-        """Strands Agentsを初期化"""
-        agent_configs = {
-            AgentType.CASPAR: {
-                "model": "anthropic.claude-3-5-sonnet-20240620-v1:0"
-            },
-            AgentType.BALTHASAR: {
-                "model": "anthropic.claude-3-5-sonnet-20240620-v1:0"
-            },
-            AgentType.MELCHIOR: {
-                "model": "anthropic.claude-3-5-sonnet-20240620-v1:0"
-            },
-            AgentType.SOLOMON: {
-                "model": "anthropic.claude-3-5-sonnet-20240620-v1:0"
-            }
-        }
-        
-        for agent_type, config in agent_configs.items():
-            try:
-                # Strands Agentの基本初期化（temperatureは後で設定）
-                agent = Agent(model=config["model"])
-                self.agents[agent_type] = agent
-                print(f"✅ {agent_type.value} agent initialized")
-            except Exception as e:
-                print(f"❌ Failed to initialize {agent_type.value}: {e}")
-                self.agents[agent_type] = None
-    
-    async def process_decision(self, request: MAGIDecisionRequest) -> MAGIDecisionResponse:
+
+    async def process_decision_stream(self, request: Dict[str, Any]):
         """
-        MAGI意思決定プロセスを実行
+        MAGI意思決定プロセス（ストリーミング版）
         
-        Args:
-            request: 意思決定リクエスト
-            
-        Returns:
-            MAGIDecisionResponse: 統合された意思決定結果
+        SSE形式でイベントをストリーミングします。
         """
         start_time = datetime.now()
-        trace_id = request.trace_id or generate_trace_id()
-        
-        self.execution_stats["total_requests"] += 1
-        
-        # エラー情報を収集するリスト
-        execution_errors = []
+        trace_id = f"trace-{int(start_time.timestamp())}"
+        question = request.get('question', 'デフォルト質問')
         
         try:
-            print(f"🧠 MAGI Decision Process Started")
-            print(f"   Question: {request.question}")
-            print(f"   Trace ID: {trace_id}")
+            # 開始イベント
+            yield self._create_sse_event("start", {
+                "trace_id": trace_id,
+                "question": question,
+                "timestamp": start_time.isoformat()
+            })
             
-            # Step 1: 3賢者による並列分析
-            sage_responses, sage_errors = await self._consult_three_sages(request.question, trace_id)
-            execution_errors.extend(sage_errors)
+            print(f"📝 Question: {question}")
             
-            # Step 2: SOLOMON Judgeによる統合評価
-            judge_response, judge_errors = await self._solomon_judgment(sage_responses, request.question, trace_id)
-            execution_errors.extend(judge_errors)
+            # 3賢者の分析開始
+            yield self._create_sse_event("sages_start", {
+                "trace_id": trace_id,
+                "sage_count": 3
+            })
             
-            # Step 3: 結果の統合
-            end_time = datetime.now()
-            total_execution_time = int((end_time - start_time).total_seconds() * 1000)
+            print("🤖 Consulting 3 sages in parallel...")
             
-            # エージェント応答が不足している場合の処理
-            if len(sage_responses) < 3:
-                # 不足しているエージェントのダミー応答を追加
-                required_agents = {AgentType.CASPAR, AgentType.BALTHASAR, AgentType.MELCHIOR}
-                existing_agents = {r.agent_id for r in sage_responses}
-                missing_agents = required_agents - existing_agents
+            # 3賢者に並列で相談（ストリーミング）
+            tasks = [
+                self._consult_sage_stream(self.caspar, "caspar", question, trace_id),
+                self._consult_sage_stream(self.balthasar, "balthasar", question, trace_id),
+                self._consult_sage_stream(self.melchior, "melchior", question, trace_id)
+            ]
+            
+            agent_responses = []
+            
+            # 並列実行してストリーミング
+            async for event in self._merge_streams(tasks):
+                yield event
                 
-                for missing_agent in missing_agents:
-                    dummy_response = AgentResponse(
-                        agent_id=missing_agent,
-                        decision=DecisionType.REJECTED,
-                        content=f"{missing_agent.value}エージェントは利用できませんでした",
-                        reasoning="エージェント初期化失敗による自動否決",
-                        confidence=0.0,
-                        execution_time=0,
-                        timestamp=datetime.now()
-                    )
-                    sage_responses.append(dummy_response)
+                # 完了イベントを収集
+                if event.get('type') == 'sage_complete':
+                    agent_responses.append(event.get('data', {}))
             
-            # エラー情報の分析
-            has_errors = len(execution_errors) > 0
-            degraded_mode = has_errors and len(sage_responses) < 3
+            # 結果を集計
+            approved = sum(1 for r in agent_responses if r.get('decision') == 'APPROVED')
+            rejected = sum(1 for r in agent_responses if r.get('decision') == 'REJECTED')
+            abstained = sum(1 for r in agent_responses if r.get('decision') == 'ABSTAINED')
             
-            response = MAGIDecisionResponse(
-                request_id=f"magi_{int(start_time.timestamp())}",
-                trace_id=trace_id,
-                agent_responses=sage_responses,
-                judge_response=judge_response,
-                total_execution_time=total_execution_time,
-                trace_steps=[],  # 簡略化
-                errors=execution_errors,
-                has_errors=has_errors,
-                degraded_mode=degraded_mode,
-                timestamp=start_time,
-                version="1.0-agentcore"
-            )
+            # SOLOMON Judge による統合評価（ストリーミング）
+            yield self._create_sse_event("judge_start", {
+                "trace_id": trace_id
+            })
             
-            # 統計更新
-            self.execution_stats["successful_requests"] += 1
-            self.execution_stats["total_execution_time"] += total_execution_time
+            print("⚖️  SOLOMON Judge evaluation...")
             
-            # ログ出力
-            print(f"✅ MAGI Decision Complete ({total_execution_time}ms)")
-            print(f"   Final Decision: {judge_response.final_decision.value}")
-            print(f"   Voting: {judge_response.voting_result.approved}可決 / {judge_response.voting_result.rejected}否決")
+            solomon_result = None
+            async for event in self._solomon_judgment_stream(agent_responses, question, trace_id):
+                yield event
+                
+                # 完了イベントを収集
+                if event.get('type') == 'judge_complete':
+                    solomon_result = event.get('data', {})
             
-            if has_errors:
-                print(f"   ⚠️  Errors encountered: {len(execution_errors)}")
-                if degraded_mode:
-                    print(f"   🔄 Running in degraded mode (partial results)")
+            # SOLOMONの最終判断を使用
+            final_decision = solomon_result.get('final_decision', 'REJECTED') if solomon_result else 'REJECTED'
             
-            return response
+            # 実行時間計算
+            end_time = datetime.now()
+            execution_time = int((end_time - start_time).total_seconds() * 1000)
+            
+            # 完了イベント
+            yield self._create_sse_event("complete", {
+                "trace_id": trace_id,
+                "final_decision": final_decision,
+                "voting_result": {
+                    "approved": approved,
+                    "rejected": rejected,
+                    "abstained": abstained
+                },
+                "solomon_judgment": solomon_result,
+                "summary": self._create_summary(agent_responses, final_decision),
+                "recommendation": self._create_recommendation(agent_responses, final_decision),
+                "confidence": solomon_result.get('confidence', 0.5) if solomon_result else 0.5,
+                "execution_time": execution_time,
+                "timestamp": end_time.isoformat()
+            })
+            
+            print(f"✅ Decision: {final_decision} (execution time: {execution_time}ms)")
             
         except Exception as e:
-            self.execution_stats["failed_requests"] += 1
-            print(f"❌ MAGI Decision Failed: {e}")
-            raise
-    
-    async def _consult_three_sages(self, question: str, trace_id: str) -> tuple[list[AgentResponse], list]:
-        """
-        3賢者による並列分析
-        
-        Returns:
-            tuple: (エージェント応答リスト, エラー情報リスト)
-        """
-        from shared.types import ExecutionError
-        
-        print(f"🔮 Consulting Three Sages...")
-        
-        sage_types = [AgentType.CASPAR, AgentType.BALTHASAR, AgentType.MELCHIOR]
-        tasks = []
-        errors = []
-        
-        for sage_type in sage_types:
-            if self.agents.get(sage_type):
-                task = self._consult_single_sage(sage_type, question, trace_id)
-                tasks.append((sage_type, task))
-            else:
-                print(f"   ⚠️  {sage_type.value} not available")
-                errors.append(ExecutionError(
-                    agent_id=sage_type,
-                    error_type="AgentNotAvailable",
-                    error_message=f"{sage_type.value} agent not initialized",
-                    retry_count=0,
-                    recovered=False
-                ))
-        
-        # 並列実行
-        if tasks:
-            results = await asyncio.gather(*[task for _, task in tasks], return_exceptions=True)
-            
-            # 成功した応答とエラーを分類
-            valid_responses = []
-            for i, result in enumerate(results):
-                sage_type = tasks[i][0]
-                
-                if isinstance(result, Exception):
-                    print(f"   ❌ {sage_type.value} failed: {result}")
-                    
-                    # エラー情報を記録
-                    errors.append(ExecutionError(
-                        agent_id=sage_type,
-                        error_type=type(result).__name__,
-                        error_message=str(result),
-                        retry_count=0,  # リトライ回数は_consult_single_sage内で管理
-                        recovered=False
-                    ))
-                    
-                    # エラー時のフォールバック応答
-                    fallback_response = AgentResponse(
-                        agent_id=sage_type,
-                        decision=DecisionType.REJECTED,
-                        content=f"{sage_type.value}の実行中にエラーが発生しました",
-                        reasoning="システムエラーによる自動否決",
-                        confidence=0.0,
-                        execution_time=0,
-                        timestamp=datetime.now()
-                    )
-                    valid_responses.append(fallback_response)
-                else:
-                    valid_responses.append(result)
-            
-            return valid_responses, errors
-        else:
-            print("   ❌ No sages available")
-            return [], errors
-    
-    async def _consult_single_sage(self, sage_type: AgentType, question: str, trace_id: str, max_retries: int = 2) -> AgentResponse:
-        """
-        個別の賢者に相談（リトライ機構付き）
-        
-        Args:
-            sage_type: エージェントタイプ
-            question: 質問内容
-            trace_id: トレースID
-            max_retries: 最大リトライ回数（デフォルト: 2）
-            
-        Returns:
-            AgentResponse: エージェントの応答
-        """
-        agent = self.agents.get(sage_type)
-        if not agent:
-            raise Exception(f"{sage_type.value} not initialized")
-        
-        last_error = None
-        
-        # リトライループ
-        for attempt in range(max_retries + 1):
-            start_time = datetime.now()
-            
-            try:
-                # リトライ時のログ
-                if attempt > 0:
-                    print(f"   🔄 Retrying {sage_type.value.upper()} (attempt {attempt + 1}/{max_retries + 1})...")
-                else:
-                    print(f"   🤖 Consulting {sage_type.value.upper()}...")
-                
-                # システムプロンプト + 質問を組み合わせ
-                system_prompt = get_agent_prompt(sage_type.value)
-                full_prompt = f"{system_prompt}\n\n## 質問\n{question}\n\n上記の質問について、あなたの視点から分析し、指定されたJSON形式で回答してください。"
-                
-                # Strands Agent呼び出し
-                result = agent(full_prompt)
-                
-                end_time = datetime.now()
-                execution_time = int((end_time - start_time).total_seconds() * 1000)
-                
-                # レスポンス解析
-                response_text = str(result)
-                parsed_response = self._parse_sage_response(response_text, sage_type, execution_time)
-                
-                # 成功ログ
-                retry_info = f" (after {attempt} retries)" if attempt > 0 else ""
-                print(f"   ✅ {sage_type.value.upper()}: {parsed_response.decision.value} (confidence: {parsed_response.confidence:.2f}){retry_info}")
-                
-                return parsed_response
-                
-            except Exception as e:
-                end_time = datetime.now()
-                execution_time = int((end_time - start_time).total_seconds() * 1000)
-                last_error = e
-                
-                # 最後のリトライでない場合は継続
-                if attempt < max_retries:
-                    print(f"   ⚠️  {sage_type.value.upper()} error (attempt {attempt + 1}): {e}")
-                    # 指数バックオフ（1秒、2秒）
-                    await asyncio.sleep(2 ** attempt)
-                    continue
-                else:
-                    # 最終的に失敗
-                    print(f"   ❌ {sage_type.value.upper()} failed after {max_retries + 1} attempts: {e}")
-                    
-                    return AgentResponse(
-                        agent_id=sage_type,
-                        decision=DecisionType.REJECTED,
-                        content=f"エラー: {str(last_error)}",
-                        reasoning=f"{max_retries + 1}回の試行後も実行エラーが継続したため自動否決",
-                        confidence=0.0,
-                        execution_time=execution_time,
-                        timestamp=datetime.now()
-                    )
-    
-    def _parse_sage_response(self, response_text: str, agent_id: AgentType, execution_time: int) -> AgentResponse:
-        """賢者の応答を解析"""
-        try:
-            # JSON部分を抽出
-            if '{' in response_text and '}' in response_text:
-                json_start = response_text.find('{')
-                json_end = response_text.rfind('}') + 1
-                json_text = response_text[json_start:json_end]
-                
-                parsed = json.loads(json_text)
-                
-                decision = DecisionType(parsed.get('decision', 'REJECTED'))
-                reasoning = parsed.get('reasoning', '解析エラー')
-                confidence = float(parsed.get('confidence', 0.5))
-                content = parsed.get('content', response_text)
-                
-                return AgentResponse(
-                    agent_id=agent_id,
-                    decision=decision,
-                    content=content,
-                    reasoning=reasoning,
-                    confidence=max(0.0, min(1.0, confidence)),
-                    execution_time=execution_time,
-                    timestamp=datetime.now()
-                )
-            else:
-                # JSON解析失敗時のフォールバック
-                return self._fallback_parse_response(response_text, agent_id, execution_time)
-                
-        except (json.JSONDecodeError, ValueError, KeyError):
-            return self._fallback_parse_response(response_text, agent_id, execution_time)
-    
-    def _fallback_parse_response(self, response_text: str, agent_id: AgentType, execution_time: int) -> AgentResponse:
-        """フォールバック応答解析"""
-        text_lower = response_text.lower()
-        
-        if 'approved' in text_lower or '可決' in text_lower or '承認' in text_lower:
-            decision = DecisionType.APPROVED
-        else:
-            decision = DecisionType.REJECTED
-        
-        return AgentResponse(
-            agent_id=agent_id,
-            decision=decision,
-            content=response_text,
-            reasoning="テキスト解析による判断",
-            confidence=0.6,
-            execution_time=execution_time,
-            timestamp=datetime.now()
-        )
-    
-    async def _solomon_judgment(self, sage_responses: list[AgentResponse], question: str, trace_id: str, max_retries: int = 2) -> tuple[JudgeResponse, list]:
-        """
-        SOLOMON Judgeによる統合評価（リトライ機構付き）
-        
-        Args:
-            sage_responses: 3賢者の応答リスト
-            question: 元の質問
-            trace_id: トレースID
-            max_retries: 最大リトライ回数（デフォルト: 2）
-            
-        Returns:
-            tuple: (統合評価結果, エラー情報リスト)
-        """
-        from shared.types import ExecutionError
-        
-        print(f"⚖️  SOLOMON Judge Evaluation...")
-        
-        errors = []
-        solomon_agent = self.agents.get(AgentType.SOLOMON)
-        
-        if not solomon_agent:
-            print(f"   ⚠️  SOLOMON not available, using fallback judgment")
-            errors.append(ExecutionError(
-                agent_id=AgentType.SOLOMON,
-                error_type="AgentNotAvailable",
-                error_message="SOLOMON agent not initialized",
-                retry_count=0,
-                recovered=False
-            ))
-            return self._create_fallback_judgment(sage_responses), errors
-        
-        last_error = None
-        
-        # リトライループ
-        for attempt in range(max_retries + 1):
-            start_time = datetime.now()
-            
-            try:
-                # リトライ時のログ
-                if attempt > 0:
-                    print(f"   🔄 Retrying SOLOMON (attempt {attempt + 1}/{max_retries + 1})...")
-                
-                # 3賢者の結果をまとめたプロンプト作成
-                sage_summary = self._create_sage_summary(sage_responses)
-                solomon_prompt = f"""
-{get_agent_prompt('solomon')}
-
-## 元の質問
-{question}
-
-## 3賢者の判断結果
-{sage_summary}
-
-上記の3賢者の判断を評価し、統合判断を行ってください。指定されたJSON形式で回答してください。
-"""
-                
-                # SOLOMON Agent呼び出し
-                result = solomon_agent(solomon_prompt)
-                end_time = datetime.now()
-                execution_time = int((end_time - start_time).total_seconds() * 1000)
-                
-                # レスポンス解析
-                response_text = str(result)
-                judge_response = self._parse_solomon_response(response_text, sage_responses, execution_time)
-                
-                # 成功ログ
-                retry_info = f" (after {attempt} retries)" if attempt > 0 else ""
-                print(f"   ✅ SOLOMON: {judge_response.final_decision.value} (confidence: {judge_response.confidence:.2f}){retry_info}")
-                
-                # リトライで回復した場合はエラー情報に記録
-                if attempt > 0:
-                    errors.append(ExecutionError(
-                        agent_id=AgentType.SOLOMON,
-                        error_type="TemporaryFailure",
-                        error_message=f"Recovered after {attempt} retries",
-                        retry_count=attempt,
-                        recovered=True
-                    ))
-                
-                return judge_response, errors
-                
-            except Exception as e:
-                last_error = e
-                
-                # 最後のリトライでない場合は継続
-                if attempt < max_retries:
-                    print(f"   ⚠️  SOLOMON error (attempt {attempt + 1}): {e}")
-                    # 指数バックオフ（1秒、2秒）
-                    await asyncio.sleep(2 ** attempt)
-                    continue
-                else:
-                    # 最終的に失敗 - フォールバック判断を使用
-                    print(f"   ❌ SOLOMON failed after {max_retries + 1} attempts: {e}")
-                    print(f"   🔄 Using fallback judgment based on sage votes")
-                    
-                    # エラー情報を記録
-                    errors.append(ExecutionError(
-                        agent_id=AgentType.SOLOMON,
-                        error_type=type(last_error).__name__,
-                        error_message=str(last_error),
-                        retry_count=max_retries,
-                        recovered=False
-                    ))
-                    
-                    return self._create_fallback_judgment(sage_responses), errors
-    
-    def _create_sage_summary(self, sage_responses: list[AgentResponse]) -> str:
-        """3賢者の結果要約を作成"""
-        summary_parts = []
-        
-        for response in sage_responses:
-            summary_parts.append(f"""
-**{response.agent_id.value.upper()}**
-- 判断: {response.decision.value}
-- 根拠: {response.reasoning}
-- 確信度: {response.confidence:.2f}
-- 分析: {response.content[:200]}...
-""")
-        
-        return "\n".join(summary_parts)
-    
-    def _parse_solomon_response(self, response_text: str, sage_responses: list[AgentResponse], execution_time: int) -> JudgeResponse:
-        """SOLOMON応答を解析"""
-        try:
-            # JSON部分を抽出
-            if '{' in response_text and '}' in response_text:
-                json_start = response_text.find('{')
-                json_end = response_text.rfind('}') + 1
-                json_text = response_text[json_start:json_end]
-                
-                parsed = json.loads(json_text)
-                
-                # 投票結果の集計
-                approved = sum(1 for r in sage_responses if r.decision == DecisionType.APPROVED)
-                rejected = sum(1 for r in sage_responses if r.decision == DecisionType.REJECTED)
-                
-                voting_result = VotingResult(
-                    approved=approved,
-                    rejected=rejected,
-                    abstained=0
-                )
-                
-                # スコア情報の抽出
-                scores = []
-                for score_data in parsed.get('scores', []):
-                    scores.append(AgentScore(
-                        agent_id=AgentType(score_data.get('agent_id', 'caspar')),
-                        score=int(score_data.get('score', 75)),
-                        reasoning=score_data.get('reasoning', '評価理由なし')
-                    ))
-                
-                return JudgeResponse(
-                    final_decision=DecisionType(parsed.get('final_decision', 'REJECTED')),
-                    voting_result=voting_result,
-                    scores=scores,
-                    summary=parsed.get('summary', '統合評価完了'),
-                    final_recommendation=parsed.get('final_recommendation', '詳細検討を推奨'),
-                    reasoning=parsed.get('reasoning', '多数決による判断'),
-                    confidence=float(parsed.get('confidence', 0.8)),
-                    execution_time=execution_time,
-                    timestamp=datetime.now()
-                )
-            else:
-                return self._create_fallback_judgment(sage_responses)
-                
-        except (json.JSONDecodeError, ValueError, KeyError):
-            return self._create_fallback_judgment(sage_responses)
-    
-    def _create_fallback_judgment(self, sage_responses: list[AgentResponse]) -> JudgeResponse:
-        """フォールバック判断を作成"""
-        approved = sum(1 for r in sage_responses if r.decision == DecisionType.APPROVED)
-        rejected = sum(1 for r in sage_responses if r.decision == DecisionType.REJECTED)
-        
-        voting_result = VotingResult(
-            approved=approved,
-            rejected=rejected,
-            abstained=0
-        )
-        
-        final_decision = DecisionType.APPROVED if approved > rejected else DecisionType.REJECTED
-        
-        scores = [
-            AgentScore(agent_id=r.agent_id, score=int(r.confidence * 100), reasoning="自動評価")
-            for r in sage_responses
-        ]
-        
-        return JudgeResponse(
-            final_decision=final_decision,
-            voting_result=voting_result,
-            scores=scores,
-            summary="3賢者の判断を集計しました",
-            final_recommendation="慎重な検討を推奨します",
-            reasoning=f"投票結果: 可決{approved}票、否決{rejected}票による判断",
-            confidence=0.7,
-            execution_time=0,
-            timestamp=datetime.now()
-        )
-    
-    def get_stats(self) -> Dict[str, Any]:
-        """実行統計を取得"""
-        return {
-            "total_requests": self.execution_stats["total_requests"],
-            "successful_requests": self.execution_stats["successful_requests"],
-            "failed_requests": self.execution_stats["failed_requests"],
-            "success_rate": (
-                self.execution_stats["successful_requests"] / self.execution_stats["total_requests"]
-                if self.execution_stats["total_requests"] > 0 else 0
-            ),
-            "total_execution_time": self.execution_stats["total_execution_time"],
-            "average_execution_time": (
-                self.execution_stats["total_execution_time"] / self.execution_stats["successful_requests"]
-                if self.execution_stats["successful_requests"] > 0 else 0
-            )
-        }
-
-
-# AgentCore Runtime エントリーポイント
-magi_core = MAGIAgentCore()
-
-
-async def handler(event: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    AgentCore Runtime エントリーポイント関数
-    
-    Args:
-        event: AgentCore Runtimeからのイベント
-        
-    Returns:
-        Dict[str, Any]: 処理結果
-    """
-    try:
-        # イベントからリクエストを構築
-        question = event.get('question', 'デフォルトの質問です')
-        context = event.get('context')
-        
-        request = MAGIDecisionRequest(
-            question=question,
-            context=context
-        )
-        
-        # MAGI意思決定実行
-        response = await magi_core.process_decision(request)
-        
-        # レスポンスをJSONシリアライズ可能な形式に変換
-        return {
-            "statusCode": 200,
-            "body": {
-                "request_id": response.request_id,
-                "trace_id": response.trace_id,
-                "final_decision": response.judge_response.final_decision.value,
-                "voting_result": {
-                    "approved": response.judge_response.voting_result.approved,
-                    "rejected": response.judge_response.voting_result.rejected,
-                    "abstained": response.judge_response.voting_result.abstained
-                },
-                "summary": response.judge_response.summary,
-                "recommendation": response.judge_response.final_recommendation,
-                "confidence": response.judge_response.confidence,
-                "execution_time": response.total_execution_time,
-                "agent_responses": [
-                    {
-                        "agent_id": ar.agent_id.value,
-                        "decision": ar.decision.value,
-                        "reasoning": ar.reasoning,
-                        "confidence": ar.confidence
-                    }
-                    for ar in response.agent_responses
-                ],
-                "timestamp": response.timestamp.isoformat(),
-                "version": response.version
-            }
-        }
-        
-    except Exception as e:
-        return {
-            "statusCode": 500,
-            "body": {
+            print(f"❌ Error: {e}")
+            yield self._create_sse_event("error", {
                 "error": str(e),
-                "message": "MAGI Decision System execution failed"
+                "timestamp": datetime.now().isoformat()
+            })
+
+    def _create_summary(self, responses: list, final_decision: str) -> str:
+        """サマリー作成"""
+        approved = sum(1 for r in responses if r.get('decision') == 'APPROVED')
+        rejected = sum(1 for r in responses if r.get('decision') == 'REJECTED')
+        
+        if approved == 3:
+            return "3賢者全員が承認しました。"
+        elif rejected == 3:
+            return "3賢者全員が却下しました。"
+        elif approved > rejected:
+            return f"3賢者のうち{approved}名が承認し、最終判断は承認となりました。"
+        else:
+            return f"3賢者のうち{rejected}名が却下し、最終判断は却下となりました。"
+    
+    def _create_recommendation(self, responses: list, final_decision: str) -> str:
+        """推奨事項作成"""
+        if final_decision == 'APPROVED':
+            return "提案を実行することを推奨します。"
+        else:
+            return "提案の再検討を推奨します。"
+    
+    def _calculate_confidence(self, responses: list) -> float:
+        """信頼度計算"""
+        if not responses:
+            return 0.0
+        
+        confidences = [r.get('confidence', 0.5) for r in responses]
+        return sum(confidences) / len(confidences)
+    
+    async def _consult_sage_stream(self, agent: Agent, agent_id: str, question: str, trace_id: str):
+        """
+        個別の賢者に相談（ストリーミング版）
+        
+        Strands Agentsのストリーミング機能を使用して、
+        思考プロセスをリアルタイムで表示します。
+        """
+        # 開始イベント
+        yield self._create_sse_event("sage_start", {
+            "agent_id": agent_id,
+            "trace_id": trace_id
+        })
+        
+        print(f"  🤖 Consulting {agent_id.upper()}...")
+        
+        try:
+            # Strands Agentsのストリーミング機能を使用
+            # stream_async()メソッドは思考プロセスをリアルタイムで返す
+            full_response = ""
+            
+            # stream_async()メソッドで非同期ストリーミング
+            async for chunk in agent.stream_async(question):
+                # チャンクからテキストを抽出
+                # Strands Agentsは辞書形式でチャンクを返す
+                if isinstance(chunk, dict):
+                    # 'data'キーにテキストが含まれる場合
+                    if 'data' in chunk:
+                        chunk_text = chunk['data']
+                    # 'delta'キーにテキストが含まれる場合
+                    elif 'delta' in chunk and isinstance(chunk['delta'], dict):
+                        chunk_text = chunk['delta'].get('text', '')
+                    # その他の場合は文字列化
+                    else:
+                        chunk_text = str(chunk)
+                else:
+                    chunk_text = str(chunk)
+                
+                # 空のチャンクはスキップ
+                if not chunk_text:
+                    continue
+                
+                full_response += chunk_text
+                
+                # チャンクイベント（思考プロセスの一部）
+                yield self._create_sse_event("sage_thinking", {
+                    "agent_id": agent_id,
+                    "chunk": chunk_text,
+                    "trace_id": trace_id
+                })
+            
+            # 最終レスポンスイベント
+            yield self._create_sse_event("sage_chunk", {
+                "agent_id": agent_id,
+                "chunk": full_response,
+                "trace_id": trace_id
+            })
+            
+            # JSON部分を抽出
+            try:
+                if '```json' in full_response:
+                    json_start = full_response.find('```json') + 7
+                    json_end = full_response.find('```', json_start)
+                    json_text = full_response[json_start:json_end].strip()
+                elif '{' in full_response:
+                    json_start = full_response.find('{')
+                    json_end = full_response.rfind('}') + 1
+                    json_text = full_response[json_start:json_end]
+                else:
+                    json_text = full_response
+                
+                result = json.loads(json_text)
+                result['agent_id'] = agent_id
+                
+                print(f"  ✅ {agent_id.upper()}: {result.get('decision')} (confidence: {result.get('confidence')})")
+                
+                # 完了イベント
+                yield self._create_sse_event("sage_complete", result)
+                
+            except json.JSONDecodeError:
+                print(f"  ⚠️ {agent_id.upper()}: JSON parse failed, using default")
+                result = {
+                    "agent_id": agent_id,
+                    "decision": "ABSTAINED",
+                    "reasoning": full_response[:200],
+                    "confidence": 0.5
+                }
+                yield self._create_sse_event("sage_complete", result)
+                
+        except Exception as e:
+            print(f"  ❌ {agent_id.upper()} failed: {e}")
+            
+            # エラー時もデフォルト結果を返す
+            default_result = {
+                "agent_id": agent_id,
+                "decision": "ABSTAINED",
+                "reasoning": f"エラーが発生しました: {str(e)}",
+                "confidence": 0.0
             }
+            
+            # エラーイベント
+            yield self._create_sse_event("sage_error", {
+                "agent_id": agent_id,
+                "error": str(e),
+                "trace_id": trace_id
+            })
+            
+            # 完了イベント（デフォルト結果）
+            yield self._create_sse_event("sage_complete", default_result)
+    
+    async def _solomon_judgment_stream(self, sage_responses: list, question: str, trace_id: str):
+        """
+        SOLOMON Judgeによる統合評価（ストリーミング版）
+        
+        Strands Agentsのストリーミング機能を使用して、
+        評価プロセスをリアルタイムで表示します。
+        """
+        try:
+            # 3賢者のデータが不足している場合の警告
+            if len(sage_responses) < 3:
+                print(f"  ⚠️ SOLOMON: Only {len(sage_responses)}/3 sages responded")
+            
+            # 3賢者の結果をフォーマット
+            sage_summary = json.dumps([
+                {
+                    "agent": r.get('agent_id'),
+                    "decision": r.get('decision'),
+                    "reasoning": r.get('reasoning'),
+                    "confidence": r.get('confidence')
+                }
+                for r in sage_responses
+            ], ensure_ascii=False, indent=2)
+            
+            # SOLOMONプロンプトに3賢者の結果を埋め込み
+            solomon_prompt = SOLOMON_PROMPT.format(sage_responses=sage_summary)
+            
+            # Strands Agentsのストリーミング機能を使用
+            # stream_async()メソッドで非同期ストリーミング
+            full_response = ""
+            
+            # stream_async()メソッドで非同期ストリーミング
+            async for chunk in self.solomon.stream_async(question, system_prompt=solomon_prompt):
+                # チャンクからテキストを抽出
+                if isinstance(chunk, dict):
+                    if 'data' in chunk:
+                        chunk_text = chunk['data']
+                    elif 'delta' in chunk and isinstance(chunk['delta'], dict):
+                        chunk_text = chunk['delta'].get('text', '')
+                    else:
+                        chunk_text = str(chunk)
+                else:
+                    chunk_text = str(chunk)
+                
+                # 空のチャンクはスキップ
+                if not chunk_text:
+                    continue
+                
+                full_response += chunk_text
+                
+                # チャンクイベント（思考プロセスの一部）
+                yield self._create_sse_event("judge_thinking", {
+                    "chunk": chunk_text,
+                    "trace_id": trace_id
+                })
+            
+            # 最終レスポンスイベント
+            yield self._create_sse_event("judge_chunk", {
+                "chunk": full_response,
+                "trace_id": trace_id
+            })
+            
+            # JSON部分を抽出
+            try:
+                if '```json' in full_response:
+                    json_start = full_response.find('```json') + 7
+                    json_end = full_response.find('```', json_start)
+                    json_text = full_response[json_start:json_end].strip()
+                elif '{' in full_response:
+                    json_start = full_response.find('{')
+                    json_end = full_response.rfind('}') + 1
+                    json_text = full_response[json_start:json_end]
+                else:
+                    json_text = full_response
+                
+                result = json.loads(json_text)
+                
+                print(f"  ✅ SOLOMON: {result.get('final_decision')} (confidence: {result.get('confidence')})")
+                
+                # 完了イベント
+                yield self._create_sse_event("judge_complete", result)
+                
+            except json.JSONDecodeError:
+                print(f"  ⚠️ SOLOMON: JSON parse failed, using default")
+                result = {
+                    "final_decision": "REJECTED",
+                    "reasoning": full_response[:300],
+                    "confidence": 0.5,
+                    "sage_scores": {}
+                }
+                yield self._create_sse_event("judge_complete", result)
+                
+        except Exception as e:
+            print(f"  ❌ SOLOMON failed: {e}")
+            
+            # エラー時もデフォルト結果を返す
+            default_result = {
+                "final_decision": "REJECTED",
+                "reasoning": f"SOLOMON評価中にエラーが発生しました: {str(e)}",
+                "confidence": 0.0,
+                "sage_scores": {}
+            }
+            
+            # エラーイベント
+            yield self._create_sse_event("judge_error", {
+                "error": str(e),
+                "trace_id": trace_id
+            })
+            
+            # 完了イベント（デフォルト結果）
+            yield self._create_sse_event("judge_complete", default_result)
+    
+    async def _merge_streams(self, tasks):
+        """
+        複数のストリームをマージ
+        """
+        # 各タスクからイベントを収集
+        for task in tasks:
+            async for event in task:
+                yield event
+    
+    def _create_sse_event(self, event_type: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        イベントを作成（AgentCore Runtimeが自動的にSSE形式に変換）
+        
+        DEBUG_STREAMING=true の場合、コンソールにイベントを表示します。
+        """
+        event = {
+            "type": event_type,
+            "data": data
         }
+        
+        # デバッグモード: ストリーミングイベントをコンソールに表示
+        if DEBUG_STREAMING:
+            self._log_streaming_event(event_type, data)
+        
+        return event
+    
+    def _log_streaming_event(self, event_type: str, data: Dict[str, Any]):
+        """
+        ストリーミングイベントをコンソールに表示（デバッグ用）
+        
+        3賢者の並列処理により、イベントは到着順に表示されます。
+        """
+        timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        
+        # イベントタイプ別の表示フォーマット
+        if event_type == "start":
+            print(f"\n{'='*80}")
+            print(f"[{timestamp}] 🚀 START")
+            print(f"  Question: {data.get('question', 'N/A')}")
+            print(f"  Trace ID: {data.get('trace_id', 'N/A')}")
+            print(f"{'='*80}\n")
+        
+        elif event_type == "sages_start":
+            print(f"[{timestamp}] 👥 SAGES_START")
+            print(f"  Consulting {data.get('sage_count', 3)} sages in parallel...\n")
+        
+        elif event_type == "sage_start":
+            agent_id = data.get('agent_id', 'unknown').upper()
+            print(f"[{timestamp}] 🤖 SAGE_START: {agent_id}")
+        
+        elif event_type == "sage_thinking":
+            agent_id = data.get('agent_id', 'unknown').upper()
+            chunk = data.get('chunk', '')
+            # 思考プロセスをリアルタイム表示
+            print(f"[{timestamp}] 💭 THINKING: {agent_id}")
+            print(f"  {chunk}")
+        
+        elif event_type == "sage_chunk":
+            agent_id = data.get('agent_id', 'unknown').upper()
+            chunk = data.get('chunk', '')
+            # チャンクが長い場合は省略表示
+            display_chunk = chunk[:100] + "..." if len(chunk) > 100 else chunk
+            print(f"[{timestamp}] 💭 SAGE_CHUNK: {agent_id}")
+            print(f"  {display_chunk}\n")
+        
+        elif event_type == "sage_complete":
+            agent_id = data.get('agent_id', 'unknown').upper()
+            decision = data.get('decision', 'N/A')
+            confidence = data.get('confidence', 0.0)
+            reasoning = data.get('reasoning', 'N/A')
+            print(f"[{timestamp}] ✅ SAGE_COMPLETE: {agent_id}")
+            print(f"  Decision: {decision}")
+            print(f"  Confidence: {confidence:.2f}")
+            print(f"  Reasoning: {reasoning[:80]}...")
+            print()
+        
+        elif event_type == "sage_error":
+            agent_id = data.get('agent_id', 'unknown').upper()
+            error = data.get('error', 'N/A')
+            print(f"[{timestamp}] ❌ SAGE_ERROR: {agent_id}")
+            print(f"  Error: {error}\n")
+        
+        elif event_type == "judge_start":
+            print(f"[{timestamp}] ⚖️  JUDGE_START")
+            print(f"  SOLOMON evaluating 3 sages' responses...\n")
+        
+        elif event_type == "judge_thinking":
+            chunk = data.get('chunk', '')
+            # 思考プロセスをリアルタイム表示
+            print(f"[{timestamp}] 💭 JUDGE_THINKING")
+            print(f"  {chunk}")
+        
+        elif event_type == "judge_chunk":
+            chunk = data.get('chunk', '')
+            display_chunk = chunk[:100] + "..." if len(chunk) > 100 else chunk
+            print(f"[{timestamp}] 💭 JUDGE_CHUNK")
+            print(f"  {display_chunk}\n")
+        
+        elif event_type == "judge_complete":
+            final_decision = data.get('final_decision', 'N/A')
+            confidence = data.get('confidence', 0.0)
+            reasoning = data.get('reasoning', 'N/A')
+            sage_scores = data.get('sage_scores', {})
+            print(f"[{timestamp}] ✅ JUDGE_COMPLETE")
+            print(f"  Final Decision: {final_decision}")
+            print(f"  Confidence: {confidence:.2f}")
+            print(f"  Reasoning: {reasoning[:80]}...")
+            if sage_scores:
+                print(f"  Sage Scores:")
+                for sage, score in sage_scores.items():
+                    print(f"    {sage.upper()}: {score}/100")
+            print()
+        
+        elif event_type == "judge_error":
+            error = data.get('error', 'N/A')
+            print(f"[{timestamp}] ❌ JUDGE_ERROR")
+            print(f"  Error: {error}\n")
+        
+        elif event_type == "complete":
+            final_decision = data.get('final_decision', 'N/A')
+            execution_time = data.get('execution_time', 0)
+            voting_result = data.get('voting_result', {})
+            print(f"\n{'='*80}")
+            print(f"[{timestamp}] 🏁 COMPLETE")
+            print(f"  Final Decision: {final_decision}")
+            print(f"  Execution Time: {execution_time}ms")
+            print(f"  Voting Result:")
+            print(f"    Approved: {voting_result.get('approved', 0)}")
+            print(f"    Rejected: {voting_result.get('rejected', 0)}")
+            print(f"    Abstained: {voting_result.get('abstained', 0)}")
+            print(f"{'='*80}\n")
+        
+        elif event_type == "error":
+            error = data.get('error', 'N/A')
+            print(f"\n{'='*80}")
+            print(f"[{timestamp}] ❌ ERROR")
+            print(f"  {error}")
+            print(f"{'='*80}\n")
+        
+        else:
+            # その他のイベント
+            print(f"[{timestamp}] 📦 {event_type.upper()}")
+            print(f"  Data: {json.dumps(data, ensure_ascii=False, indent=2)}\n")
 
 
-# テスト実行関数
-async def test_magi_agent():
-    """MAGI Agentのテスト"""
-    print("🚀 Testing MAGI Agent (AgentCore Runtime)")
-    print("=" * 60)
+# グローバルインスタンス
+magi_strands = MAGIStrandsAgent()
+
+
+@app.entrypoint
+async def handler_strands(payload: Dict[str, Any]):
+    """
+    AgentCore Runtime エントリーポイント（ストリーミング専用）
     
-    test_request = MAGIDecisionRequest(
-        question="新しいAIシステムを全社に導入すべきか？",
-        context="コスト削減と効率化が期待されるが、従業員の反発も予想される"
-    )
-    
-    try:
-        response = await magi_core.process_decision(test_request)
-        
-        print(f"\n📊 MAGI Decision Results:")
-        print(f"   Final Decision: {response.judge_response.final_decision.value}")
-        print(f"   Execution Time: {response.total_execution_time}ms")
-        print(f"   Voting: {response.judge_response.voting_result.approved}可決 / {response.judge_response.voting_result.rejected}否決")
-        print(f"   Summary: {response.judge_response.summary}")
-        
-        # 各賢者の結果
-        print(f"\n🧠 Individual Sage Results:")
-        for agent_response in response.agent_responses:
-            print(f"   {agent_response.agent_id.value}: {agent_response.decision.value} (confidence: {agent_response.confidence:.2f})")
-        
-        # システム統計
-        stats = magi_core.get_stats()
-        print(f"\n📈 System Statistics:")
-        print(f"   Total Requests: {stats['total_requests']}")
-        print(f"   Success Rate: {stats['success_rate']:.2%}")
-        print(f"   Average Execution Time: {stats['average_execution_time']:.0f}ms")
-        
-        return response
-        
-    except Exception as e:
-        print(f"❌ Test failed: {e}")
-        return None
+    常にストリーミングレスポンスを返します。
+    UXを考慮し、3賢者の思考プロセスをリアルタイムで表示します。
+    """
+    async for event in magi_strands.process_decision_stream(payload):
+        yield event
 
 
 if __name__ == "__main__":
-    # 直接実行時のテスト
-    asyncio.run(test_magi_agent())
+    # AgentCore Runtime起動
+    print("🚀 Starting MAGI Strands Agent...")
+    app.run()
