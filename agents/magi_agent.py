@@ -6,10 +6,11 @@ Strands Agentsフレームワークを使用した3賢者システムの実装�
 Amazon Bedrockと統合し、実際のLLM推論を実行します。
 """
 
+import errno
 import json
 import asyncio
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime
 
 # AgentCore Runtime統合
@@ -294,9 +295,34 @@ class MAGIStrandsAgent:
         """信頼度計算"""
         if not responses:
             return 0.0
-        
+
         confidences = [r.get('confidence', 0.5) for r in responses]
         return sum(confidences) / len(confidences)
+
+    def _extract_json_block(self, full_text: str, key_hint: str) -> Optional[str]:
+        """Extract a JSON object that contains a specific key."""
+        if not full_text:
+            return None
+
+        key_position = full_text.find(key_hint)
+        if key_position == -1:
+            return None
+
+        start_index = full_text.rfind('{', 0, key_position)
+        if start_index == -1:
+            return None
+
+        depth = 0
+        for index in range(start_index, len(full_text)):
+            char = full_text[index]
+            if char == '{':
+                depth += 1
+            elif char == '}':
+                depth -= 1
+                if depth == 0:
+                    return full_text[start_index:index + 1].strip()
+
+        return None
     
     async def _consult_sage_stream(self, agent: Agent, agent_id: str, question: str, trace_id: str):
         """
@@ -361,17 +387,16 @@ class MAGIStrandsAgent:
             
             # JSON部分を抽出
             try:
-                if '```json' in full_response:
-                    json_start = full_response.find('```json') + 7
-                    json_end = full_response.find('```', json_start)
-                    json_text = full_response[json_start:json_end].strip()
-                elif '{' in full_response:
+                json_text = self._extract_json_block(full_response, '"decision"')
+
+                if not json_text and '{' in full_response:
                     json_start = full_response.find('{')
                     json_end = full_response.rfind('}') + 1
                     json_text = full_response[json_start:json_end]
-                else:
-                    json_text = full_response
-                
+
+                if not json_text:
+                    json_text = full_response.strip()
+
                 result = json.loads(json_text)
                 result['agent_id'] = agent_id
                 
@@ -474,17 +499,16 @@ class MAGIStrandsAgent:
             
             # JSON部分を抽出
             try:
-                if '```json' in full_response:
-                    json_start = full_response.find('```json') + 7
-                    json_end = full_response.find('```', json_start)
-                    json_text = full_response[json_start:json_end].strip()
-                elif '{' in full_response:
+                json_text = self._extract_json_block(full_response, '"final_decision"')
+
+                if not json_text and '{' in full_response:
                     json_start = full_response.find('{')
                     json_end = full_response.rfind('}') + 1
                     json_text = full_response[json_start:json_end]
-                else:
-                    json_text = full_response
-                
+
+                if not json_text:
+                    json_text = full_response.strip()
+
                 result = json.loads(json_text)
                 
                 print(f"  ✅ SOLOMON: {result.get('final_decision')} (confidence: {result.get('confidence')})")
@@ -686,4 +710,34 @@ async def handler_strands(payload: Dict[str, Any]):
 if __name__ == "__main__":
     # AgentCore Runtime起動
     print("🚀 Starting MAGI Strands Agent...")
-    app.run()
+
+    port_env = os.getenv("AGENTCORE_RUNTIME_PORT") or os.getenv("PORT")
+    host_env = os.getenv("AGENTCORE_RUNTIME_HOST")
+    fallback_port_env = os.getenv("AGENTCORE_RUNTIME_FALLBACK_PORT")
+
+    try:
+        port_value = int(port_env) if port_env else 8080
+    except ValueError:
+        print(f"⚠️  Invalid port value '{port_env}', falling back to 8080")
+        port_value = 8080
+
+    run_kwargs = {}
+    if host_env:
+        run_kwargs["host"] = host_env
+
+    try:
+        app.run(port=port_value, **run_kwargs)
+    except OSError as exc:
+        if exc.errno == errno.EADDRINUSE and fallback_port_env:
+            try:
+                fallback_port = int(fallback_port_env)
+            except ValueError:
+                print(f"❌ Invalid fallback port '{fallback_port_env}'.")
+                raise
+
+            print(
+                f"⚠️  Port {port_value} in use. Retrying on fallback port {fallback_port}."
+            )
+            app.run(port=fallback_port, **run_kwargs)
+        else:
+            raise
