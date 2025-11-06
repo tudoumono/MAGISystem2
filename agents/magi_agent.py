@@ -761,9 +761,15 @@ class MAGIStrandsAgent:
             # Strands Agentsのストリーミング機能を使用
             # stream_async()メソッドで非同期ストリーミング
             full_response = ""
-            
+            chunk_count = 0
+
+            print(f"  🔍 DEBUG: Starting Solomon stream_async()...")
+            print(f"  🔍 DEBUG: sage_responses count: {len(sage_responses)}")
+
             # stream_async()メソッドで非同期ストリーミング
             async for chunk in self.solomon.stream_async(question, system_prompt=solomon_prompt):
+                chunk_count += 1
+
                 # チャンクからテキストを抽出
                 chunk_text = None
                 
@@ -793,18 +799,19 @@ class MAGIStrandsAgent:
                 
                 elif isinstance(chunk, str):
                     chunk_text = chunk
-                
                 # 空のチャンクはスキップ
                 if not chunk_text:
                     continue
-                
+
                 full_response += chunk_text
-                
+
                 # チャンクイベント（思考プロセスの一部）
                 yield self._create_sse_event("judge_thinking", {
                     "chunk": chunk_text,
                     "trace_id": trace_id
                 })
+
+            print(f"  🔍 DEBUG: Solomon stream completed. Chunks: {chunk_count}, Response length: {len(full_response)}")
             
             # 最終レスポンスイベント
             yield self._create_sse_event("judge_chunk", {
@@ -814,6 +821,11 @@ class MAGIStrandsAgent:
             
             # JSON部分を抽出
             try:
+                print(f"  🔍 DEBUG: Attempting to parse JSON from response (length: {len(full_response)})")
+
+                if not full_response or len(full_response) < 10:
+                    raise ValueError(f"Solomon response too short or empty: '{full_response}'")
+
                 json_text = self._extract_json_block(full_response, '"final_decision"')
 
                 if not json_text and '{' in full_response:
@@ -823,6 +835,8 @@ class MAGIStrandsAgent:
 
                 if not json_text:
                     json_text = full_response.strip()
+
+                print(f"  🔍 DEBUG: Extracted JSON text (length: {len(json_text)}): {json_text[:100]}...")
 
                 result = json.loads(json_text)
                 
@@ -842,7 +856,10 @@ class MAGIStrandsAgent:
                 yield self._create_sse_event("judge_complete", result)
                 
         except Exception as e:
+            import traceback
+            error_detail = traceback.format_exc()
             print(f"  ❌ SOLOMON failed: {e}")
+            print(f"  🔍 DEBUG: Full error trace:\n{error_detail}")
             
             # エラー時もデフォルト結果を返す（信頼度を0.5に設定）
             default_result = {
@@ -864,6 +881,7 @@ class MAGIStrandsAgent:
             # エラーイベント
             yield self._create_sse_event("judge_error", {
                 "error": str(e),
+                "error_type": type(e).__name__,
                 "trace_id": trace_id
             })
             
