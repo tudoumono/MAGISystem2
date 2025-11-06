@@ -35,12 +35,28 @@ from datetime import datetime
 # Strands Agents
 from strands import Agent
 
-# デバッグモード設定（環境変数で制御）
-DEBUG_STREAMING = os.getenv('DEBUG_STREAMING', 'false').lower() == 'true'
-
-print("✅ MAGI Strands Agent initialized successfully")
-if DEBUG_STREAMING:
-    print("🐛 DEBUG_STREAMING enabled - All streaming events will be logged to console")
+# 設定管理（AgentCore Runtime対応）
+try:
+    import sys
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).parent))
+    from shared.config import MAGIConfig
+    
+    # AgentCore Runtime環境用の設定
+    config = MAGIConfig.for_agentcore_runtime()
+    DEBUG_STREAMING = config.is_debug_enabled()
+    
+    print("✅ MAGI Strands Agent initialized successfully")
+    if DEBUG_STREAMING:
+        print("🐛 DEBUG_STREAMING enabled - All streaming events will be logged to console")
+        
+except ImportError as e:
+    # フォールバック: 環境変数のみ使用
+    print(f"⚠️  Config module not available: {e}")
+    DEBUG_STREAMING = os.getenv('DEBUG_STREAMING', 'false').lower() == 'true'
+    print("✅ MAGI Strands Agent initialized (fallback mode)")
+    if DEBUG_STREAMING:
+        print("🐛 DEBUG_STREAMING enabled (fallback) - All streaming events will be logged to console")
 
 
 # 3賢者のシステムプロンプト
