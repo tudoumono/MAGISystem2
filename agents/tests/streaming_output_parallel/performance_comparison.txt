@@ -1,0 +1,9 @@
+# Performance Comparison: Sequential vs Parallel
+================================================================================
+
+Sequential Version: 10.93 seconds
+Parallel Version:   6.97 seconds
+Improvement:        36.2% faster
+Speedup:            1.57x
+
+⚠️  MODERATE: Some improvement, but room for optimization.
