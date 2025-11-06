@@ -320,6 +320,10 @@ class MAGIStrandsAgent:
             
             # stream_async()メソッドで非同期ストリーミング
             async for chunk in agent.stream_async(question):
+                # デバッグ: チャンクの型と内容を出力
+                print(f"  🔍 {agent_id.upper()} chunk type: {type(chunk)}")
+                print(f"  🔍 {agent_id.upper()} chunk content: {chunk}")
+                
                 # チャンクからテキストを抽出
                 # Strands Agentsは辞書形式でチャンクを返す
                 if isinstance(chunk, dict):

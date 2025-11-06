@@ -1,36 +1,22 @@
 # MAGI Streaming Classification Test Summary
 ================================================================================
 
-Test Time: 2025-11-06T00:26:22.615639
-Duration: 11.05 seconds
-Total Events: 390
+Test Time: 2025-11-06T16:00:19.195391
+Duration: 1.91 seconds
+Total Events: 3
 
 ## Events by Type
-  complete: 1
-  judge_complete: 1
-  judge_error: 1
-  judge_start: 1
-  sage_chunk: 3
-  sage_complete: 3
-  sage_start: 3
-  sage_thinking: 375
-  sages_start: 1
+  error: 2
   start: 1
 
 ## Chunks by Agent
-  caspar: 1 chunks
-  balthasar: 1 chunks
-  melchior: 1 chunks
+  caspar: 0 chunks
+  balthasar: 0 chunks
+  melchior: 0 chunks
   solomon: 0 chunks
 
 ## Stream Sizes
-  caspar: 5858 characters
-  balthasar: 6507 characters
-  melchior: 6725 characters
 
 ## Files Generated
-  - caspar_stream.txt
-  - balthasar_stream.txt
-  - melchior_stream.txt
   - full_stream.json
   - summary.txt
