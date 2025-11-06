@@ -1,9 +1,23 @@
 # MAGI Streaming Classification Test Summary
 ================================================================================
+# 🎯 PHASE 2 COMPLETE - WORKING BASELINE ✅
+# ===========================================
+# 
+# ✅ 動作確認済み (2025-11-06): 参考記事準拠のNext.js + Python統合パターンが完全動作
+# ✅ 3賢者システム: CASPAR/BALTHASAR/MELCHIOR が並列実行で正常動作
+# ✅ ストリーミング: Server-Sent Events による完全なリアルタイムストリーミング
+# ✅ JSON通信: 標準入出力による完全なJSON Lines通信
+# 
+# 🔄 ROLLBACK POINT: この実行結果は動作確認済みベースライン
+# 問題が発生した場合は、test_magi2.py を実行してこの結果と比較すること
+# 
+# アーキテクチャ検証完了:
+#   Next.js Backend (/invocations) → Python subprocess → 3賢者並列実行 → JSON Lines出力
+================================================================================
 
-Test Time: 2025-11-06T15:43:43.516369
-Duration: 11.03 seconds
-Total Events: 14
+Test Time: 2025-11-06T19:45:58.201731
+Duration: 11.96 seconds
+Total Events: 383
 
 ## Events by Type
   complete: 1
@@ -13,7 +27,9 @@ Total Events: 14
   sage_chunk: 3
   sage_complete: 3
   sage_start: 3
+  sage_thinking: 367
   sages_start: 1
+  start: 2
 
 ## Chunks by Agent
   caspar: 1 chunks
@@ -22,9 +38,9 @@ Total Events: 14
   solomon: 0 chunks
 
 ## Stream Sizes
-  caspar: 0 characters
-  balthasar: 0 characters
-  melchior: 0 characters
+  caspar: 5265 characters
+  balthasar: 7643 characters
+  melchior: 5859 characters
 
 ## Files Generated
   - caspar_stream.txt

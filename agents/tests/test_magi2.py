@@ -2,6 +2,20 @@
 """
 MAGIストリーミング分類テスト - Phase 2版（HTTP POST / 参考記事準拠）
 
+🎯 PHASE 2 COMPLETE - WORKING BASELINE ✅
+===========================================
+
+✅ 動作確認済み (2025-11-06): 参考記事準拠のNext.js + Python統合パターンが完全動作
+✅ テスト結果: 11.96秒、383イベント、3賢者完全動作を確認
+✅ 出力ファイル: streaming_output_phase2/ に完全な実行記録を保存
+
+🔄 ROLLBACK POINT: このテストファイルは動作確認済みベースライン
+問題が発生した場合は、このテストを実行して動作確認すること
+
+実行方法:
+    cd agents/tests
+    python test_magi2.py
+
 AgentCore Runtime（Next.js + Python統合版）に直接HTTP POSTリクエストを送信し、
 ストリーミングレスポンスを受信して各賢者とSOLOMON Judgeのストリームを保存します。
 
