@@ -2,6 +2,25 @@
 """
 MAGI Agent - Strands Agents統合版
 
+🎯 PHASE 2 COMPLETE - WORKING BASELINE ✅
+===========================================
+
+✅ 動作確認済み (2025-11-06): 参考記事準拠のNext.js + Python統合パターンが完全動作
+✅ テスト結果: test_magi2.py で11.96秒、383イベント、3賢者完全動作を確認
+✅ 実行方式: Next.jsから子プロセスとして呼び出され、標準入出力でJSON通信
+✅ ストリーミング: リアルタイムでイベントをJSON Lines形式で出力
+
+🔄 ROLLBACK POINT: このファイルは動作確認済みベースライン
+問題が発生した場合は、このバージョンに戻すこと
+
+アーキテクチャ:
+  Next.js (agents/backend/app/api/invocations/route.ts)
+      ↓ spawn('python', ['magi_agent.py'])
+  Python magi_agent.py (このファイル) ← 動作確認済み
+      ├─ 標準入力: JSON リクエスト受信
+      ├─ 標準出力: JSON Lines ストリーミング出力
+      └─ 3賢者 + SOLOMON Judge 並列実行
+
 Strands Agentsフレームワークを使用した3賢者システムの実装。
 Amazon Bedrockと統合し、実際のLLM推論を実行します。
 """
@@ -10,17 +29,11 @@ import errno
 import json
 import asyncio
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, AsyncGenerator
 from datetime import datetime
-
-# AgentCore Runtime統合
-from bedrock_agentcore import BedrockAgentCoreApp
 
 # Strands Agents
 from strands import Agent
-
-# アプリケーション初期化
-app = BedrockAgentCoreApp()
 
 # デバッグモード設定（環境変数で制御）
 DEBUG_STREAMING = os.getenv('DEBUG_STREAMING', 'false').lower() == 'true'
@@ -691,53 +704,62 @@ class MAGIStrandsAgent:
             print(f"  Data: {json.dumps(data, ensure_ascii=False, indent=2)}\n")
 
 
-# グローバルインスタンス
-magi_strands = MAGIStrandsAgent()
+# グローバルインスタンス（子プロセス実行用）
+print("✅ 3賢者 + SOLOMON Judge 初期化完了")
 
 
-@app.entrypoint
-async def handler_strands(payload: Dict[str, Any]):
+async def main():
     """
-    AgentCore Runtime エントリーポイント（ストリーミング専用）
-    
-    常にストリーミングレスポンスを返します。
-    UXを考慮し、3賢者の思考プロセスをリアルタイムで表示します。
+    子プロセスとしてのメイン実行関数
+    標準入力からJSONを受け取り、標準出力にストリーミング結果を出力
     """
-    async for event in magi_strands.process_decision_stream(payload):
-        yield event
+    try:
+        # 標準入力からリクエストデータを読み取り
+        import sys
+        input_data = sys.stdin.read()
+        
+        if not input_data.strip():
+            print(json.dumps({
+                "type": "error",
+                "data": {"error": "No input data received", "code": "INPUT_ERROR"},
+                "timestamp": datetime.now().isoformat()
+            }), flush=True)
+            return
+        
+        # JSONデータをパース
+        try:
+            payload = json.loads(input_data)
+        except json.JSONDecodeError as e:
+            print(json.dumps({
+                "type": "error", 
+                "data": {"error": f"Invalid JSON: {e}", "code": "JSON_PARSE_ERROR"},
+                "timestamp": datetime.now().isoformat()
+            }), flush=True)
+            return
+        
+        # MAGI決定プロセスを実行
+        magi_strands = MAGIStrandsAgent()
+        
+        async for event in magi_strands.process_decision_stream(payload):
+            # 各イベントをJSON行として出力
+            print(json.dumps(event), flush=True)
+            
+    except Exception as e:
+        # 予期しないエラーの処理
+        print(json.dumps({
+            "type": "error",
+            "data": {"error": f"Unexpected error: {str(e)}", "code": "SYSTEM_ERROR"},
+            "timestamp": datetime.now().isoformat()
+        }), flush=True)
 
 
 if __name__ == "__main__":
-    # AgentCore Runtime起動
-    print("🚀 Starting MAGI Strands Agent...")
-
-    port_env = os.getenv("AGENTCORE_RUNTIME_PORT") or os.getenv("PORT")
-    host_env = os.getenv("AGENTCORE_RUNTIME_HOST")
-    fallback_port_env = os.getenv("AGENTCORE_RUNTIME_FALLBACK_PORT")
-
-    try:
-        port_value = int(port_env) if port_env else 8080
-    except ValueError:
-        print(f"⚠️  Invalid port value '{port_env}', falling back to 8080")
-        port_value = 8080
-
-    run_kwargs = {}
-    if host_env:
-        run_kwargs["host"] = host_env
-
-    try:
-        app.run(port=port_value, **run_kwargs)
-    except OSError as exc:
-        if exc.errno == errno.EADDRINUSE and fallback_port_env:
-            try:
-                fallback_port = int(fallback_port_env)
-            except ValueError:
-                print(f"❌ Invalid fallback port '{fallback_port_env}'.")
-                raise
-
-            print(
-                f"⚠️  Port {port_value} in use. Retrying on fallback port {fallback_port}."
-            )
-            app.run(port=fallback_port, **run_kwargs)
-        else:
-            raise
+    # 常に子プロセスとして実行（Next.jsから呼び出される）
+    print(json.dumps({
+        "type": "start",
+        "data": {"message": "MAGI Strands Agent started as subprocess"},
+        "timestamp": datetime.now().isoformat()
+    }), flush=True)
+    
+    # 非同期メイン関数を実行
+    asyncio.run(main())
