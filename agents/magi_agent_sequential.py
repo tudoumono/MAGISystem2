@@ -1,31 +1,25 @@
 #!/usr/bin/env python3
 """
-MAGI Agent - Strands Agents統合版 (PARALLEL STREAMING)
+MAGI Agent - Strands Agents統合版 (SEQUENTIAL BACKUP)
 
-🚀 PHASE 3 - TRUE PARALLEL EXECUTION ⚡
-==========================================
+🎯 PHASE 2 COMPLETE - WORKING BASELINE ✅
+===========================================
 
-✅ 真の並列実行: 3賢者が同時に思考・応答
-✅ リアルタイムストリーミング: 各賢者の思考プロセスを即座に表示
-✅ パフォーマンス向上: 実行時間を1/3に短縮（30秒 → 10秒目標）
-✅ エラー処理: 1つの賢者が失敗しても他は継続
+✅ 動作確認済み (2025-11-06): 参考記事準拠のNext.js + Python統合パターンが完全動作
+✅ テスト結果: test_magi2.py で11.96秒、383イベント、3賢者完全動作を確認
+✅ 実行方式: Next.jsから子プロセスとして呼び出され、標準入出力でJSON通信
+✅ ストリーミング: リアルタイムでイベントをJSON Lines形式で出力
 
-🔄 ROLLBACK AVAILABLE: magi_agent_sequential.py
-問題が発生した場合は、逐次実行版に戻すことができます
+🔄 ROLLBACK POINT: このファイルは動作確認済みベースライン
+問題が発生した場合は、このバージョンに戻すこと
 
 アーキテクチャ:
   Next.js (agents/backend/app/api/invocations/route.ts)
       ↓ spawn('python', ['magi_agent.py'])
-  Python magi_agent.py (このファイル) ← 並列実行版
+  Python magi_agent.py (このファイル) ← 動作確認済み
       ├─ 標準入力: JSON リクエスト受信
       ├─ 標準出力: JSON Lines ストリーミング出力
-      └─ 3賢者 TRUE PARALLEL + SOLOMON Judge
-
-並列実行の特徴:
-- asyncio.Queue による真の並列ストリーミング
-- 各賢者が独立してLLM推論を実行
-- リアルタイムイベント配信
-- タイムアウト・エラーハンドリング
+      └─ 3賢者 + SOLOMON Judge 並列実行
 
 Strands Agentsフレームワークを使用した3賢者システムの実装。
 Amazon Bedrockと統合し、実際のLLM推論を実行します。
@@ -174,7 +168,7 @@ SOLOMON_PROMPT = """あなたはSOLOMON（ソロモン）です。
 
 
 class MAGIStrandsAgent:
-    """MAGI Strands Agent - 3賢者システム"""
+    """MAGI Strands Agent - 3賢者システム (SEQUENTIAL VERSION)"""
     
     def __init__(self):
         """初期化"""
@@ -583,72 +577,12 @@ class MAGIStrandsAgent:
     
     async def _merge_streams(self, tasks):
         """
-        複数のストリームを真の並列実行でマージ
-        
-        3賢者が同時に思考・応答し、リアルタイムでイベントをストリーミングします。
+        複数のストリームをマージ (SEQUENTIAL VERSION)
         """
-        import asyncio
-        from asyncio import Queue
-        
-        # 各タスクの出力を収集するキュー
-        event_queue = Queue()
-        
-        async def task_wrapper(task, task_id):
-            """タスクをラップしてキューに出力"""
-            try:
-                async for event in task:
-                    await event_queue.put((task_id, event))
-            except Exception as e:
-                await event_queue.put((task_id, {
-                    'type': 'sage_error', 
-                    'data': {
-                        'agent_id': task_id,
-                        'error': str(e)
-                    }
-                }))
-            finally:
-                await event_queue.put((task_id, None))  # 終了マーカー
-        
-        # 並列実行開始
-        async def run_parallel_tasks():
-            tasks_to_run = []
-            for i, task in enumerate(tasks):
-                task_name = f"sage_{i}"
-                tasks_to_run.append(asyncio.create_task(task_wrapper(task, task_name)))
-            
-            # 全タスクの完了を待機
-            await asyncio.gather(*tasks_to_run, return_exceptions=True)
-        
-        # バックグラウンドでタスクを実行
-        parallel_task = asyncio.create_task(run_parallel_tasks())
-        
-        # 完了カウンター
-        completed_tasks = 0
-        total_tasks = len(tasks)
-        
-        # イベントを順次処理
-        while completed_tasks < total_tasks:
-            try:
-                # タイムアウト付きでイベントを取得
-                task_id, event = await asyncio.wait_for(event_queue.get(), timeout=60.0)
-                
-                if event is None:  # 終了マーカー
-                    completed_tasks += 1
-                    print(f"  ✅ Task {task_id} completed ({completed_tasks}/{total_tasks})")
-                else:
-                    yield event
-                    
-            except asyncio.TimeoutError:
-                print("  ⚠️ Timeout waiting for sage responses")
-                break
-        
-        # 並列タスクの完了を確認
-        if not parallel_task.done():
-            parallel_task.cancel()
-            try:
-                await parallel_task
-            except asyncio.CancelledError:
-                pass
+        # 各タスクからイベントを収集 (逐次実行)
+        for task in tasks:
+            async for event in task:
+                yield event
     
     def _create_sse_event(self, event_type: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """
