@@ -559,10 +559,14 @@ def main():
     メイン関数
     """
     # AgentCore RuntimeのARN（環境変数から取得）
-    agent_arn = os.environ.get(
-        'MAGI_AGENT_ARN',
-        'arn:aws:bedrock-agentcore:ap-northeast-1:262152767881:runtime/magi_agent-4ORNam2cHb'
-    )
+    # 設定読み込み
+    import sys
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).parent.parent))
+    from shared.config import get_config
+    
+    config = get_config()
+    agent_arn = config.get_agent_arn()
     
     # AWSリージョン
     region = os.environ.get('AWS_REGION', 'ap-northeast-1')
