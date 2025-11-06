@@ -39,6 +39,8 @@ class MAGIConfig:
         1. 指定されたenv_file
         2. agents/.env
         3. プロジェクトルート/.env.local
+        
+        Note: AgentCore Runtime環境では.envファイルが利用できない場合があります
         """
         if not DOTENV_AVAILABLE:
             return
@@ -59,10 +61,30 @@ class MAGIConfig:
             env_paths.append(root_env)
         
         # 見つかった.envファイルを読み込み（後のものが優先）
+        loaded_count = 0
         for env_path in env_paths:
             if env_path.exists():
-                load_dotenv(env_path, override=True)
-                print(f"✅ Loaded config from: {env_path}")
+                try:
+                    load_dotenv(env_path, override=True)
+                    print(f"✅ Loaded config from: {env_path}")
+                    loaded_count += 1
+                except Exception as e:
+                    print(f"⚠️  Failed to load {env_path}: {e}")
+        
+        # AgentCore Runtime環境での警告
+        if loaded_count == 0 and self._is_agentcore_runtime():
+            print("ℹ️  AgentCore Runtime環境: .envファイルが見つかりません")
+            print("   環境変数または.bedrock_agentcore.yamlから設定を読み込みます")
+    
+    def _is_agentcore_runtime(self) -> bool:
+        """AgentCore Runtime環境かどうかを判定"""
+        # AgentCore Runtime特有の環境変数をチェック
+        agentcore_indicators = [
+            'BEDROCK_AGENTCORE_RUNTIME',
+            'AWS_LAMBDA_FUNCTION_NAME',
+            'AWS_EXECUTION_ENV'
+        ]
+        return any(os.getenv(indicator) for indicator in agentcore_indicators)
     
     def _load_config(self) -> Dict[str, Any]:
         """設定値を読み込み"""
@@ -168,6 +190,7 @@ class MAGIConfig:
         """現在の設定を表示"""
         print("🔧 MAGI Configuration")
         print("=" * 50)
+        print(f"Environment: {'AgentCore Runtime' if self._is_agentcore_runtime() else 'Local Development'}")
         print(f"AWS Region: {self.get_region()}")
         print(f"Agent ARN: {self.get('magi_agent_arn', 'Not set')}")
         print(f"Agent ID: {self.get('magi_agent_id', 'Not set')}")
@@ -175,6 +198,38 @@ class MAGIConfig:
         print(f"Verbose Mode: {self.is_verbose_enabled()}")
         print(f"Output Dir: {self.get_output_dir()}")
         print("=" * 50)
+    
+    def setup_agentcore_env(self):
+        """
+        AgentCore Runtime環境用の設定セットアップ
+        
+        .bedrock_agentcore.yamlから環境変数を設定
+        """
+        if not self._is_agentcore_runtime():
+            return
+        
+        bedrock_config = self._load_bedrock_config()
+        if not bedrock_config:
+            return
+        
+        # 環境変数として設定（AgentCore Runtime内で利用）
+        for key, value in bedrock_config.items():
+            env_key = key.upper()
+            if not os.getenv(env_key):
+                os.environ[env_key] = str(value)
+                print(f"🔧 Set {env_key}={value}")
+    
+    @classmethod
+    def for_agentcore_runtime(cls) -> 'MAGIConfig':
+        """
+        AgentCore Runtime専用の設定インスタンスを作成
+        
+        Returns:
+            AgentCore Runtime用に最適化された設定インスタンス
+        """
+        config = cls()
+        config.setup_agentcore_env()
+        return config
 
 
 # グローバル設定インスタンス
