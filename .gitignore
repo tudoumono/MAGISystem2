@@ -277,6 +277,7 @@ agents/Dockerfile
 **/local_server.py
 **/test_local_server.py
 
+
 # Archive directory (deprecated implementations)
 agents/archive/
 
@@ -308,3 +309,8 @@ streaming_output/
 # ============================================================================
 
 agents/backend/
+agents/tests/streaming_output/balthasar_stream.txt
+agents/tests/streaming_output/caspar_stream.txt
+agents/tests/streaming_output/full_stream.json
+agents/tests/streaming_output/melchior_stream.txt
+agents/tests/streaming_output/summary.txt
