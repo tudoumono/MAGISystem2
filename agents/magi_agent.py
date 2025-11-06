@@ -83,7 +83,7 @@ CASPAR_PROMPT = """あなたはCASPAR（カスパー）です。
 5. 実装の複雑さ
 
 【出力形式】
-以下のJSON形式で回答してください：
+**重要**: 以下のJSON形式**のみ**で回答してください。説明文や追加コメントは一切不要です。
 {
   "decision": "APPROVED" | "REJECTED" | "ABSTAINED",
   "reasoning": "判断理由（200文字以内）",
@@ -107,7 +107,7 @@ BALTHASAR_PROMPT = """あなたはBALTHASAR（バルタザール）です。
 5. 社会的意義
 
 【出力形式】
-以下のJSON形式で回答してください：
+**重要**: 以下のJSON形式**のみ**で回答してください。説明文や追加コメントは一切不要です。
 {
   "decision": "APPROVED" | "REJECTED" | "ABSTAINED",
   "reasoning": "判断理由（200文字以内）",
@@ -131,7 +131,7 @@ MELCHIOR_PROMPT = """あなたはMELCHIOR（メルキオール）です。
 5. 総合的なバランス
 
 【出力形式】
-以下のJSON形式で回答してください：
+**重要**: 以下のJSON形式**のみ**で回答してください。説明文や追加コメントは一切不要です。
 {
   "decision": "APPROVED" | "REJECTED" | "ABSTAINED",
   "reasoning": "判断理由（200文字以内）",
@@ -160,17 +160,17 @@ SOLOMON_PROMPT = """あなたはSOLOMON（ソロモン）です。
 {sage_responses}
 
 【出力形式】
-以下のJSON形式で回答してください：
-{
+**重要**: 以下のJSON形式**のみ**で回答してください。説明文や追加コメントは一切不要です。
+{{
   "final_decision": "APPROVED" | "REJECTED",
   "reasoning": "統合判断の理由（300文字以内）",
   "confidence": 0.0-1.0,
-  "sage_scores": {
+  "sage_scores": {{
     "caspar": 0-100,
     "balthasar": 0-100,
     "melchior": 0-100
-  }
-}"""
+  }}
+}}"""
 
 
 class MAGIStrandsAgent:
