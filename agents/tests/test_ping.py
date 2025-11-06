@@ -5,64 +5,33 @@ AgentCore Runtime GET /ping エンドポイントテスト
 使用方法:
   python test_ping.py
   
-環境変数:
-  MAGI_AGENT_ARN - AgentCore RuntimeのARN
-  AWS_REGION - AWSリージョン (デフォルト: ap-northeast-1)
+設定方法:
+  1. agents/.env ファイル
+  2. 環境変数 MAGI_AGENT_ARN, AWS_REGION
+  3. .bedrock_agentcore.yaml ファイル（自動フォールバック）
 """
+
+import sys
+from pathlib import Path
+
+# 共通設定モジュールをインポート
+sys.path.append(str(Path(__file__).parent.parent))
+from shared.config import get_config
 
 import boto3
 import json
 import uuid
-import os
-import yaml
 from datetime import datetime
 from botocore.config import Config
-from pathlib import Path
-
-def load_agent_config():
-    """設定ファイルからエージェント情報を読み込み"""
-    
-    # 1. 環境変数から取得
-    agent_arn = os.getenv('MAGI_AGENT_ARN')
-    region = os.getenv('AWS_REGION', 'ap-northeast-1')
-    
-    if agent_arn:
-        return agent_arn, region
-    
-    # 2. .bedrock_agentcore.yaml から取得
-    config_path = Path(__file__).parent.parent / '.bedrock_agentcore.yaml'
-    if config_path.exists():
-        try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config = yaml.safe_load(f)
-                
-            default_agent = config.get('default_agent', 'magi_agent')
-            agent_config = config.get('agents', {}).get(default_agent, {})
-            
-            agent_arn = agent_config.get('bedrock_agentcore', {}).get('agent_arn')
-            config_region = agent_config.get('aws', {}).get('region', region)
-            
-            if agent_arn:
-                return agent_arn, config_region
-                
-        except Exception as e:
-            print(f"⚠️  設定ファイル読み込みエラー: {e}")
-    
-    # 3. 設定が見つからない場合
-    raise ValueError(
-        "AgentCore Runtime ARNが見つかりません。以下のいずれかを設定してください:\n"
-        "  1. 環境変数 MAGI_AGENT_ARN\n"
-        "  2. .bedrock_agentcore.yaml ファイル\n"
-        "\n例:\n"
-        "  export MAGI_AGENT_ARN='arn:aws:bedrock-agentcore:ap-northeast-1:123456789012:runtime/magi_agent-xxxxx'"
-    )
 
 def test_ping_endpoint():
     """GET /ping エンドポイントをテスト"""
     
     # 設定読み込み
     try:
-        agent_runtime_arn, region = load_agent_config()
+        config = get_config()
+        agent_runtime_arn = config.get_agent_arn()
+        region = config.get_region()
     except ValueError as e:
         print(f"❌ 設定エラー: {e}")
         return False
@@ -153,7 +122,9 @@ def test_agent_status():
         
         # 設定読み込み
         try:
-            agent_runtime_arn, region = load_agent_config()
+            config = get_config()
+            agent_runtime_arn = config.get_agent_arn()
+            region = config.get_region()
         except ValueError as e:
             print(f"❌ 設定読み込みエラー: {e}")
             return
@@ -179,8 +150,11 @@ def test_agent_status():
         print(f"❌ ステータス確認エラー: {e}")
 
 if __name__ == "__main__":
-    # 環境確認
-    print("🚀 MAGI AgentCore Runtime Ping テスト")
+    # 設定表示
+    config = get_config()
+    config.print_config()
+    
+    print("\n🚀 MAGI AgentCore Runtime Ping テスト")
     print("=" * 60)
     
     # Ping テスト実行
@@ -195,6 +169,7 @@ if __name__ == "__main__":
         print("🎉 AgentCore Runtime は正常に動作しています")
     else:
         print("⚠️  AgentCore Runtime に問題があります")
+        print("   - agents/.env ファイルの設定を確認してください")
         print("   - AWS認証情報を確認してください")
         print("   - エージェントがデプロイされているか確認してください")
         print("   - ネットワーク接続を確認してください")
