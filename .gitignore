@@ -149,6 +149,7 @@ agents/.tox/
 
 # MAGI Decision System - Strands Agents
 agents/.env
+!agents/.env.template
 agents/logs/
 agents/cache/
 agents/temp/

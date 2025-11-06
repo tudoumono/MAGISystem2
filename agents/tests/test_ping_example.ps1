@@ -1,13 +1,20 @@
 # MAGI AgentCore Runtime Ping テスト実行例 (PowerShell)
 
-# 環境変数設定
-$env:MAGI_AGENT_ARN = "arn:aws:bedrock-agentcore:ap-northeast-1:262152767881:runtime/magi_agent-4ORNam2cHb"
-$env:AWS_REGION = "ap-northeast-1"
-
-# テスト実行
 Write-Host "🚀 MAGI Ping テスト実行" -ForegroundColor Green
-Write-Host "Agent ARN: $env:MAGI_AGENT_ARN" -ForegroundColor Cyan
-Write-Host "Region: $env:AWS_REGION" -ForegroundColor Cyan
+Write-Host "設定は agents/.env ファイルから読み込まれます" -ForegroundColor Cyan
 Write-Host ""
 
+# .envファイルの存在確認
+if (-not (Test-Path "../.env")) {
+    Write-Host "❌ agents/.env ファイルが見つかりません" -ForegroundColor Red
+    Write-Host "agents/.env.template をコピーして設定してください:" -ForegroundColor Yellow
+    Write-Host "  Copy-Item ../.env.template ../.env" -ForegroundColor Yellow
+    Write-Host "  # 設定を編集" -ForegroundColor Yellow
+    exit 1
+}
+
+Write-Host "✅ agents/.env ファイルが見つかりました" -ForegroundColor Green
+Write-Host ""
+
+# テスト実行
 python test_ping.py
