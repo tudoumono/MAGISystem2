@@ -88,7 +88,7 @@ class MAGIConfig:
     
     def _load_config(self) -> Dict[str, Any]:
         """設定値を読み込み"""
-        
+
         # 1. 環境変数から基本設定を取得
         config = {
             'aws_region': os.getenv('AWS_REGION', 'ap-northeast-1'),
@@ -100,14 +100,19 @@ class MAGIConfig:
             'request_timeout': int(os.getenv('REQUEST_TIMEOUT', '300')),
             'connect_timeout': int(os.getenv('CONNECT_TIMEOUT', '10')),
             'max_retries': int(os.getenv('MAX_RETRIES', '3')),
+            # カスタムプロンプト設定
+            'caspar_custom_prompt': os.getenv('CASPAR_CUSTOM_PROMPT'),
+            'balthasar_custom_prompt': os.getenv('BALTHASAR_CUSTOM_PROMPT'),
+            'melchior_custom_prompt': os.getenv('MELCHIOR_CUSTOM_PROMPT'),
+            'solomon_custom_prompt': os.getenv('SOLOMON_CUSTOM_PROMPT'),
         }
-        
+
         # 2. .bedrock_agentcore.yamlから補完（ARNが未設定の場合）
         if not config['magi_agent_arn']:
             bedrock_config = self._load_bedrock_config()
             if bedrock_config:
                 config.update(bedrock_config)
-        
+
         return config
     
     def _load_bedrock_config(self) -> Optional[Dict[str, Any]]:
@@ -186,6 +191,28 @@ class MAGIConfig:
         output_dir.mkdir(parents=True, exist_ok=True)
         return output_dir
     
+    def get_custom_prompt(self, agent_name: str) -> Optional[str]:
+        """
+        カスタムプロンプトを取得
+
+        Args:
+            agent_name: エージェント名（caspar, balthasar, melchior, solomon）
+
+        Returns:
+            カスタムプロンプト、または None（デフォルト使用）
+        """
+        key = f'{agent_name.lower()}_custom_prompt'
+        return self.get(key)
+
+    def has_custom_prompts(self) -> bool:
+        """カスタムプロンプトが設定されているかチェック"""
+        return any([
+            self.get_custom_prompt('caspar'),
+            self.get_custom_prompt('balthasar'),
+            self.get_custom_prompt('melchior'),
+            self.get_custom_prompt('solomon')
+        ])
+
     def print_config(self):
         """現在の設定を表示"""
         print("🔧 MAGI Configuration")
@@ -197,6 +224,7 @@ class MAGIConfig:
         print(f"Debug Mode: {self.is_debug_enabled()}")
         print(f"Verbose Mode: {self.is_verbose_enabled()}")
         print(f"Output Dir: {self.get_output_dir()}")
+        print(f"Custom Prompts: {'Enabled' if self.has_custom_prompts() else 'Disabled (using defaults)'}")
         print("=" * 50)
     
     def setup_agentcore_env(self):
