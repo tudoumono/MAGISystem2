@@ -14,7 +14,7 @@ try:
     DOTENV_AVAILABLE = True
 except ImportError:
     DOTENV_AVAILABLE = False
-    print("⚠️  python-dotenv not installed. Using environment variables only.")
+    print("[WARN] python-dotenv not installed. Using environment variables only.")
 
 
 class MAGIConfig:
@@ -66,10 +66,10 @@ class MAGIConfig:
             if env_path.exists():
                 try:
                     load_dotenv(env_path, override=True)
-                    print(f"✅ Loaded config from: {env_path}")
+                    print(f"[OK] Loaded config from: {env_path}")
                     loaded_count += 1
                 except Exception as e:
-                    print(f"⚠️  Failed to load {env_path}: {e}")
+                    print(f"[WARN] Failed to load {env_path}: {e}")
         
         # AgentCore Runtime環境での警告
         if loaded_count == 0 and self._is_agentcore_runtime():
@@ -147,7 +147,7 @@ class MAGIConfig:
             return result if result else None
             
         except Exception as e:
-            print(f"⚠️  .bedrock_agentcore.yaml読み込みエラー: {e}")
+            print(f"[WARN] .bedrock_agentcore.yaml読み込みエラー: {e}")
             return None
     
     def get(self, key: str, default: Any = None) -> Any:
