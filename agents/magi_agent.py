@@ -155,16 +155,16 @@ SOLOMON_PROMPT = """あなたはSOLOMON（ソロモン）です。
 
 【出力形式】
 以下のJSON形式で回答してください：
-{
+{{
   "final_decision": "APPROVED" | "REJECTED",
   "reasoning": "統合判断の理由（300文字以内）",
   "confidence": 0.0-1.0,
-  "sage_scores": {
+  "sage_scores": {{
     "caspar": 0-100,
     "balthasar": 0-100,
     "melchior": 0-100
-  }
-}"""
+  }}
+}}"""
 
 
 class MAGIStrandsAgent:
