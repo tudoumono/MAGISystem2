@@ -154,9 +154,7 @@ SOLOMON_PROMPT = """あなたはSOLOMON（ソロモン）です。
 {sage_responses}
 
 【出力形式】
-**重要**: 以下のJSON形式**のみ**で回答してください。説明文や追加コメントは一切不要です。
-
-必須フォーマット:
+以下のJSON形式で回答してください：
 {{
   "final_decision": "APPROVED" | "REJECTED",
   "reasoning": "統合判断の理由（300文字以内）",
@@ -166,9 +164,7 @@ SOLOMON_PROMPT = """あなたはSOLOMON（ソロモン）です。
     "balthasar": 0-100,
     "melchior": 0-100
   }}
-}}
-
-JSON形式のみで回答してください。他のテキストは含めないでください。"""
+}}"""
 
 
 class MAGIStrandsAgent:
