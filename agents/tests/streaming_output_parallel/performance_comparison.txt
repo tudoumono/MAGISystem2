@@ -2,8 +2,8 @@
 ================================================================================
 
 Sequential Version: 10.93 seconds
-Parallel Version:   6.97 seconds
-Improvement:        36.2% faster
-Speedup:            1.57x
+Parallel Version:   4.91 seconds
+Improvement:        55.1% faster
+Speedup:            2.23x
 
-⚠️  MODERATE: Some improvement, but room for optimization.
+✅ GOOD: Significant performance improvement!
