@@ -717,16 +717,43 @@ class MAGIStrandsAgent:
             if len(sage_responses) < 3:
                 print(f"  ⚠️ SOLOMON: Only {len(sage_responses)}/3 sages responded")
             
+            # ステートマシンから正確な賢者データを取得
+            sage_data = []
+            for agent_id in ["caspar", "balthasar", "melchior"]:
+                if agent_id in self.sage_states and self.sage_states[agent_id]["decision"]:
+                    decision_data = self.sage_states[agent_id]["decision"]
+                    sage_data.append({
+                        "agent": agent_id,
+                        "decision": decision_data.get("decision", "ABSTAINED"),
+                        "reasoning": decision_data.get("reasoning", "No reasoning provided"),
+                        "confidence": decision_data.get("confidence", 0.5)
+                    })
+                else:
+                    # フォールバック: sage_responsesから取得
+                    fallback_data = next((r for r in sage_responses if r.get('agent_id') == agent_id), None)
+                    if fallback_data:
+                        sage_data.append({
+                            "agent": agent_id,
+                            "decision": fallback_data.get("decision", "ABSTAINED"),
+                            "reasoning": fallback_data.get("reasoning", "No reasoning provided"),
+                            "confidence": fallback_data.get("confidence", 0.5)
+                        })
+                    else:
+                        sage_data.append({
+                            "agent": agent_id,
+                            "decision": "ABSTAINED",
+                            "reasoning": f"No response from {agent_id}",
+                            "confidence": 0.0
+                        })
+            
             # 3賢者の結果をフォーマット
-            sage_summary = json.dumps([
-                {
-                    "agent": r.get('agent_id'),
-                    "decision": r.get('decision'),
-                    "reasoning": r.get('reasoning'),
-                    "confidence": r.get('confidence')
-                }
-                for r in sage_responses
-            ], ensure_ascii=False, indent=2)
+            sage_summary = json.dumps(sage_data, ensure_ascii=False, indent=2)
+            
+            if DEBUG_STREAMING:
+                print(f"  🔍 SOLOMON input data:")
+                print(f"    Sage responses count: {len(sage_responses)}")
+                print(f"    State machine data: {len([s for s in self.sage_states.values() if s['decision']])}")
+                print(f"    Final sage data: {sage_summary}")
             
             # SOLOMONプロンプトに3賢者の結果を埋め込み
             solomon_prompt = SOLOMON_PROMPT.format(sage_responses=sage_summary)
@@ -817,13 +844,22 @@ class MAGIStrandsAgent:
         except Exception as e:
             print(f"  ❌ SOLOMON failed: {e}")
             
-            # エラー時もデフォルト結果を返す
+            # エラー時もデフォルト結果を返す（信頼度を0.5に設定）
             default_result = {
                 "final_decision": "REJECTED",
                 "reasoning": f"SOLOMON評価中にエラーが発生しました: {str(e)}",
-                "confidence": 0.0,
-                "sage_scores": {}
+                "confidence": 0.5,  # エラー時でも0.5の信頼度を設定
+                "sage_scores": {
+                    "caspar": 50,
+                    "balthasar": 50,
+                    "melchior": 50
+                }
             }
+            
+            if DEBUG_STREAMING:
+                print(f"  🔍 SOLOMON error details: {e}")
+                print(f"  🔍 Sage responses received: {len(sage_responses)}")
+                print(f"  🔍 State machine status: {[(k, v['completed']) for k, v in self.sage_states.items()]}")
             
             # エラーイベント
             yield self._create_sse_event("judge_error", {

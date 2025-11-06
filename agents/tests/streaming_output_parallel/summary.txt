@@ -1,10 +1,10 @@
 # MAGI Parallel Streaming Test Summary
 ================================================================================
 
-Test Time: 2025-11-07T01:35:45.607971
-Total Duration: 4.91 seconds
-Parallel Execution Time: 3.18 seconds
-Total Events: 32
+Test Time: 2025-11-07T01:52:58.439069
+Total Duration: 5.20 seconds
+Parallel Execution Time: 3.50 seconds
+Total Events: 43
 
 ## Events by Type
   complete: 1
@@ -14,9 +14,10 @@ Total Events: 32
   sage_chunk: 3
   sage_complete: 3
   sage_start: 3
-  sage_thinking: 16
+  sage_thinking: 26
   sages_start: 1
   start: 2
+  unknown: 1
 
 ## Chunks by Agent
   caspar: 1 chunks
@@ -25,9 +26,9 @@ Total Events: 32
   solomon: 0 chunks
 
 ## Stream Sizes
-  caspar: 203 characters
-  balthasar: 219 characters
-  melchior: 191 characters
+  caspar: 176 characters
+  balthasar: 209 characters
+  melchior: 202 characters
 
 ## Files Generated
   - caspar_stream.txt
