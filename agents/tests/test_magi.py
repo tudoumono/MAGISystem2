@@ -574,18 +574,21 @@ async def main():
     """
     メイン関数
     """
-    # AgentCore RuntimeのARN（環境変数または直接指定）
-    agent_runtime_arn = os.environ.get(
-        "MAGI_AGENT_ARN",
-        "arn:aws:bedrock-agentcore:ap-northeast-1:262152767881:runtime/magi_agent-4ORNam2cHb"
-    )
+    # 設定読み込み
+    import sys
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).parent.parent))
+    from shared.config import get_config
+    
+    config = get_config()
+    agent_runtime_arn = config.get_agent_arn()
     
     # テスト質問
     test_question = "新しいAIシステムを全社に導入すべきか？コスト削減と効率化が期待されるが、従業員の反発も予想される。"
     
-    # デバッグモード設定（環境変数で制御）
+    # デバッグモード設定（.env設定で制御）
     # verbose=True で3賢者の並列ストリーミングをリアルタイム表示
-    verbose = os.environ.get('DEBUG_STREAMING', 'true').lower() == 'true'
+    verbose = config.is_debug_enabled()
     
     # テスター初期化
     tester = StreamingClassificationTester(agent_runtime_arn, verbose=verbose)
