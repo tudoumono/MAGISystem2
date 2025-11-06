@@ -430,7 +430,7 @@ class ParallelStreamingTester:
             
             print(f"🎉 MAGI Parallel Decision Complete!")
             print(f"   Final Decision: {final_decision}")
-            print(f"   Voting: {voting_result.get('approved')}可決 / {voting_result.get('rejected')}否決")
+            print(f"   Voting: {voting_result.get('approved')}可決 / {voting_result.get('rejected')}否決 / {voting_result.get('abstained')}棄権")
             print(f"   Total Time: {execution_time}ms")
             print()
         
