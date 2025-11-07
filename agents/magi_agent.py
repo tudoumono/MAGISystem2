@@ -65,8 +65,40 @@ except ImportError as e:
         print("🐛 DEBUG_STREAMING enabled (fallback) - All streaming events will be logged to console")
 
 
-# 3賢者のシステムプロンプト
-CASPAR_PROMPT = """あなたはCASPAR（カスパー）です。
+# =============================================================================
+# JSON出力形式（固定・変更不可）
+# バックエンドのパース処理に必須のため、この部分は変更できません
+# =============================================================================
+
+SAGE_JSON_FORMAT = """
+【出力形式】※この形式は厳守してください
+以下のJSON形式で回答してください：
+{
+  "decision": "APPROVED" | "REJECTED" | "ABSTAINED",
+  "reasoning": "判断理由（200文字以内）",
+  "confidence": 0.0-1.0
+}"""
+
+SOLOMON_JSON_FORMAT = """
+【出力形式】※この形式は厳守してください
+以下のJSON形式で回答してください：
+{
+  "final_decision": "APPROVED" | "REJECTED",
+  "reasoning": "統合判断の理由（300文字以内）",
+  "confidence": 0.0-1.0,
+  "sage_scores": {
+    "caspar": 0-100,
+    "balthasar": 0-100,
+    "melchior": 0-100
+  }
+}"""
+
+# =============================================================================
+# デフォルトのロール説明（カスタマイズ可能）
+# 環境変数やリクエストパラメータで上書き可能
+# =============================================================================
+
+DEFAULT_CASPAR_ROLE = """あなたはCASPAR（カスパー）です。
 保守的で現実的な視点を持つ賢者として、以下の特性で判断してください：
 
 【人格特性】
@@ -80,17 +112,9 @@ CASPAR_PROMPT = """あなたはCASPAR（カスパー）です。
 2. コスト対効果
 3. リスクの大きさ
 4. 既存システムとの互換性
-5. 実装の複雑さ
+5. 実装の複雑さ"""
 
-【出力形式】
-**重要**: 以下のJSON形式**のみ**で回答してください。説明文や追加コメントは一切不要です。
-{
-  "decision": "APPROVED" | "REJECTED" | "ABSTAINED",
-  "reasoning": "判断理由（200文字以内）",
-  "confidence": 0.0-1.0
-}"""
-
-BALTHASAR_PROMPT = """あなたはBALTHASAR（バルタザール）です。
+DEFAULT_BALTHASAR_ROLE = """あなたはBALTHASAR（バルタザール）です。
 革新的で感情的な視点を持つ賢者として、以下の特性で判断してください：
 
 【人格特性】
@@ -104,17 +128,9 @@ BALTHASAR_PROMPT = """あなたはBALTHASAR（バルタザール）です。
 2. 倫理的影響
 3. 人々への影響
 4. 長期的価値
-5. 社会的意義
+5. 社会的意義"""
 
-【出力形式】
-**重要**: 以下のJSON形式**のみ**で回答してください。説明文や追加コメントは一切不要です。
-{
-  "decision": "APPROVED" | "REJECTED" | "ABSTAINED",
-  "reasoning": "判断理由（200文字以内）",
-  "confidence": 0.0-1.0
-}"""
-
-MELCHIOR_PROMPT = """あなたはMELCHIOR（メルキオール）です。
+DEFAULT_MELCHIOR_ROLE = """あなたはMELCHIOR（メルキオール）です。
 バランス型で科学的な視点を持つ賢者として、以下の特性で判断してください：
 
 【人格特性】
@@ -128,17 +144,9 @@ MELCHIOR_PROMPT = """あなたはMELCHIOR（メルキオール）です。
 2. 論理的整合性
 3. 多面的な影響
 4. 持続可能性
-5. 総合的なバランス
+5. 総合的なバランス"""
 
-【出力形式】
-**重要**: 以下のJSON形式**のみ**で回答してください。説明文や追加コメントは一切不要です。
-{
-  "decision": "APPROVED" | "REJECTED" | "ABSTAINED",
-  "reasoning": "判断理由（200文字以内）",
-  "confidence": 0.0-1.0
-}"""
-
-SOLOMON_PROMPT = """あなたはSOLOMON（ソロモン）です。
+DEFAULT_SOLOMON_ROLE = """あなたはSOLOMON（ソロモン）です。
 3賢者（CASPAR、BALTHASAR、MELCHIOR）の判断を統合評価する統括AIとして、
 最終的な意思決定を行います。
 
@@ -157,46 +165,66 @@ SOLOMON_PROMPT = """あなたはSOLOMON（ソロモン）です。
 
 【入力】
 3賢者の判断結果：
-{sage_responses}
+{sage_responses}"""
 
-【出力形式】
-**重要**: 以下のJSON形式**のみ**で回答してください。説明文や追加コメントは一切不要です。
-{{
-  "final_decision": "APPROVED" | "REJECTED",
-  "reasoning": "統合判断の理由（300文字以内）",
-  "confidence": 0.0-1.0,
-  "sage_scores": {{
-    "caspar": 0-100,
-    "balthasar": 0-100,
-    "melchior": 0-100
-  }}
-}}"""
+# 後方互換性のため、デフォルトの完全なプロンプトを維持
+CASPAR_PROMPT = DEFAULT_CASPAR_ROLE + SAGE_JSON_FORMAT
+BALTHASAR_PROMPT = DEFAULT_BALTHASAR_ROLE + SAGE_JSON_FORMAT
+MELCHIOR_PROMPT = DEFAULT_MELCHIOR_ROLE + SAGE_JSON_FORMAT
+SOLOMON_PROMPT = DEFAULT_SOLOMON_ROLE + SOLOMON_JSON_FORMAT
 
 
 class MAGIStrandsAgent:
     """MAGI Strands Agent - 3賢者システム"""
-    
-    def __init__(self):
-        """初期化"""
+
+    def __init__(self, custom_prompts: Optional[Dict[str, str]] = None):
+        """
+        初期化
+
+        Args:
+            custom_prompts: カスタムプロンプト辞書（省略時は環境変数から読み込み）
+                例: {
+                    'caspar': 'あなたは保守的な賢者です...',
+                    'balthasar': 'あなたは革新的な賢者です...',
+                    'melchior': 'あなたはバランス型の賢者です...',
+                    'solomon': 'あなたは統括AIです...'
+                }
+        """
+        # カスタムプロンプトの読み込み（優先順位：引数 > 環境変数 > デフォルト）
+        self.custom_prompts = custom_prompts or {}
+
+        # 環境変数からカスタムプロンプトを読み込み（引数で指定されていない場合）
+        if config:
+            for agent_name in ['caspar', 'balthasar', 'melchior', 'solomon']:
+                if agent_name not in self.custom_prompts:
+                    env_prompt = config.get_custom_prompt(agent_name)
+                    if env_prompt:
+                        self.custom_prompts[agent_name] = env_prompt
+
+        # プロンプトを構築（カスタム + JSON形式）
+        caspar_prompt = self._build_prompt('caspar', DEFAULT_CASPAR_ROLE, SAGE_JSON_FORMAT)
+        balthasar_prompt = self._build_prompt('balthasar', DEFAULT_BALTHASAR_ROLE, SAGE_JSON_FORMAT)
+        melchior_prompt = self._build_prompt('melchior', DEFAULT_MELCHIOR_ROLE, SAGE_JSON_FORMAT)
+
         # 3賢者のエージェント作成
         self.caspar = Agent(
             name="CASPAR",
             model="anthropic.claude-3-5-sonnet-20240620-v1:0",
-            system_prompt=CASPAR_PROMPT
+            system_prompt=caspar_prompt
         )
-        
+
         self.balthasar = Agent(
             name="BALTHASAR",
             model="anthropic.claude-3-5-sonnet-20240620-v1:0",
-            system_prompt=BALTHASAR_PROMPT
+            system_prompt=balthasar_prompt
         )
-        
+
         self.melchior = Agent(
             name="MELCHIOR",
             model="anthropic.claude-3-5-sonnet-20240620-v1:0",
-            system_prompt=MELCHIOR_PROMPT
+            system_prompt=melchior_prompt
         )
-        
+
         # SOLOMON Judge（統括AI）
         # 注: system_promptは実行時に3賢者の結果を含めて動的に生成
         self.solomon = Agent(
@@ -210,19 +238,56 @@ class MAGIStrandsAgent:
             "balthasar": {"buffer": "", "in_message": False, "completed": False, "decision": None},
             "melchior": {"buffer": "", "in_message": False, "completed": False, "decision": None}
         }
-        
-        print("✅ 3賢者 + SOLOMON Judge 初期化完了")
+
+        # カスタムプロンプトの使用状況を表示
+        custom_count = len(self.custom_prompts)
+        if custom_count > 0:
+            print(f"✅ 3賢者 + SOLOMON Judge 初期化完了（{custom_count}個のカスタムプロンプト使用中）")
+        else:
+            print("✅ 3賢者 + SOLOMON Judge 初期化完了（デフォルトプロンプト使用）")
+
+    def _build_prompt(self, agent_name: str, default_role: str, json_format: str) -> str:
+        """
+        プロンプトを構築（カスタムロール + 固定JSON形式）
+
+        Args:
+            agent_name: エージェント名
+            default_role: デフォルトのロール説明
+            json_format: JSON出力形式（固定）
+
+        Returns:
+            完全なプロンプト
+        """
+        # カスタムプロンプトが設定されている場合はそれを使用
+        role = self.custom_prompts.get(agent_name, default_role)
+
+        # ロール説明 + JSON形式（固定）
+        return role + json_format
     
 
     async def process_decision_stream(self, request: Dict[str, Any]):
         """
         MAGI意思決定プロセス（ストリーミング版）
-        
+
         SSE形式でイベントをストリーミングします。
+
+        Args:
+            request: リクエストデータ
+                - question: 判断する質問
+                - custom_prompts (optional): リクエスト固有のカスタムプロンプト
+                    例: {
+                        'caspar': 'あなたは...',
+                        'balthasar': 'あなたは...',
+                        'melchior': 'あなたは...',
+                        'solomon': 'あなたは...'
+                    }
         """
         start_time = datetime.now()
         trace_id = f"trace-{int(start_time.timestamp())}"
         question = request.get('question', 'デフォルト質問')
+
+        # リクエストレベルのカスタムプロンプトを取得
+        request_custom_prompts = request.get('custom_prompts', {})
         
         try:
             # 開始イベント
@@ -243,10 +308,20 @@ class MAGIStrandsAgent:
             print("🤖 Consulting 3 sages in parallel...")
             
             # 3賢者に並列で相談（ストリーミング）
+            # リクエスト固有のカスタムプロンプトがある場合は使用
             tasks = [
-                self._consult_sage_stream(self.caspar, "caspar", question, trace_id),
-                self._consult_sage_stream(self.balthasar, "balthasar", question, trace_id),
-                self._consult_sage_stream(self.melchior, "melchior", question, trace_id)
+                self._consult_sage_stream(
+                    self.caspar, "caspar", question, trace_id,
+                    custom_role=request_custom_prompts.get('caspar')
+                ),
+                self._consult_sage_stream(
+                    self.balthasar, "balthasar", question, trace_id,
+                    custom_role=request_custom_prompts.get('balthasar')
+                ),
+                self._consult_sage_stream(
+                    self.melchior, "melchior", question, trace_id,
+                    custom_role=request_custom_prompts.get('melchior')
+                )
             ]
             
             agent_responses = []
@@ -286,9 +361,12 @@ class MAGIStrandsAgent:
             print("⚖️  SOLOMON Judge evaluation...")
             
             solomon_result = None
-            async for event in self._solomon_judgment_stream(agent_responses, question, trace_id):
+            async for event in self._solomon_judgment_stream(
+                agent_responses, question, trace_id,
+                custom_role=request_custom_prompts.get('solomon')
+            ):
                 yield event
-                
+
                 # 完了イベントを収集
                 if event.get('type') == 'judge_complete':
                     solomon_result = event.get('data', {})
@@ -568,12 +646,26 @@ class MAGIStrandsAgent:
         
         return None
     
-    async def _consult_sage_stream(self, agent: Agent, agent_id: str, question: str, trace_id: str):
+    async def _consult_sage_stream(
+        self,
+        agent: Agent,
+        agent_id: str,
+        question: str,
+        trace_id: str,
+        custom_role: Optional[str] = None
+    ):
         """
         個別の賢者に相談（ストリーミング版）
-        
+
         Strands Agentsのストリーミング機能を使用して、
         思考プロセスをリアルタイムで表示します。
+
+        Args:
+            agent: Strandsエージェントインスタンス
+            agent_id: エージェントID
+            question: 質問
+            trace_id: トレースID
+            custom_role: カスタムロール（省略時はエージェントのデフォルトを使用）
         """
         # 開始イベント
         yield self._create_sse_event("sage_start", {
@@ -588,14 +680,28 @@ class MAGIStrandsAgent:
             self.sage_states[agent_id]["completed"] = False
         
         print(f"  🤖 Consulting {agent_id.upper()}...")
-        
+
         try:
+            # カスタムロールが指定されている場合は、動的にプロンプトを構築
+            if custom_role:
+                # カスタムロール + 固定JSON形式
+                custom_prompt = custom_role + SAGE_JSON_FORMAT
+                stream_kwargs = {'system_prompt': custom_prompt}
+            else:
+                # デフォルトのエージェントプロンプトを使用
+                stream_kwargs = {}
+
             # Strands Agentsのストリーミング機能を使用
             # stream_async()メソッドは思考プロセスをリアルタイムで返す
             full_response = ""
-            
+
             # stream_async()メソッドで非同期ストリーミング
-            async for chunk in agent.stream_async(question):
+            async for chunk in agent.stream_async(question, **stream_kwargs):
+                # デバッグ: チャンクの型と内容を出力
+                if DEBUG_STREAMING:
+                    print(f"  🔍 {agent_id.upper()} chunk type: {type(chunk)}")
+                    print(f"  🔍 {agent_id.upper()} chunk content: {chunk}")
+                
                 # チャンクからテキストを抽出
                 # Strands Agentsは辞書形式でチャンクを返す
                 chunk_text = None
@@ -705,12 +811,24 @@ class MAGIStrandsAgent:
             # 完了イベント（デフォルト結果）
             yield self._create_sse_event("sage_complete", default_result)
     
-    async def _solomon_judgment_stream(self, sage_responses: list, question: str, trace_id: str):
+    async def _solomon_judgment_stream(
+        self,
+        sage_responses: list,
+        question: str,
+        trace_id: str,
+        custom_role: Optional[str] = None
+    ):
         """
         SOLOMON Judgeによる統合評価（ストリーミング版）
-        
+
         Strands Agentsのストリーミング機能を使用して、
         評価プロセスをリアルタイムで表示します。
+
+        Args:
+            sage_responses: 3賢者の判断結果
+            question: 質問
+            trace_id: トレースID
+            custom_role: カスタムロール（省略時はデフォルトを使用）
         """
         try:
             # 3賢者のデータが不足している場合の警告
@@ -755,16 +873,26 @@ class MAGIStrandsAgent:
                 print(f"    State machine data: {len([s for s in self.sage_states.values() if s['decision']])}")
                 print(f"    Final sage data: {sage_summary}")
             
-            # SOLOMONプロンプトに3賢者の結果を埋め込み
-            solomon_prompt = SOLOMON_PROMPT.format(sage_responses=sage_summary)
-            
+            # SOLOMONプロンプトを構築
+            if custom_role:
+                # カスタムロール + 固定JSON形式
+                solomon_role = custom_role
+            else:
+                # デフォルトロール
+                solomon_role = DEFAULT_SOLOMON_ROLE
+
+            # 3賢者の結果を埋め込み
+            solomon_role_with_data = solomon_role.format(sage_responses=sage_summary)
+            solomon_prompt = solomon_role_with_data + SOLOMON_JSON_FORMAT
+
             # Strands Agentsのストリーミング機能を使用
             # stream_async()メソッドで非同期ストリーミング
             full_response = ""
             chunk_count = 0
 
-            print(f"  🔍 DEBUG: Starting Solomon stream_async()...")
-            print(f"  🔍 DEBUG: sage_responses count: {len(sage_responses)}")
+            if DEBUG_STREAMING:
+                print(f"  🔍 DEBUG: Starting Solomon stream_async()...")
+                print(f"  🔍 DEBUG: sage_responses count: {len(sage_responses)}")
 
             # stream_async()メソッドで非同期ストリーミング
             async for chunk in self.solomon.stream_async(question, system_prompt=solomon_prompt):
@@ -811,7 +939,8 @@ class MAGIStrandsAgent:
                     "trace_id": trace_id
                 })
 
-            print(f"  🔍 DEBUG: Solomon stream completed. Chunks: {chunk_count}, Response length: {len(full_response)}")
+            if DEBUG_STREAMING:
+                print(f"  🔍 DEBUG: Solomon stream completed. Chunks: {chunk_count}, Response length: {len(full_response)}")
             
             # 最終レスポンスイベント
             yield self._create_sse_event("judge_chunk", {
@@ -821,7 +950,8 @@ class MAGIStrandsAgent:
             
             # JSON部分を抽出
             try:
-                print(f"  🔍 DEBUG: Attempting to parse JSON from response (length: {len(full_response)})")
+                if DEBUG_STREAMING:
+                    print(f"  🔍 DEBUG: Attempting to parse JSON from response (length: {len(full_response)})")
 
                 if not full_response or len(full_response) < 10:
                     raise ValueError(f"Solomon response too short or empty: '{full_response}'")
@@ -836,7 +966,8 @@ class MAGIStrandsAgent:
                 if not json_text:
                     json_text = full_response.strip()
 
-                print(f"  🔍 DEBUG: Extracted JSON text (length: {len(json_text)}): {json_text[:100]}...")
+                if DEBUG_STREAMING:
+                    print(f"  🔍 DEBUG: Extracted JSON text (length: {len(json_text)}): {json_text[:100]}...")
 
                 result = json.loads(json_text)
                 
@@ -1126,9 +1257,14 @@ async def main():
             }), flush=True)
             return
         
+        # カスタムプロンプトの取得（リクエストレベルで指定可能）
+        request_custom_prompts = payload.get('custom_prompts', {})
+
         # MAGI決定プロセスを実行
+        # 環境変数のカスタムプロンプトは __init__ で自動的に読み込まれる
+        # リクエストレベルのカスタムプロンプトは process_decision_stream で使用される
         magi_strands = MAGIStrandsAgent()
-        
+
         async for event in magi_strands.process_decision_stream(payload):
             # 各イベントをJSON行として出力
             print(json.dumps(event), flush=True)
