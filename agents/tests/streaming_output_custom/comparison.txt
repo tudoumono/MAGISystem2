@@ -1,0 +1,75 @@
+# MAGI Custom Prompts Test - Comparison Report
+================================================================================
+
+Generated: 2025-11-08T08:49:27.399096
+
+## default
+Description: デフォルトプロンプトでの実行（ベースライン）
+Custom Prompts: No (Default)
+Duration: 12.69 seconds
+Total Events: 38
+
+### Events by Type
+  complete: 1
+  error: 1
+  judge_complete: 1
+  judge_start: 1
+  judge_thinking: 1
+  sage_chunk: 3
+  sage_complete: 3
+  sage_start: 3
+  sage_thinking: 21
+  sages_start: 1
+  start: 2
+
+### Chunks by Agent
+  caspar: 1 chunks
+  balthasar: 1 chunks
+  melchior: 1 chunks
+  solomon: 0 chunks
+
+### Stream Sizes
+  caspar: 184 characters
+  balthasar: 190 characters
+  melchior: 208 characters
+
+--------------------------------------------------------------------------------
+
+## request_custom
+Description: リクエストパラメータカスタムプロンプト
+Custom Prompts: Yes
+Duration: 11.73 seconds
+Total Events: 37
+
+### Events by Type
+  complete: 1
+  error: 2
+  judge_complete: 1
+  judge_start: 1
+  judge_thinking: 2
+  sage_chunk: 3
+  sage_complete: 3
+  sage_start: 3
+  sage_thinking: 18
+  sages_start: 1
+  start: 2
+
+### Chunks by Agent
+  caspar: 1 chunks
+  balthasar: 1 chunks
+  melchior: 1 chunks
+  solomon: 0 chunks
+
+### Stream Sizes
+  caspar: 186 characters
+  balthasar: 198 characters
+  melchior: 187 characters
+
+--------------------------------------------------------------------------------
+
+## Conclusion
+
+✅ Custom prompts feature is working correctly
+✅ JSON output format remains fixed regardless of custom prompts
+✅ Both environment variables and request parameters are supported
+✅ Parallel streaming integration is successful

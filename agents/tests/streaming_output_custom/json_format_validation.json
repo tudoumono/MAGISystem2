@@ -1,0 +1,50 @@
+[
+  {
+    "scenario": "default",
+    "agent": "balthasar",
+    "valid": true,
+    "missing_keys": []
+  },
+  {
+    "scenario": "default",
+    "agent": "caspar",
+    "valid": true,
+    "missing_keys": []
+  },
+  {
+    "scenario": "default",
+    "agent": "melchior",
+    "valid": true,
+    "missing_keys": []
+  },
+  {
+    "scenario": "default",
+    "agent": "solomon",
+    "valid": true,
+    "missing_keys": []
+  },
+  {
+    "scenario": "request_custom",
+    "agent": "caspar",
+    "valid": true,
+    "missing_keys": []
+  },
+  {
+    "scenario": "request_custom",
+    "agent": "balthasar",
+    "valid": true,
+    "missing_keys": []
+  },
+  {
+    "scenario": "request_custom",
+    "agent": "melchior",
+    "valid": true,
+    "missing_keys": []
+  },
+  {
+    "scenario": "request_custom",
+    "agent": "solomon",
+    "valid": true,
+    "missing_keys": []
+  }
+]
