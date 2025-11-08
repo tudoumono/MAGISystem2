@@ -298,11 +298,17 @@ agents/tests/streaming_output_phase2/*.txt
 agents/tests/streaming_output_phase2/*.json
 !agents/tests/streaming_output_phase2/summary.txt
 
-# Streaming test outputs - 並列版（test_parallel.py）
+# Streaming test outputs - 並列版（test_magi_parallel.py）
 agents/tests/streaming_output_parallel/*.txt
 agents/tests/streaming_output_parallel/*.json
 !agents/tests/streaming_output_parallel/summary.txt
 !agents/tests/streaming_output_parallel/performance_comparison.txt
+
+# Streaming test outputs - カスタムプロンプト版（test_magi3.py）
+agents/tests/streaming_output_custom/*.txt
+agents/tests/streaming_output_custom/*.json
+!agents/tests/streaming_output_custom/comparison.txt
+!agents/tests/streaming_output_custom/json_format_validation.json
 
 # 旧パス（互換性のため）
 streaming_output/
