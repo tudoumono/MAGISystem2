@@ -103,44 +103,52 @@ const AgentColumn: React.FC<AgentColumnProps> = ({
 }) => {
   const colorClasses = {
     blue: {
-      border: 'border-l-4 border-blue-500',
-      bg: 'bg-gray-50',
-      icon: '🔵',
+      glass: 'glass-caspar',
+      border: 'neon-border-caspar',
+      neonText: 'neon-caspar',
+      bg: 'from-magi-caspar-500/5 to-magi-caspar-600/5',
       name: 'CASPAR',
-      type: '保守型'
+      type: '保守型・科学的',
+      icon: 'C'
     },
     purple: {
-      border: 'border-l-4 border-purple-600',
-      bg: 'bg-gray-50',
-      icon: '🟣',
+      glass: 'glass-balthasar',
+      border: 'neon-border-balthasar',
+      neonText: 'neon-balthasar',
+      bg: 'from-magi-balthasar-500/5 to-magi-balthasar-600/5',
       name: 'BALTHASAR',
-      type: '革新型'
+      type: '革新型・感情的',
+      icon: 'B'
     },
     green: {
-      border: 'border-l-4 border-green-500',
-      bg: 'bg-gray-50',
-      icon: '🟢',
+      glass: 'glass-melchior',
+      border: 'neon-border-melchior',
+      neonText: 'neon-melchior',
+      bg: 'from-magi-melchior-500/5 to-magi-melchior-600/5',
       name: 'MELCHIOR',
-      type: 'バランス型'
+      type: 'バランス型・統合的',
+      icon: 'M'
     }
   };
 
   const colors = colorClasses[color];
 
   return (
-    <div className={`flex flex-col ${colors.border} rounded-lg bg-white overflow-hidden h-[500px]`}>
+    <div className={`flex flex-col ${colors.glass} border-2 ${colors.border} rounded-2xl overflow-hidden h-[500px] transition-smooth hover:shadow-elevation-lg hover:-translate-y-0.5`}>
       {/* ヘッダー（固定） */}
-      <div className={`p-4 border-b border-gray-200 ${colors.bg} flex-shrink-0`}>
+      <div className={`p-4 border-b border-white/10 bg-gradient-to-br ${colors.bg} backdrop-blur-sm flex-shrink-0`}>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span className="text-xl">{colors.icon}</span>
+          <div className="flex items-center gap-3">
+            <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${color === 'blue' ? 'from-magi-caspar-500 to-magi-caspar-700' : color === 'purple' ? 'from-magi-balthasar-500 to-magi-balthasar-700' : 'from-magi-melchior-500 to-magi-melchior-700'} flex items-center justify-center text-white font-bold text-xl shadow-lg`}>
+              {colors.icon}
+            </div>
             <div>
-              <div className="font-semibold text-sm text-gray-900">{colors.name}</div>
-              <div className="text-xs text-gray-600">{colors.type}</div>
+              <div className={`font-bold text-sm ${colors.neonText}`}>{colors.name}</div>
+              <div className="text-xs text-gray-300">{colors.type}</div>
             </div>
           </div>
-          <div className="font-semibold text-blue-600 text-sm">
-            {Math.round((agent.confidence || 0.8) * 100)}点
+          <div className="font-bold text-white text-sm px-3 py-1 bg-white/10 rounded-lg">
+            {Math.round((agent.confidence || 0.8) * 100)}%
           </div>
         </div>
       </div>
@@ -226,13 +234,15 @@ const SolomonJudgeCard: React.FC<SolomonJudgeCardProps> = ({
   traceId
 }) => {
   return (
-    <div className="border-l-4 border-amber-500 rounded-lg bg-gradient-to-br from-amber-50 to-yellow-50 overflow-hidden">
+    <div className="glass-solomon border-2 neon-border-solomon rounded-2xl overflow-hidden transition-smooth hover:shadow-elevation-lg hover:-translate-y-0.5">
       {/* ヘッダー（固定） */}
-      <div className="p-4 border-b border-amber-300 bg-yellow-50 flex items-center gap-2.5">
-        <span className="text-xl">🟡</span>
+      <div className="p-4 border-b border-white/10 bg-gradient-to-br from-magi-solomon-500/5 to-magi-solomon-600/5 backdrop-blur-sm flex items-center gap-3">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-magi-solomon-500 to-magi-solomon-700 flex items-center justify-center text-white font-bold text-xl shadow-lg">
+          S
+        </div>
         <div>
-          <div className="font-semibold text-sm text-gray-900">SOLOMON JUDGE</div>
-          <div className="text-xs text-gray-600">総合判定</div>
+          <div className="font-bold text-sm neon-solomon">SOLOMON JUDGE</div>
+          <div className="text-xs text-gray-300">統括者・最終判定</div>
         </div>
       </div>
 
@@ -396,23 +406,23 @@ const UserMessage: React.FC<UserMessageProps> = ({
   timestamp,
   className = ''
 }) => (
-  <div className={`flex justify-end ${className}`}>
+  <div className={`flex justify-end ${className} animate-fade-in-up`}>
     <div className="max-w-3xl">
-      <Card className="bg-blue-500 text-white p-4">
-        <div className="flex items-start space-x-3">
+      <div className="glass border border-white/20 rounded-2xl p-5 shadow-elevation-md hover:shadow-elevation-lg transition-smooth">
+        <div className="flex items-start space-x-4">
           <div className="flex-1">
-            <p className="text-sm leading-relaxed whitespace-pre-wrap">
+            <p className="text-sm leading-relaxed whitespace-pre-wrap text-white">
               {content}
             </p>
           </div>
           <div className="flex-shrink-0">
-            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-              <User className="w-4 h-4" />
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
+              <User className="w-5 h-5 text-white" />
             </div>
           </div>
         </div>
         <MessageMetadata timestamp={typeof timestamp === 'string' ? timestamp : timestamp.toISOString()} />
-      </Card>
+      </div>
     </div>
   </div>
 );
