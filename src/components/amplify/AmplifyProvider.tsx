@@ -2,22 +2,22 @@
 
 /**
  * AmplifyProvider - クライアント側Amplify初期化コンポーネント
- * 
+ *
  * このコンポーネントはクライアント側でAmplifyの初期化を行います。
  * Server Componentのlayout.tsxから呼び出され、全ページでAmplifyが利用可能になります。
- * 
+ *
  * 目的:
  * - クライアント側でのAmplify.configure()実行
- * - amplify_outputs.jsonの直接読み込み
+ * - amplify_outputs.jsonの動的読み込み
  * - 初期化状態の管理とエラーハンドリング
  * - 開発時のデバッグ情報表示
- * 
+ *
  * 設計理由:
  * - useEffectによる初期化タイミングの制御
  * - 重複初期化の防止
- * - エラー時のフォールバック処理
+ * - エラー時のフォールバック処理（ファイル不在時も対応）
  * - 型安全性の確保
- * 
+ *
  * 使用例:
  * ```typescript
  * // layout.tsx内で使用
@@ -25,15 +25,12 @@
  *   {children}
  * </AmplifyProvider>
  * ```
- * 
+ *
  * 関連: src/lib/amplify/config.ts, amplify_outputs.json
  */
 
 import { useEffect, useState, ReactNode } from 'react';
 import { Amplify } from 'aws-amplify';
-
-// amplify_outputs.jsonを直接インポート
-import amplifyOutputs from '../../../amplify_outputs.json';
 
 interface AmplifyProviderProps {
   children: ReactNode;
@@ -76,14 +73,33 @@ export function AmplifyProvider({ children }: AmplifyProviderProps) {
             isInitialized: true,
             isLoading: false,
             error: null,
-            modelCount: Object.keys(amplifyOutputs.data?.model_introspection?.models || {}).length
+            modelCount: 0
+          });
+          return;
+        }
+
+        // amplify_outputs.jsonを動的にインポート
+        let amplifyOutputs;
+        try {
+          amplifyOutputs = await import('../../../amplify_outputs.json');
+        } catch (importError) {
+          // ファイルが存在しない場合（ローカル開発環境など）
+          console.warn('⚠️ amplify_outputs.json not found - Amplify features will be disabled');
+          console.warn('Run "npm run setup:amplify" or deploy backend to generate this file');
+
+          // 初期化なしで続行（認証なしモード）
+          setInitState({
+            isInitialized: false,
+            isLoading: false,
+            error: null, // エラーではなく警告として扱う
+            modelCount: 0
           });
           return;
         }
 
         // amplify_outputs.jsonの検証
         if (!amplifyOutputs) {
-          throw new Error('amplify_outputs.json not found');
+          throw new Error('amplify_outputs.json is empty');
         }
 
         if (!amplifyOutputs.data?.url) {
@@ -120,7 +136,7 @@ export function AmplifyProvider({ children }: AmplifyProviderProps) {
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown initialization error';
         console.error('❌ Failed to initialize Amplify on client side:', errorMessage);
-        
+
         setInitState({
           isInitialized: false,
           isLoading: false,
