@@ -66,7 +66,7 @@ export const MAGIBootSequence: React.FC<MAGIBootSequenceProps> = ({
       minute: '2-digit',
       second: '2-digit',
       fractionalSecondDigits: 3
-    });
+    } as any);
     setLogs(prev => [...prev, { timestamp, message, level }]);
   };
 
