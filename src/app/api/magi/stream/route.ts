@@ -2,50 +2,70 @@
  * MAGI Decision System - ストリーミングAPI Route
  *
  * このファイルはMAGIシステムのストリーミング対応APIエンドポイントです。
- * Amazon Bedrock AgentCore Runtime（独立デプロイ）にHTTPSリクエストを送信します。
+ * AWS SDK for JavaScript (BedrockAgentCoreClient) を使用して、
+ * AgentCore Runtime（独立デプロイ）と通信します。
  *
  * 主要機能:
+ * - AWS SDK経由のAgentCore Runtime呼び出し
+ * - AWS SigV4認証（自動処理）
  * - Server-Sent Eventsによるストリーミングレスポンス
- * - AgentCore RuntimeへのHTTPSリクエスト
  * - 認証・権限チェック
  * - エラーハンドリングとフォールバック
  *
  * 学習ポイント:
+ * - AWS SDKの使い方
+ * - BedrockAgentCoreClientの使用方法
  * - Next.js API Routesでのストリーミング実装
- * - 外部APIとの通信
  * - Server-Sent Eventsプロトコル
  *
  * アーキテクチャ:
  * Amplify Hosting (Next.js)
- *   ↓ HTTPS POST /invocations
+ *   ↓ BedrockAgentCoreClient.send()
+ *   ↓ AWS SigV4認証（自動）
  * Amazon Bedrock AgentCore Runtime (独立デプロイ)
+ *   └─ magi_agent.py
+ *      ├─ CASPAR (保守的視点)
+ *      ├─ BALTHASAR (革新的視点)
+ *      ├─ MELCHIOR (バランス型視点)
+ *      └─ SOLOMON Judge (統合評価)
  *   ↓ AWS SDK
  * Amazon Bedrock (Claude 3.5 Sonnet)
  *
  * 参考:
  * - AgentCore Runtime: 独立したDockerコンテナとしてデプロイ
- * - エンドポイント: /invocations, /ping
+ * - 認証: AWS SigV4署名（SDKが自動処理）
+ * - Python側実装: agents/magi_agent.py
+ * - テストコード: agents/tests/test_magi.py
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  BedrockAgentCoreClient,
+  InvokeAgentRuntimeCommand
+} from '@aws-sdk/client-bedrock-agentcore';
 import { checkRateLimit } from '@/lib/security/rate-limit';
 import { validateRequestBody } from '@/lib/security/request-validator';
 
+// Next.js設定
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 /**
- * AgentCore RuntimeへHTTPSリクエストを送信
+ * AgentCore RuntimeへAWS SDK経由で呼び出し
  *
  * アーキテクチャ:
  * Next.js API Route
- *   ↓ HTTPS
- * AgentCore Runtime /invocations
- *   ↓ AWS SDK
+ *   ↓ BedrockAgentCoreClient
+ *   ↓ AWS SigV4認証（自動）
+ * AgentCore Runtime
+ *   ↓ magi_agent.py
  * Bedrock (Claude)
  */
 async function invokeAgentCoreRuntime(
   controller: ReadableStreamDefaultController,
   encoder: TextEncoder,
   question: string,
-  sessionId?: string
+  sessionId: string
 ) {
   const sendMessage = (type: string, content: string, agentId?: string) => {
     controller.enqueue(
@@ -61,108 +81,99 @@ async function invokeAgentCoreRuntime(
   try {
     sendMessage('phase', 'MAGI System Initialization...');
 
-    // AgentCore Runtime エンドポイント URL
-    const agentCoreUrl = process.env.AGENTCORE_RUNTIME_URL;
+    // AgentCore Runtime ARN
+    const agentRuntimeArn = process.env.MAGI_AGENT_ARN;
 
-    if (!agentCoreUrl) {
-      throw new Error('AGENTCORE_RUNTIME_URL environment variable is not set');
+    if (!agentRuntimeArn) {
+      throw new Error('MAGI_AGENT_ARN environment variable is not set');
     }
 
-    const endpoint = `${agentCoreUrl}/invocations`;
+    console.log(`[MAGI] Invoking AgentCore Runtime: ARN=${agentRuntimeArn}, Session=${sessionId}`);
+    sendMessage('system', `AgentCore Runtime に接続中...`);
 
-    sendMessage('system', `AgentCore Runtime に接続中: ${endpoint}`);
-
-    // AgentCore Runtime にHTTPSリクエスト送信
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // AWS Signature V4 が必要な場合はここに追加
-      },
-      body: JSON.stringify({
-        question,
-        sessionId: sessionId || `session-${Date.now()}`,
-      }),
+    // 1. BedrockAgentCoreClient初期化
+    const client = new BedrockAgentCoreClient({
+      region: process.env.AWS_REGION || 'ap-northeast-1',
+      // 認証情報は自動取得（環境変数またはIAMロール）
+      // - ローカル開発: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+      // - Amplify Hosting: IAMロール（自動）
     });
 
-    if (!response.ok) {
-      throw new Error(`AgentCore Runtime returned ${response.status}: ${response.statusText}`);
-    }
+    // 2. InvokeAgentRuntimeCommand実行
+    const command = new InvokeAgentRuntimeCommand({
+      agentRuntimeArn,  // ARNを指定
+      runtimeSessionId: sessionId,
+      payload: new TextEncoder().encode(JSON.stringify({ question }))
+    });
 
-    if (!response.body) {
-      throw new Error('AgentCore Runtime response body is empty');
-    }
+    const response = await client.send(command);
 
     sendMessage('system', 'AgentCore Runtime からストリーミング受信中...');
 
-    // ストリーミングレスポンスを読み取る
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
+    // 3. ストリーミングレスポンスを処理
+    let eventCount = 0;
 
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
+    if (response.response) {
+      // SdkStreamをReadableStreamに変換
+      const stream = response.response as any;
 
-        if (done) {
-          break;
-        }
+      // Node.js StreamまたはWeb ReadableStreamの場合
+      if (stream.transformToByteArray) {
+        // AWS SDK v3のSdkStreamの場合
+        const bytes = await stream.transformToByteArray();
+        const fullText = new TextDecoder().decode(bytes);
 
-        // チャンクをデコード
-        buffer += decoder.decode(value, { stream: true });
-
-        // 改行で分割してJSON Linesをパース
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // 最後の不完全な行はバッファに残す
+        // 改行で分割してJSON Linesを処理
+        const lines = fullText.split('\n').filter(line => line.trim());
 
         for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
+          eventCount++;
 
+          // デバッグログ（本番環境では削除推奨）
+          if (process.env.NODE_ENV !== 'production') {
+            console.log(`[MAGI] Event ${eventCount}:`, line.substring(0, 150));
+          }
+
+          // magi_agent.pyの出力はJSON形式
+          // 各行がJSONイベント（type, data）なので、そのままSSE形式で送信
           try {
-            const event = JSON.parse(trimmed);
-
-            // AgentCore Runtimeからのイベントをそのまま転送
-            if (event.type && event.content) {
-              sendMessage(event.type, event.content, event.agentId);
+            const parsed = JSON.parse(line);
+            if (parsed.type && parsed.data) {
+              // magi_agent.pyの形式: {"type": "...", "data": {...}}
+              // SSE形式に変換: data: {"type": "...", "content": {...}, ...}
+              sendMessage(
+                parsed.type,
+                typeof parsed.data === 'string' ? parsed.data : JSON.stringify(parsed.data),
+                parsed.data.agent_id || parsed.data.agentId
+              );
             } else {
-              // フォールバック: JSON全体を送信
-              sendMessage('agent_chunk', trimmed);
+              // フォールバック: そのまま転送
+              sendMessage('agent_chunk', line);
             }
           } catch (parseError) {
             // JSON parseエラー時はテキストとして送信
-            console.warn('Failed to parse JSON line:', trimmed, parseError);
-            sendMessage('agent_chunk', trimmed);
+            console.warn('[MAGI] Failed to parse JSON:', line.substring(0, 100), parseError);
+            sendMessage('agent_chunk', line);
           }
         }
+      } else {
+        // フォールバック: ストリームとして処理できない場合
+        console.warn('[MAGI] Response is not a streamable format');
+        sendMessage('error', 'Unexpected response format from AgentCore Runtime');
       }
-
-      // バッファに残ったデータを処理
-      if (buffer.trim()) {
-        try {
-          const event = JSON.parse(buffer.trim());
-          if (event.type && event.content) {
-            sendMessage(event.type, event.content, event.agentId);
-          }
-        } catch (parseError) {
-          sendMessage('agent_chunk', buffer.trim());
-        }
-      }
-
-      sendMessage('phase', 'MAGI Decision Complete');
-      sendMessage('complete', 'MAGI Decision System: 分析が完了しました。');
-
-    } finally {
-      reader.releaseLock();
     }
 
+    console.log(`[MAGI] Stream complete: ${eventCount} events received`);
+    sendMessage('phase', 'MAGI Decision Complete');
+    sendMessage('complete', 'MAGI Decision System: 分析が完了しました。');
+
   } catch (error) {
-    console.error('AgentCore Runtime error:', error);
+    console.error('[MAGI] AgentCore Runtime error:', error);
 
     try {
       sendMessage('error', `AgentCore Runtime エラー: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } catch (controllerError) {
-      console.error('Controller error:', controllerError);
+      console.error('[MAGI] Controller error:', controllerError);
     }
 
     // 開発環境でのみフォールバック
@@ -176,13 +187,14 @@ async function invokeAgentCoreRuntime(
     try {
       controller.close();
     } catch (closeError) {
-      console.error('Controller close error:', closeError);
+      console.error('[MAGI] Controller close error:', closeError);
     }
   }
 }
 
 /**
  * 開発環境用のフォールバックレスポンス
+ * MAGI_AGENT_ARNが未設定の場合や接続エラー時に使用
  */
 async function sendDevelopmentFallback(
   controller: ReadableStreamDefaultController,
@@ -203,10 +215,10 @@ async function sendDevelopmentFallback(
   };
 
   try {
-    sendMessage('phase', 'MAGI System Initialization...');
+    sendMessage('phase', 'MAGI System Initialization (Mock)...');
     await delay(800);
 
-    sendMessage('system', 'SOLOMON Judge: システム起動中...');
+    sendMessage('system', 'SOLOMON Judge: システム起動中... (Mock)');
     await delay(500);
 
     sendMessage('system', 'SOLOMON Judge: 3賢者エージェント初期化中...');
@@ -290,10 +302,10 @@ async function sendDevelopmentFallback(
     await delay(300);
     sendMessage('complete', 'MAGI Decision System: 全ての分析が完了しました。');
     await delay(200);
-    sendMessage('note', '※ 現在はモックモードで動作しています。AgentCore Runtime URLを設定してください。');
+    sendMessage('note', '※ 現在はモックモードで動作しています。MAGI_AGENT_ARNを設定してください。');
 
   } catch (error) {
-    sendMessage('error', `Streaming simulation error: ${error}`);
+    sendMessage('error', `Mock streaming error: ${error}`);
   } finally {
     controller.close();
   }
@@ -309,6 +321,7 @@ export async function POST(request: NextRequest) {
   try {
     // 認証チェック（本番環境では必須）
     if (process.env.NODE_ENV === 'production' && !process.env.SKIP_AUTH_CHECK) {
+      // TODO: Amplify Auth統合後、ここで認証チェックを実装
       return NextResponse.json(
         {
           error: 'Authentication Required',
@@ -324,7 +337,7 @@ export async function POST(request: NextRequest) {
 
     // リクエストボディの解析
     const body = await request.json();
-    const { question, sessionId } = body;
+    const { question } = body;
 
     // リクエストの検証
     const validation = validateRequestBody(body);
@@ -359,6 +372,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // セッションID生成（33文字以上必須）
+    const timestamp = Date.now().toString();
+    const random = Math.random().toString(36).substring(2);
+    const sessionId = `magi-session-${timestamp}-${random}`.padEnd(33, '0');
+
     // Server-Sent Eventsストリーム作成
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
@@ -368,15 +386,16 @@ export async function POST(request: NextRequest) {
             encoder.encode(`data: ${JSON.stringify({
               type: 'start',
               message: 'MAGI Decision System starting...',
+              sessionId,
               timestamp: new Date().toISOString()
             })}\n\n`)
           );
 
-          console.log('🚀 Invoking AgentCore Runtime...');
+          console.log('🚀 Invoking AgentCore Runtime via AWS SDK...');
           await invokeAgentCoreRuntime(controller, encoder, question, sessionId);
 
         } catch (error) {
-          console.error('AgentCore Runtime error:', error);
+          console.error('[MAGI] API Route error:', error);
 
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({
@@ -397,6 +416,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no', // nginxバッファリング無効化
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST',
         'Access-Control-Allow-Headers': 'Content-Type',
@@ -404,9 +424,13 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('API Route error:', error);
+    console.error('[MAGI] API Route error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
+      },
       { status: 500 }
     );
   }

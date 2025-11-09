@@ -25,6 +25,7 @@
     "@aws-amplify/backend": "^1.6.0",
     "@aws-amplify/backend-cli": "^1.4.0",
     "@aws-sdk/client-bedrock-agent-runtime": "^3.918.0",
+    "@aws-sdk/client-bedrock-agentcore": "^3.927.0",
     "@aws-sdk/client-bedrock-runtime": "^3.922.0",
     "@aws-sdk/client-cloudwatch": "^3.705.0",
     "@aws-sdk/client-cloudwatch-logs": "^3.705.0",
