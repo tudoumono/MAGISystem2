@@ -110,56 +110,57 @@ async function invokeAgentCoreRuntime(
 
     sendMessage('system', 'AgentCore Runtime からストリーミング受信中...');
 
-    // 3. ストリーミングレスポンスを処理
+    // 3. ストリーミングレスポンスを処理（リアルタイム）
     let eventCount = 0;
 
     if (response.response) {
-      // SdkStreamをReadableStreamに変換
-      const stream = response.response as any;
+      // ✅ 正しい実装: AsyncIterableとして処理（リアルタイムストリーミング）
+      // TypeScript型エラーを回避するため as any を使用
+      const eventStream = response.response as any;
 
-      // Node.js StreamまたはWeb ReadableStreamの場合
-      if (stream.transformToByteArray) {
-        // AWS SDK v3のSdkStreamの場合
-        const bytes = await stream.transformToByteArray();
-        const fullText = new TextDecoder().decode(bytes);
+      for await (const event of eventStream) {
+        eventCount++;
 
-        // 改行で分割してJSON Linesを処理
-        const lines = fullText.split('\n').filter(line => line.trim());
-
-        for (const line of lines) {
-          eventCount++;
+        // magi_agent.pyの標準出力がevent.chunk.bytesに含まれる
+        if ('chunk' in event && event.chunk?.bytes) {
+          const chunkText = new TextDecoder().decode(event.chunk.bytes);
 
           // デバッグログ（本番環境では削除推奨）
           if (process.env.NODE_ENV !== 'production') {
-            console.log(`[MAGI] Event ${eventCount}:`, line.substring(0, 150));
+            console.log(`[MAGI] Event ${eventCount}:`, chunkText.substring(0, 150));
           }
 
-          // magi_agent.pyの出力はJSON形式
-          // 各行がJSONイベント（type, data）なので、そのままSSE形式で送信
-          try {
-            const parsed = JSON.parse(line);
-            if (parsed.type && parsed.data) {
-              // magi_agent.pyの形式: {"type": "...", "data": {...}}
-              // SSE形式に変換: data: {"type": "...", "content": {...}, ...}
-              sendMessage(
-                parsed.type,
-                typeof parsed.data === 'string' ? parsed.data : JSON.stringify(parsed.data),
-                parsed.data.agent_id || parsed.data.agentId
-              );
-            } else {
-              // フォールバック: そのまま転送
+          // magi_agent.pyの出力はJSON Lines形式
+          // 各行がJSONオブジェクト: {"type": "...", "data": {...}}
+          const lines = chunkText.split('\n').filter(line => line.trim());
+
+          for (const line of lines) {
+            try {
+              const parsed = JSON.parse(line);
+              if (parsed.type && parsed.data) {
+                // magi_agent.pyの形式: {"type": "...", "data": {...}}
+                // SSE形式に変換: data: {"type": "...", "content": {...}, ...}
+                sendMessage(
+                  parsed.type,
+                  typeof parsed.data === 'string' ? parsed.data : JSON.stringify(parsed.data),
+                  parsed.data.agent_id || parsed.data.agentId
+                );
+              } else {
+                // フォールバック: そのまま転送
+                sendMessage('agent_chunk', line);
+              }
+            } catch (parseError) {
+              // JSON parseエラー時はテキストとして送信
+              console.warn('[MAGI] Failed to parse JSON:', line.substring(0, 100), parseError);
               sendMessage('agent_chunk', line);
             }
-          } catch (parseError) {
-            // JSON parseエラー時はテキストとして送信
-            console.warn('[MAGI] Failed to parse JSON:', line.substring(0, 100), parseError);
-            sendMessage('agent_chunk', line);
+          }
+        } else if ('trace' in event) {
+          // トレース情報（デバッグ用）
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[MAGI] Trace:', event.trace);
           }
         }
-      } else {
-        // フォールバック: ストリームとして処理できない場合
-        console.warn('[MAGI] Response is not a streamable format');
-        sendMessage('error', 'Unexpected response format from AgentCore Runtime');
       }
     }
 
