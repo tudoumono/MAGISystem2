@@ -1,83 +1,85 @@
 # MAGI Decision System - ドキュメント
 
-## 📚 ドキュメント構成
+MAGI Decision Systemの技術ドキュメントへようこそ。
 
-このプロジェクトは**AgentCore Runtime + Strands Agents**アーキテクチャで実装されています。
+## 📖 クイックナビゲーション
+
+### 🚀 はじめに
+
+- **[5分クイックスタート](01-getting-started/QUICKSTART.md)** - 今すぐ始める
+- **[開発環境セットアップ](01-getting-started/DEVELOPMENT_SETUP.md)** - 詳細な環境構築手順
 
 ### 🏗️ アーキテクチャ
 
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - システム全体のアーキテクチャ設計
-  - AgentCore Runtime（1つのDockerコンテナ）
-  - Next.js + Python統合パターン
-  - 参考記事完全準拠の実装方針
+- **[システム概要](02-architecture/OVERVIEW.md)** - MAGI Systemの全体像
+- **[設計判断記録](02-architecture/DESIGN_DECISIONS.md)** - 技術選択の理由と経緯
+- **[詳細設計](02-architecture/DETAILS.md)** - 実装の詳細
 
-### 🚀 セットアップ・デプロイ
+### 🚢 デプロイ
 
-- **[ENVIRONMENT_SETUP.md](./ENVIRONMENT_SETUP.md)** - 開発環境のセットアップ手順
-- **[agentcore-runtime-setup.md](./agentcore-runtime-setup.md)** - AgentCore Runtimeのセットアップ
-- **[DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md)** - デプロイ前のチェックリスト
-- **[deployment/](./deployment/)** - 詳細なデプロイ手順
-  - [bedrock-agentcore-setup.md](./deployment/bedrock-agentcore-setup.md)
-  - [user-action-guide.md](./deployment/user-action-guide.md)
+- **[デプロイチェックリスト](03-deployment/CHECKLIST.md)** - デプロイ前の確認事項
+- **[本番環境デプロイ](03-deployment/PRODUCTION_GUIDE.md)** - 本番環境への展開手順
 
-### 🤖 エージェント・AI
+### ⚙️ エージェント設定
 
-- **[bedrock-models-for-magi.md](./bedrock-models-for-magi.md)** - Bedrockモデル設定
-- **[agents/README.md](../agents/README.md)** - Strands Agents実装ガイド
-- **[agents/DEBUG_GUIDE.md](../agents/DEBUG_GUIDE.md)** - エージェントデバッグガイド
+- **[AgentCore Runtime](04-agent-configuration/AGENTCORE_SETUP.md)** - AgentCore環境構築
+- **[カスタムプロンプト](04-agent-configuration/CUSTOM_PROMPTS.md)** - プロンプト設定
+- **[モデル設定](04-agent-configuration/MODEL_CONFIGURATION.md)** - Bedrockモデル選択
 
-### 💰 運用・コスト
+### 📊 運用
 
-- **[magi-system-cost-estimation.md](./magi-system-cost-estimation.md)** - コスト見積もり
+- **[コスト見積もり](05-operations/COST_ESTIMATION.md)** - AWS利用料金の試算
 
-### 🛠️ 開発
+### 📚 参考資料
 
-- **[DEVELOPMENT_GUIDE.md](./DEVELOPMENT_GUIDE.md)** - 開発ガイド
-- **[learning/](./learning/)** - 学習リソース
-  - [uv-python-management.md](./learning/uv-python-management.md) - Python環境管理
+- **[学習リソース](99-reference/learning/)** - 技術学習資料
+- **[アーカイブ](99-reference/archive-deployment/)** - 過去のドキュメント
 
----
+## 🎯 ドキュメント構成
 
-## 🎯 クイックスタート
+```
+docs/
+├── 01-getting-started/      # 入門ガイド
+├── 02-architecture/         # アーキテクチャ設計
+├── 03-deployment/           # デプロイ手順
+├── 04-agent-configuration/  # エージェント設定
+├── 05-operations/           # 運用ガイド
+└── 99-reference/            # 参考資料・アーカイブ
+```
 
-### 1. システム理解
-まずは **[ARCHITECTURE.md](./ARCHITECTURE.md)** を読んで、全体像を把握してください。
+## 🔍 ドキュメントの探し方
 
-### 2. 開発環境構築
-**[ENVIRONMENT_SETUP.md](./ENVIRONMENT_SETUP.md)** に従って、ローカル開発環境を構築してください。
+### 初めての方
 
-### 3. AgentCore Runtimeセットアップ
-**[agentcore-runtime-setup.md](./agentcore-runtime-setup.md)** でエージェント実行環境をセットアップしてください。
+1. [5分クイックスタート](01-getting-started/QUICKSTART.md)で動作確認
+2. [開発環境セットアップ](01-getting-started/DEVELOPMENT_SETUP.md)で詳細構築
+3. [システム概要](02-architecture/OVERVIEW.md)でアーキテクチャ理解
 
-### 4. デプロイ
-**[DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md)** を確認してデプロイしてください。
+### 開発者向け
 
----
+- **フロントエンド開発**: [開発環境セットアップ](01-getting-started/DEVELOPMENT_SETUP.md)
+- **エージェント開発**: [AgentCore Runtime](04-agent-configuration/AGENTCORE_SETUP.md)
+- **プロンプト調整**: [カスタムプロンプト](04-agent-configuration/CUSTOM_PROMPTS.md)
 
-## 📋 重要な設計判断
+### 運用担当者向け
 
-### AgentCore Runtime統合パターン
+- **デプロイ**: [本番環境デプロイ](03-deployment/PRODUCTION_GUIDE.md)
+- **コスト管理**: [コスト見積もり](05-operations/COST_ESTIMATION.md)
+- **トラブルシューティング**: 各ガイドのトラブルシューティングセクション
 
-このプロジェクトは以下の記事のアーキテクチャを**完全準拠**で実装します：
+## 🤝 貢献
 
-**[Amplify HostingでBedrock AgentCoreを使う](https://qiita.com/moritalous/items/ea695f8a328585e1313b)**
+ドキュメントの改善提案は[GitHub Issues](https://github.com/tudoumono/MAGISystem2/issues)へお願いします。
 
-### 主要な特徴
+## 📝 ドキュメント更新履歴
 
-1. **1つのDockerコンテナ** - Next.js + Pythonが同じコンテナ内で動作
-2. **ストリーミング対応** - Server-Sent Eventsによるリアルタイム応答
-3. **Strands Agents 1.0** - 本番対応のマルチエージェントフレームワーク
-4. **既存資産活用** - フロントエンド・バックエンドの再利用
+- **2025-11-10**: ドキュメント構造を大幅リファクタリング（17→10ファイル）
+- **2025-11**: Phase 2完了、AgentCore Runtime統合
+- **2024**: プロジェクト開始、初期ドキュメント作成
 
----
+## 🔗 外部リンク
 
-## 🔄 ドキュメント更新履歴
-
-| 日付 | 更新内容 |
-|------|----------|
-| 2025-11-06 | 古い設計のドキュメントを削除、AgentCore Runtime準拠に整理 |
-| 2025-10-26 | 初版ドキュメント作成 |
-
----
-
-**MAGI Development Team**
+- **[GitHub Repository](https://github.com/tudoumono/MAGISystem2)**
+- **[Strands Agents公式](https://strandsagents.com/latest/)**
+- **[AWS Amplify Gen 2](https://docs.amplify.aws/react/)**
+- **[Amazon Bedrock](https://docs.aws.amazon.com/bedrock/)**
