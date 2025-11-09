@@ -1,8 +1,22 @@
-# MAGI System Deployment Guide - 参考記事準拠版
+# MAGI System Deployment Guide - AgentCore Runtime + Python統合版
 
 ## 📚 概要
 
-このガイドは、[参考記事](https://qiita.com/moritalous/items/ea695f8a328585e1313b)のアーキテクチャに完全準拠したデプロイ手順です。
+このガイドは、[参考記事](https://qiita.com/moritalous/items/ea695f8a328585e1313b)のAgentCore Runtimeコンセプトを採用し、AWS Strands Agentsを使用したPython統合を追加した実装のデプロイ手順です。
+
+### 参考記事との違い
+
+**参考記事の実装:**
+```
+AgentCore Runtime → @ai-sdk/amazon-bedrock → Bedrock API
+```
+
+**MAGI実装:**
+```
+AgentCore Runtime → spawn(python) → Strands Agents → Bedrock API
+```
+
+MAGI独自の3賢者システム（CASPAR/BALTHASAR/MELCHIOR + SOLOMON Judge）をStrands Agentsで実装しています。
 
 ### アーキテクチャ
 
@@ -277,9 +291,17 @@ A: 参考記事では、AgentCore Runtime（Dockerコンテナ）として実装
 
 A: フロントエンドからAgentCore Runtimeへの呼び出しには通常のHTTP fetchを使用します。AgentCore Runtime内部では、Pythonスクリプトが `boto3` (AWS SDK for Python) を使用してBedrockにアクセスします。
 
-### Q: PR #5の実装（AWS SDK方式）とどう違うのですか？
+### Q: 参考記事の実装とどう違うのですか？
 
-A: PR #5では、フロントエンドから `BedrockAgentCoreClient` を使用してAWS SDKで直接呼び出す実装でしたが、参考記事では、AgentCore Runtime内でNext.jsとPythonを統合し、spawn()で子プロセスとして呼び出すアーキテクチャです。
+A:
+- **参考記事**: Next.jsから直接 `@ai-sdk/amazon-bedrock` でBedrock呼び出し
+- **MAGI実装**: Next.jsから spawn() でPythonエージェント起動 → AWS Strands Agents使用
+
+MAGIシステムは、参考記事のAgentCore Runtimeコンセプトを採用しつつ、既存のPythonエージェント（Strands Agents）を活用する独自の拡張を追加しています。
+
+### Q: PR #5の実装（BedrockAgentCoreClient方式）とどう違うのですか？
+
+A: PR #5では、フロントエンドから `BedrockAgentCoreClient` を使用してAWS SDKで直接呼び出す実装でしたが、これは誤った方向性でした。MAGIの正しい実装では、AgentCore Runtime内でNext.jsとPythonを統合し、spawn()で子プロセスとして呼び出すアーキテクチャを採用しています。
 
 ## 🎯 次のステップ
 
@@ -294,4 +316,4 @@ A: PR #5では、フロントエンドから `BedrockAgentCoreClient` を使用�
 
 **更新日**: 2025-11-09
 **バージョン**: 1.0
-**ステータス**: ✅ 参考記事完全準拠の実装完了
+**ステータス**: ✅ 参考記事コンセプト + Python統合の実装完了

@@ -1,31 +1,31 @@
 /**
  * ⚠️ DEPRECATED - このファイルは非推奨です ⚠️
  *
- * PR #5で誤って実装されたAWS SDK方式のAPI Routeです。
- * 参考記事のアーキテクチャとは異なります。
+ * PR #5で誤って実装されたBedrockAgentCoreClient方式のAPI Routeです。
+ * 参考記事のコンセプトとMAGIの要件から逸脱しています。
  *
  * 🎯 正しい実装:
  * - agents/backend/app/api/invocations/route.ts を使用してください
  * - フロントエンドは AgentCore Runtime の /api/invocations を直接呼び出します
  *
- * 参考記事準拠アーキテクチャ:
+ * MAGIアーキテクチャ（参考記事コンセプト + Python統合）:
  *   Amplify Hosting (Next.js Frontend)
  *       ↓ fetch(NEXT_PUBLIC_AGENTCORE_URL + '/api/invocations')
  *   AgentCore Runtime (Docker Container)
  *       ├─ Next.jsバックエンド (ポート8080)
  *       │   └─ spawn('python', ['magi_agent.py'])
- *       └─ Python magi_agent.py (子プロセス)
+ *       └─ Python magi_agent.py (AWS Strands Agents使用)
  *
  * ❌ このファイルのアーキテクチャ（誤り）:
  * Amplify Hosting (Next.js)
- *   ↓ BedrockAgentCoreClient.send() ← AWS SDKを使用（参考記事と異なる）
+ *   ↓ BedrockAgentCoreClient.send() ← 誤った方向性
  *   ↓ AWS SigV4認証
  * Amazon Bedrock AgentCore Runtime (独立デプロイ)
  *   └─ magi_agent.py
  *
- * 理由: 参考記事では、AgentCore Runtime内でNext.jsとPythonを統合し、
- *       spawn()で子プロセスとして呼び出すアーキテクチャを採用しています。
- *       AWS SDKでの独立した呼び出しは、参考記事の意図とは異なります。
+ * 理由: MAGIシステムは既存のPythonエージェント（Strands Agents）を活用し、
+ *       参考記事のAgentCore Runtimeコンセプトを採用しています。
+ *       BedrockAgentCoreClientでの独立した呼び出しは、この方針と異なります。
  *
  * 参考:
  * - 参考記事: https://qiita.com/moritalous/items/ea695f8a328585e1313b
