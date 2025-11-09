@@ -2,52 +2,56 @@
  * MAGI Decision System - ストリーミングAPI Route
  *
  * このファイルはMAGIシステムのストリーミング対応APIエンドポイントです。
- * AgentCore Runtimeとの統合により、リアルタイムエージェント応答を実現します。
+ * 同一コンテナ内のPython magi_agent.pyを子プロセスとして実行します。
  *
  * 主要機能:
  * - Server-Sent Eventsによるストリーミングレスポンス
- * - AgentCore Runtime統合
+ * - Python子プロセス実行（spawn）
+ * - 標準入出力による通信
  * - 認証・権限チェック
  * - エラーハンドリングとフォールバック
  *
  * 学習ポイント:
  * - Next.js API Routesでのストリーミング実装
- * - AgentCore Runtime呼び出し
+ * - Node.js child_process.spawn()の使用
  * - Server-Sent Eventsプロトコル
  *
- * アーキテクチャ:
- * Next.js API Route → AgentCore Runtime (port 8080) → magi_agent.py → Bedrock
+ * アーキテクチャ（同一コンテナ内）:
+ * Next.js API Route
+ *   ↓ spawn('python3', ['agents/magi_agent.py'])
+ * Python magi_agent.py（子プロセス）
+ *   ↓ 標準出力にJSON Lines
+ * Next.js（親プロセス）
+ *   ↓ Server-Sent Events
+ * フロントエンド
  *
  * 参考: https://qiita.com/moritalous/items/ea695f8a328585e1313b
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { spawn } from 'child_process';
 import { checkRateLimit } from '@/lib/security/rate-limit';
 import { validateRequestBody } from '@/lib/security/request-validator';
+import path from 'path';
 
 /**
- * AgentCore Runtime URL設定
- *
- * 環境別URL:
- * - ローカル開発: http://localhost:8080
- * - Amplify Hosting: https://your-app.amplifyapp.com (環境変数で設定)
- */
-const AGENTCORE_URL = process.env.AGENTCORE_URL || 'http://localhost:8080';
-
-/**
- * AgentCore Runtime経由でMAGI Agentを呼び出し
+ * Python magi_agent.pyを子プロセスとして実行
  *
  * アーキテクチャ:
- * API Route → AgentCore Runtime /invocations → Python magi_agent.py
+ * Node.js (このAPI Route)
+ *   ↓ spawn()
+ * Python magi_agent.py
+ *   ↓ stdout（JSON Lines形式）
+ * Node.js
+ *   ↓ Server-Sent Events
+ * クライアント
  */
-async function invokeMAGIAgentCore(
+async function invokeMAGIPythonProcess(
   controller: ReadableStreamDefaultController,
   encoder: TextEncoder,
   question: string,
   sessionId?: string
 ) {
-  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
   const sendMessage = (type: string, content: string, agentId?: string) => {
     controller.enqueue(
       encoder.encode(`data: ${JSON.stringify({
@@ -60,131 +64,104 @@ async function invokeMAGIAgentCore(
   };
 
   try {
-    // Phase 1: システム初期化
     sendMessage('phase', 'MAGI System Initialization...');
-    await delay(500);
 
-    sendMessage('system', 'AgentCore Runtime: 接続中...');
-    await delay(300);
+    // Pythonスクリプトのパス
+    const pythonScriptPath = path.join(process.cwd(), 'agents', 'magi_agent.py');
 
-    sendMessage('system', 'AgentCore Runtime: MAGI Agent起動中...');
-    await delay(700);
+    // Pythonプロセスを起動
+    const pythonProcess = spawn('python3', [
+      pythonScriptPath,
+      '--question', question,
+      '--session-id', sessionId || `session-${Date.now()}`
+    ]);
 
-    // Phase 2: AgentCore Runtime呼び出し
-    sendMessage('phase', 'AgentCore Runtime Execution');
-    await delay(400);
+    sendMessage('system', 'Python MAGI Agentプロセス起動中...');
 
-    sendMessage('system', `質問をAgentCore Runtimeに送信: "${question}"`);
-    await delay(600);
+    // 標準出力からのデータ受信
+    pythonProcess.stdout.on('data', (data) => {
+      try {
+        const lines = data.toString().split('\n').filter((line: string) => line.trim());
 
-    sendMessage('system', 'AgentCore Runtime経由でMAGI Agentを呼び出し中...');
-    await delay(500);
+        for (const line of lines) {
+          try {
+            const event = JSON.parse(line);
 
-    try {
-      // AgentCore Runtime /invocations エンドポイント呼び出し
-      const agentcorePayload = {
-        question: question,
-        sessionId: sessionId || `session-${Date.now()}`,
-      };
+            // Pythonからのイベントをそのまま転送
+            if (event.type && event.content) {
+              sendMessage(event.type, event.content, event.agentId);
+            } else {
+              // フォールバック: JSON全体を送信
+              sendMessage('agent_chunk', line);
+            }
+          } catch (parseError) {
+            // JSON parseエラー時はテキストとして送信
+            sendMessage('agent_chunk', line);
+          }
+        }
+      } catch (error) {
+        console.error('Error processing Python output:', error);
+        sendMessage('error', `Python出力処理エラー: ${error}`);
+      }
+    });
 
-      sendMessage('system', 'AgentCore Runtime実行中...');
-      await delay(300);
+    // 標準エラー出力の処理
+    pythonProcess.stderr.on('data', (data) => {
+      const errorMessage = data.toString();
+      console.error('Python stderr:', errorMessage);
 
-      const agentcoreResponse = await fetch(`${AGENTCORE_URL}/invocations`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(agentcorePayload),
+      // デバッグ情報として送信（開発環境のみ）
+      if (process.env.NODE_ENV !== 'production') {
+        sendMessage('debug', `Python stderr: ${errorMessage}`);
+      }
+    });
+
+    // プロセス終了処理
+    return new Promise<void>((resolve, reject) => {
+      pythonProcess.on('close', (code) => {
+        if (code === 0) {
+          sendMessage('phase', 'MAGI Decision Complete');
+          sendMessage('complete', 'MAGI Decision System: 分析が完了しました。');
+          resolve();
+        } else {
+          const errorMsg = `Python process exited with code ${code}`;
+          console.error(errorMsg);
+          sendMessage('error', errorMsg);
+
+          // 開発環境でのみフォールバック
+          if (process.env.NODE_ENV !== 'production') {
+            sendMessage('system', '開発環境: フォールバックモードで継続します');
+            sendDevelopmentFallback(controller, encoder, question).then(resolve);
+          } else {
+            reject(new Error(errorMsg));
+          }
+        }
       });
 
-      if (!agentcoreResponse.ok) {
-        throw new Error(`AgentCore Runtime returned status ${agentcoreResponse.status}`);
-      }
+      pythonProcess.on('error', (error) => {
+        console.error('Failed to start Python process:', error);
+        sendMessage('error', `Pythonプロセス起動エラー: ${error.message}`);
 
-      sendMessage('system', 'AgentCore Runtimeからレスポンス受信');
-      await delay(300);
-
-      // レスポンスの解析
-      const responseBody = await agentcoreResponse.json();
-
-      sendMessage('system', 'AgentCore Runtime実行完了');
-      await delay(400);
-
-      // Phase 3: レスポンス処理
-      sendMessage('phase', 'Processing MAGI Response');
-      await delay(300);
-
-      // AgentCore Runtimeからの構造化レスポンスを表示
-      if (responseBody.success && responseBody.response) {
-        const magiResponse = responseBody.response;
-
-        // レスポンスが文字列の場合はパース
-        let parsedResponse;
-        if (typeof magiResponse === 'string') {
-          try {
-            parsedResponse = JSON.parse(magiResponse);
-          } catch (e) {
-            parsedResponse = null;
-          }
+        // 開発環境でのみフォールバック
+        if (process.env.NODE_ENV !== 'production') {
+          sendMessage('system', '開発環境: フォールバックモードで継続します');
+          sendDevelopmentFallback(controller, encoder, question).then(resolve);
         } else {
-          parsedResponse = magiResponse;
+          reject(error);
         }
-
-        // 構造化されたMAGI応答を表示
-        if (parsedResponse && parsedResponse.body) {
-          await displayStructuredMAGIResponse(parsedResponse.body, sendMessage, delay);
-        } else if (responseBody.fullResponse) {
-          try {
-            const fullParsed = JSON.parse(responseBody.fullResponse);
-            if (fullParsed.body) {
-              await displayStructuredMAGIResponse(fullParsed.body, sendMessage, delay);
-            }
-          } catch (e) {
-            sendMessage('system', 'AgentCore Runtime実行完了（レスポンス形式が異なります）');
-            sendMessage('agent_chunk', responseBody.fullResponse || JSON.stringify(responseBody.response));
-          }
-        }
-      } else {
-        throw new Error('Invalid response format from AgentCore Runtime');
-      }
-
-    } catch (agentcoreError) {
-      console.error('AgentCore Runtime invocation failed:', agentcoreError);
-
-      sendMessage('error', 'AgentCore Runtimeの呼び出しに失敗しました');
-      await delay(300);
-
-      const errorMessage = agentcoreError instanceof Error ? agentcoreError.message : 'Unknown error';
-      sendMessage('error', `エラー詳細: ${errorMessage}`);
-      await delay(300);
-
-      // 開発環境でのみフォールバック
-      if (process.env.NODE_ENV !== 'production') {
-        sendMessage('system', '開発環境: フォールバックモードで継続します');
-        await delay(500);
-        await sendDevelopmentFallback(controller, encoder, question);
-        return;
-      }
-
-      sendMessage('error', '本番環境ではフォールバックは利用できません。システム管理者に連絡してください。');
-      throw new Error(`AgentCore Runtime invocation failed: ${errorMessage}`);
-    }
-
-    // Phase 5: 完了
-    sendMessage('phase', 'MAGI Decision Complete');
-    await delay(300);
-
-    sendMessage('complete', 'MAGI Decision System: 実際のAI分析が完了しました。');
+      });
+    });
 
   } catch (error) {
-    console.error('AgentCore Runtime error:', error);
+    console.error('MAGI Python process error:', error);
 
     try {
-      sendMessage('error', `AgentCore Runtime error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      sendMessage('error', `Python実行エラー: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } catch (controllerError) {
       console.error('Controller error:', controllerError);
     }
+
+    throw error;
   } finally {
     try {
       controller.close();
@@ -192,67 +169,6 @@ async function invokeMAGIAgentCore(
       console.error('Controller close error:', closeError);
     }
   }
-}
-
-/**
- * 構造化されたMAGI応答の表示
- */
-async function displayStructuredMAGIResponse(
-  responseBody: any,
-  sendMessage: (type: string, content: string, agentId?: string) => void,
-  delay: (ms: number) => Promise<unknown>
-) {
-  sendMessage('phase', 'MAGI Decision Results');
-  await delay(400);
-
-  // 各エージェントの結果を段階的に表示
-  if (responseBody.agent_responses) {
-    sendMessage('system', '3賢者の判断結果:');
-    await delay(300);
-
-    for (const agentResponse of responseBody.agent_responses) {
-      const agentName = agentResponse.agent_id.toUpperCase();
-      const decision = agentResponse.decision;
-      const confidence = (agentResponse.confidence * 100).toFixed(0);
-
-      sendMessage('agent_complete',
-        `${agentName}: ${decision} (確信度: ${confidence}%)`,
-        agentResponse.agent_id.toLowerCase()
-      );
-      await delay(400);
-
-      sendMessage('agent_chunk',
-        `理由: ${agentResponse.reasoning}`,
-        agentResponse.agent_id.toLowerCase()
-      );
-      await delay(300);
-    }
-  }
-
-  // SOLOMON Judgeの最終判断
-  sendMessage('phase', 'SOLOMON Judge Final Decision');
-  await delay(500);
-
-  sendMessage('judge_thinking', 'SOLOMON Judge: 統合評価完了');
-  await delay(400);
-
-  sendMessage('judge_chunk', `【最終判断】: ${responseBody.final_decision}`);
-  await delay(400);
-
-  sendMessage('judge_chunk', `【投票結果】: 可決${responseBody.voting_result.approved}票 / 否決${responseBody.voting_result.rejected}票`);
-  await delay(400);
-
-  sendMessage('judge_chunk', `【統合評価】: ${responseBody.summary}`);
-  await delay(400);
-
-  sendMessage('judge_chunk', `【推奨事項】: ${responseBody.recommendation}`);
-  await delay(400);
-
-  sendMessage('judge_chunk', `【確信度】: ${(responseBody.confidence * 100).toFixed(0)}%`);
-  await delay(400);
-
-  sendMessage('judge_chunk', `【実行時間】: ${responseBody.execution_time}ms`);
-  await delay(300);
 }
 
 /**
@@ -364,7 +280,7 @@ async function sendDevelopmentFallback(
     await delay(300);
     sendMessage('complete', 'MAGI Decision System: 全ての分析が完了しました。');
     await delay(200);
-    sendMessage('note', '※ 現在はモックモードで動作しています。AgentCore Runtime (AGENTCORE_URL) への接続を確認してください。');
+    sendMessage('note', '※ 現在はモックモードで動作しています。Python magi_agent.pyを配置してください。');
 
   } catch (error) {
     sendMessage('error', `Streaming simulation error: ${error}`);
@@ -446,11 +362,11 @@ export async function POST(request: NextRequest) {
             })}\n\n`)
           );
 
-          console.log(`🚀 Calling AgentCore Runtime at ${AGENTCORE_URL}`);
-          await invokeMAGIAgentCore(controller, encoder, question, sessionId);
+          console.log('🚀 Starting Python MAGI Agent process...');
+          await invokeMAGIPythonProcess(controller, encoder, question, sessionId);
 
         } catch (error) {
-          console.error('AgentCore Runtime error:', error);
+          console.error('Python MAGI Agent error:', error);
 
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({
