@@ -173,15 +173,9 @@ agents/test_request.json
 amplify/functions/agent-gateway-disabled/
 
 # MAGI Decision System - Development artifacts
-# Kiro IDE specs (contains sensitive information like AWS ARNs)
 .kiro/
-# Allow consolidated-magi-system spec (sanitized version)
-!.kiro/specs/
-!.kiro/specs/consolidated-magi-system/
-!.kiro/specs/consolidated-magi-system/*.md
 docs/build/
 docs/generated/
-
 
 # OpenTelemetry
 otel-traces/
