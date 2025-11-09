@@ -48,6 +48,19 @@ MAGI Decision Systemは、3賢者（CASPAR、BALTHASAR、MELCHIOR）による多
 
 ### バックエンド・インフラ
 - **Hosting**: AWS Amplify Hosting (SSR対応)
+- **Backend**: AWS Amplify Gen 2 (TypeScript設定)
+- **AI Runtime**: Amazon Bedrock AgentCore
+- **Agent Framework**: Strands Agents v1.0
+- **LLM**: Claude 3.5 Sonnet (Amazon Bedrock)
+
+## 📖 ドキュメント
+
+- **[5分セットアップ](docs/01-getting-started/QUICKSTART.md)** - 今すぐ始める
+- **[開発ガイド](docs/01-getting-started/DEVELOPMENT_SETUP.md)** - 詳細な開発環境構築
+- **[アーキテクチャ](docs/02-architecture/OVERVIEW.md)** - システム設計
+- **[デプロイ](docs/03-deployment/CHECKLIST.md)** - 本番環境へのデプロイ
+
+すべてのドキュメントは [docs/](docs/) ディレクトリを参照してください。
 - **Authentication**: AWS Amplify Auth (Amazon Cognito)
 - **Data Management**: AWS Amplify Data/AI Kit
 - **Database**: Amazon DynamoDB
