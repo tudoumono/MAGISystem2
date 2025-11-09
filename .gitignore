@@ -174,8 +174,13 @@ amplify/functions/agent-gateway-disabled/
 
 # MAGI Decision System - Development artifacts
 .kiro/
+!.kiro\specs\consolidated-magi-system\design.md
+!.kiro\specs\consolidated-magi-system\requirements.md
+!.kiro\specs\consolidated-magi-system\spec.md
+!.kiro\specs\consolidated-magi-system\tasks.md
 docs/build/
 docs/generated/
+
 
 # OpenTelemetry
 otel-traces/
