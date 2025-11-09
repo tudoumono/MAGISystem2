@@ -12,32 +12,52 @@
  */
 
 import type { Metadata } from 'next';
-import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import ClientEnvironmentStatus from '../components/dev/ClientEnvironmentStatus';
 import { ServerAuthProvider } from '../components/auth/ServerAuthProvider';
 import { AuthProvider } from '../components/auth/AuthProvider';
 import { AmplifyProvider } from '../components/amplify/AmplifyProvider';
 
-/**
- * フォント設定
- * 
- * 学習ポイント:
- * - next/font/googleによる最適化されたフォント読み込み
- * - Inter: 読みやすいサンセリフフォント（UI用）
- * - JetBrains Mono: 等幅フォント（コード表示用）
- */
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-});
+// フォントの条件付きインポート（ネットワーク接続が利用可能な環境でのみ）
+let inter: any = null;
+let jetbrainsMono: any = null;
 
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  variable: '--font-jetbrains-mono',
-  display: 'swap',
-});
+// Amplify環境や通常のビルド環境ではフォントを読み込む
+// ネットワーク制限がある環境ではスキップ
+const shouldLoadFonts = process.env.SKIP_FONT_DOWNLOAD !== 'true';
+
+if (shouldLoadFonts) {
+  try {
+    const { Inter, JetBrains_Mono } = require('next/font/google');
+
+    /**
+     * フォント設定
+     *
+     * 学習ポイント:
+     * - next/font/googleによる最適化されたフォント読み込み
+     * - Inter: 読みやすいサンセリフフォント（UI用）
+     * - JetBrains Mono: 等幅フォント（コード表示用）
+     * - fallback指定でネットワークエラー時も安定動作
+     */
+    inter = Inter({
+      subsets: ['latin'],
+      variable: '--font-inter',
+      display: 'swap',
+      fallback: ['system-ui', 'arial'],
+      adjustFontFallback: true,
+    });
+
+    jetbrainsMono = JetBrains_Mono({
+      subsets: ['latin'],
+      variable: '--font-jetbrains-mono',
+      display: 'swap',
+      fallback: ['Courier New', 'monospace'],
+      adjustFontFallback: true,
+    });
+  } catch (error) {
+    console.warn('⚠️ Failed to load Google Fonts, using system fonts');
+  }
+}
 
 /**
  * ビューポート設定
@@ -126,10 +146,16 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // フォント変数のクラス名を構築（フォントが読み込まれている場合のみ）
+  const fontClasses = [
+    inter?.variable,
+    jetbrainsMono?.variable,
+  ].filter(Boolean).join(' ');
+
   return (
-    <html 
-      lang="ja" 
-      className={`${inter.variable} ${jetbrainsMono.variable}`}
+    <html
+      lang="ja"
+      className={fontClasses || undefined}
       suppressHydrationWarning
     >
       <head>

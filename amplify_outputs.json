@@ -1,0 +1,27 @@
+{
+  "version": "1.0",
+  "auth": {
+    "user_pool_id": "placeholder-user-pool-id",
+    "user_pool_client_id": "placeholder-client-id",
+    "identity_pool_id": "placeholder-identity-pool-id",
+    "aws_region": "ap-northeast-1",
+    "unauthenticated_identities_enabled": false,
+    "password_policy": {
+      "minLength": 8,
+      "requireLowercase": true,
+      "requireUppercase": true,
+      "requireNumbers": true,
+      "requireSpecialCharacters": true
+    }
+  },
+  "data": {
+    "url": "https://placeholder-graphql-endpoint.appsync-api.ap-northeast-1.amazonaws.com/graphql",
+    "aws_region": "ap-northeast-1",
+    "default_authorization_type": "AMAZON_COGNITO_USER_POOLS",
+    "api_key": "placeholder-api-key",
+    "model_introspection": {
+      "version": 1,
+      "models": {}
+    }
+  }
+}
