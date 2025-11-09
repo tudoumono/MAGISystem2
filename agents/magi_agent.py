@@ -70,28 +70,52 @@ except ImportError as e:
 # バックエンドのパース処理に必須のため、この部分は変更できません
 # =============================================================================
 
-SAGE_JSON_FORMAT = """
-【出力形式】※この形式は厳守してください
-以下のJSON形式で回答してください：
-{
-  "decision": "APPROVED" | "REJECTED" | "ABSTAINED",
-  "reasoning": "判断理由（200文字以内）",
-  "confidence": 0.0-1.0
-}"""
+def _get_sage_json_format(max_length: int = 1000) -> str:
+    """
+    3賢者用のJSON出力形式を生成
 
-SOLOMON_JSON_FORMAT = """
+    Args:
+        max_length: reasoning の最大文字数（デフォルト: 1000）
+
+    Returns:
+        JSON形式の文字列
+    """
+    return f"""
 【出力形式】※この形式は厳守してください
 以下のJSON形式で回答してください：
-{
+{{
+  "decision": "APPROVED" | "REJECTED" | "ABSTAINED",
+  "reasoning": "判断理由（{max_length}文字以内）",
+  "confidence": 0.0-1.0
+}}"""
+
+def _get_solomon_json_format(max_length: int = 1500) -> str:
+    """
+    SOLOMON用のJSON出力形式を生成
+
+    Args:
+        max_length: reasoning の最大文字数（デフォルト: 1500）
+
+    Returns:
+        JSON形式の文字列
+    """
+    return f"""
+【出力形式】※この形式は厳守してください
+以下のJSON形式で回答してください：
+{{
   "final_decision": "APPROVED" | "REJECTED",
-  "reasoning": "統合判断の理由（300文字以内）",
+  "reasoning": "統合判断の理由（{max_length}文字以内）",
   "confidence": 0.0-1.0,
-  "sage_scores": {
+  "sage_scores": {{
     "caspar": 0-100,
     "balthasar": 0-100,
     "melchior": 0-100
-  }
-}"""
+  }}
+}}"""
+
+# 後方互換性のため、デフォルト値で生成（環境変数が未設定の場合）
+SAGE_JSON_FORMAT = _get_sage_json_format(1000)
+SOLOMON_JSON_FORMAT = _get_solomon_json_format(1500)
 
 # =============================================================================
 # デフォルトのロール説明（カスタマイズ可能）
@@ -201,10 +225,22 @@ class MAGIStrandsAgent:
                     if env_prompt:
                         self.custom_prompts[agent_name] = env_prompt
 
+        # 文字数制限を設定から読み込み
+        sage_max_length = config.get('sage_reasoning_max_length', 1000) if config else 1000
+        solomon_max_length = config.get('solomon_reasoning_max_length', 1500) if config else 1500
+
+        # JSON形式を動的に生成
+        sage_json_format = _get_sage_json_format(sage_max_length)
+        solomon_json_format = _get_solomon_json_format(solomon_max_length)
+
+        # 文字数制限を保存（後で使用）
+        self.sage_max_length = sage_max_length
+        self.solomon_max_length = solomon_max_length
+
         # プロンプトを構築（カスタム + JSON形式）
-        caspar_prompt = self._build_prompt('caspar', DEFAULT_CASPAR_ROLE, SAGE_JSON_FORMAT)
-        balthasar_prompt = self._build_prompt('balthasar', DEFAULT_BALTHASAR_ROLE, SAGE_JSON_FORMAT)
-        melchior_prompt = self._build_prompt('melchior', DEFAULT_MELCHIOR_ROLE, SAGE_JSON_FORMAT)
+        caspar_prompt = self._build_prompt('caspar', DEFAULT_CASPAR_ROLE, sage_json_format)
+        balthasar_prompt = self._build_prompt('balthasar', DEFAULT_BALTHASAR_ROLE, sage_json_format)
+        melchior_prompt = self._build_prompt('melchior', DEFAULT_MELCHIOR_ROLE, sage_json_format)
 
         # 3賢者のエージェント作成
         self.caspar = Agent(
@@ -684,8 +720,9 @@ class MAGIStrandsAgent:
         try:
             # カスタムロールが指定されている場合は、動的にプロンプトを構築
             if custom_role:
-                # カスタムロール + 固定JSON形式
-                custom_prompt = custom_role + SAGE_JSON_FORMAT
+                # カスタムロール + 動的JSON形式
+                sage_json_format = _get_sage_json_format(self.sage_max_length)
+                custom_prompt = custom_role + sage_json_format
                 stream_kwargs = {'system_prompt': custom_prompt}
             else:
                 # デフォルトのエージェントプロンプトを使用
@@ -875,15 +912,24 @@ class MAGIStrandsAgent:
             
             # SOLOMONプロンプトを構築
             if custom_role:
-                # カスタムロール + 固定JSON形式
+                # カスタムロール
                 solomon_role = custom_role
             else:
                 # デフォルトロール
                 solomon_role = DEFAULT_SOLOMON_ROLE
 
+            # {sage_responses}プレースホルダーの自動挿入
+            # カスタムプロンプトに{sage_responses}が含まれていない場合、自動的に追加
+            if '{sage_responses}' not in solomon_role:
+                print("  ℹ️  SOLOMON: {sage_responses}プレースホルダーが見つかりません。自動的に末尾に追加します")
+                solomon_role += "\n\n【入力】\n3賢者の判断結果：\n{sage_responses}"
+
             # 3賢者の結果を埋め込み
             solomon_role_with_data = solomon_role.format(sage_responses=sage_summary)
-            solomon_prompt = solomon_role_with_data + SOLOMON_JSON_FORMAT
+
+            # 動的JSON形式を追加
+            solomon_json_format = _get_solomon_json_format(self.solomon_max_length)
+            solomon_prompt = solomon_role_with_data + solomon_json_format
 
             # Strands Agentsのストリーミング機能を使用
             # stream_async()メソッドで非同期ストリーミング
