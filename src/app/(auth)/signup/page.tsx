@@ -25,6 +25,7 @@ import { useRouter } from 'next/navigation';
 import { SignUpForm } from '@/components/auth/SignUpForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { PageTransition } from '@/components/layout/PageTransition';
 
 /**
  * サインアップ成功画面
@@ -106,43 +107,45 @@ export default function SignUpPage() {
   };
   
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md">
-        {signUpSuccess ? (
-          <SignUpSuccess email={signUpSuccess} />
-        ) : (
-          <div className="space-y-6">
-            {/* MAGIシステムロゴ */}
-            <div className="text-center">
-              <div className="mx-auto w-16 h-16 bg-gradient-to-br from-magi-caspar-500 via-magi-balthasar-500 to-magi-melchior-500 rounded-xl flex items-center justify-center shadow-lg mb-4">
-                <span className="text-xl font-bold text-white">M</span>
+    <PageTransition variant="fade" duration={0.4}>
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <div className="w-full max-w-md">
+          {signUpSuccess ? (
+            <SignUpSuccess email={signUpSuccess} />
+          ) : (
+            <div className="space-y-6">
+              {/* MAGIシステムロゴ */}
+              <div className="text-center">
+                <div className="mx-auto w-16 h-16 bg-gradient-to-br from-magi-caspar-500 via-magi-balthasar-500 to-magi-melchior-500 rounded-xl flex items-center justify-center shadow-lg mb-4">
+                  <span className="text-xl font-bold text-white">M</span>
+                </div>
+                <h1 className="text-2xl font-bold text-foreground">MAGI Decision System</h1>
+                <p className="text-sm text-muted-foreground">3賢者による多視点分析システム</p>
               </div>
-              <h1 className="text-2xl font-bold text-foreground">MAGI Decision System</h1>
-              <p className="text-sm text-muted-foreground">3賢者による多視点分析システム</p>
+
+              {/* サインアップフォーム */}
+              <SignUpForm
+                onSuccess={handleSignUpSuccess}
+                showSignInLink={false}
+              />
+
+              {/* サインインリンク */}
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">
+                  すでにアカウントをお持ちの方は{' '}
+                  <button
+                    type="button"
+                    onClick={handleSignInClick}
+                    className="text-primary hover:underline focus:outline-none focus:underline font-medium"
+                  >
+                    サインイン
+                  </button>
+                </p>
+              </div>
             </div>
-            
-            {/* サインアップフォーム */}
-            <SignUpForm
-              onSuccess={handleSignUpSuccess}
-              showSignInLink={false}
-            />
-            
-            {/* サインインリンク */}
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground">
-                すでにアカウントをお持ちの方は{' '}
-                <button
-                  type="button"
-                  onClick={handleSignInClick}
-                  className="text-primary hover:underline focus:outline-none focus:underline font-medium"
-                >
-                  サインイン
-                </button>
-              </p>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+    </PageTransition>
   );
 }

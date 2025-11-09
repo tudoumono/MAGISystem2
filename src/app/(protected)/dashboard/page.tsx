@@ -27,6 +27,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 // import { signOutAction } from '@/lib/auth/server-actions';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { PageTransition } from '@/components/layout/PageTransition';
 
 /**
  * DashboardPageコンポーネント
@@ -46,7 +47,6 @@ export default function DashboardPage() {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = React.useState(false);
-  const [showDebugPanel, setShowDebugPanel] = React.useState(false);
   
   /**
    * サインアウト処理
@@ -75,9 +75,10 @@ export default function DashboardPage() {
   };
   
   return (
-    <div className="min-h-screen bg-background">
-      {/* ヘッダー */}
-      <header className="border-b border-border bg-card">
+    <PageTransition variant="slide-up" duration={0.5}>
+      <div className="min-h-screen bg-background">
+        {/* ヘッダー */}
+        <header className="border-b border-border bg-card">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             {/* ロゴとタイトル */}
@@ -92,22 +93,12 @@ export default function DashboardPage() {
             
             {/* ユーザー情報とアクション */}
             <div className="flex items-center gap-4">
-              {/* デバッグモード切り替え */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowDebugPanel(!showDebugPanel)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                {showDebugPanel ? '🔧 デバッグOFF' : '🔧 デバッグON'}
-              </Button>
-              
               {user && (
                 <div className="text-sm text-muted-foreground">
                   {user.username}
                 </div>
               )}
-              
+
               <Button
                 variant="outline"
                 size="sm"
@@ -186,105 +177,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
-        
-        {/* システムステータス */}
-        {showDebugPanel && (
-          <div className="mb-8">
-            <Card className="border-blue-500 bg-blue-50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-blue-900">
-                  <span className="text-xl">🔧</span>
-                  システムステータス
-                </CardTitle>
-                <CardDescription className="text-blue-700">
-                  AWSリソースとの接続状態を確認
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* システム診断 */}
-                  <button
-                    onClick={() => router.push('/test/data/models-check')}
-                    className="p-4 bg-white rounded-lg border border-blue-200 hover:border-blue-400 hover:shadow-md transition-all text-left"
-                  >
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                        <span className="text-xl">📊</span>
-                      </div>
-                      <div>
-                        <div className="font-medium text-blue-900">システム診断</div>
-                        <div className="text-xs text-blue-700">Amplify接続状態の確認</div>
-                      </div>
-                    </div>
-                    <p className="text-sm text-blue-800">
-                      Amplify Data、Cognito、AppSyncとの接続状態を診断します
-                    </p>
-                  </button>
-                  
-                  {/* API Health Check */}
-                  <button
-                    onClick={() => window.open('/api/health', '_blank')}
-                    className="p-4 bg-white rounded-lg border border-green-200 hover:border-green-400 hover:shadow-md transition-all text-left"
-                  >
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
-                        <span className="text-xl">💚</span>
-                      </div>
-                      <div>
-                        <div className="font-medium text-green-900">API Health Check</div>
-                        <div className="text-xs text-green-700">APIエンドポイントの確認</div>
-                      </div>
-                    </div>
-                    <p className="text-sm text-green-800">
-                      Next.js APIルートの動作状態を確認します
-                    </p>
-                  </button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-        
-        {/* システムステータス（簡易版） */}
-        {!showDebugPanel && (
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold text-foreground">
-                📊 システムステータス
-              </h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowDebugPanel(true)}
-                className="text-sm text-blue-600 hover:text-blue-700"
-              >
-                詳細を表示 →
-              </Button>
-            </div>
-            <Card className="hover:shadow-md transition-shadow">
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <span className="text-lg">🔍</span>
-                  接続診断
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-3">
-                  AWSリソース（Amplify Data、Cognito、AppSync）との接続状態を確認
-                </p>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => router.push('/test/data/models-check')}
-                  className="w-full"
-                >
-                  診断ページへ
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-        
+
         {/* システム情報 */}
         <Card>
           <CardHeader>
@@ -330,6 +223,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </main>
-    </div>
+      </div>
+    </PageTransition>
   );
 }

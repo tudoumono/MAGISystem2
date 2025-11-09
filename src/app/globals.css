@@ -15,6 +15,151 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ========================================
+   MAGI System - World-Class Design System
+   ======================================== */
+
+/* === ガラスモーフィズム効果 === */
+@layer components {
+  .glass {
+    @apply bg-white/80 backdrop-blur-xl border border-white/20 shadow-glass;
+  }
+
+  .glass-dark {
+    @apply bg-gray-900/80 backdrop-blur-xl border border-white/10 shadow-glass;
+  }
+
+  .glass-caspar {
+    @apply bg-gradient-to-br from-magi-caspar-500/10 to-magi-caspar-600/5 backdrop-blur-xl border border-magi-caspar-500/20 shadow-glass;
+  }
+
+  .glass-balthasar {
+    @apply bg-gradient-to-br from-magi-balthasar-500/10 to-magi-balthasar-600/5 backdrop-blur-xl border border-magi-balthasar-500/20 shadow-glass;
+  }
+
+  .glass-melchior {
+    @apply bg-gradient-to-br from-magi-melchior-500/10 to-magi-melchior-600/5 backdrop-blur-xl border border-magi-melchior-500/20 shadow-glass;
+  }
+
+  .glass-solomon {
+    @apply bg-gradient-to-br from-magi-solomon-500/10 to-magi-solomon-600/5 backdrop-blur-xl border border-magi-solomon-500/20 shadow-glass;
+  }
+}
+
+/* === ネオンエフェクト === */
+@layer components {
+  .neon-caspar {
+    text-shadow:
+      0 0 10px rgba(0, 217, 255, 0.8),
+      0 0 20px rgba(0, 217, 255, 0.6),
+      0 0 30px rgba(0, 217, 255, 0.4);
+    color: #00d9ff;
+  }
+
+  .neon-balthasar {
+    text-shadow:
+      0 0 10px rgba(255, 0, 128, 0.8),
+      0 0 20px rgba(255, 0, 128, 0.6),
+      0 0 30px rgba(255, 0, 128, 0.4);
+    color: #ff0080;
+  }
+
+  .neon-melchior {
+    text-shadow:
+      0 0 10px rgba(0, 255, 159, 0.8),
+      0 0 20px rgba(0, 255, 159, 0.6),
+      0 0 30px rgba(0, 255, 159, 0.4);
+    color: #00ff9f;
+  }
+
+  .neon-solomon {
+    text-shadow:
+      0 0 10px rgba(191, 64, 255, 0.8),
+      0 0 20px rgba(191, 64, 255, 0.6),
+      0 0 30px rgba(191, 64, 255, 0.4);
+    color: #bf40ff;
+  }
+
+  .neon-border-caspar {
+    box-shadow:
+      0 0 10px rgba(0, 217, 255, 0.5),
+      0 0 20px rgba(0, 217, 255, 0.3),
+      inset 0 0 10px rgba(0, 217, 255, 0.2);
+    border-color: #00d9ff;
+  }
+
+  .neon-border-balthasar {
+    box-shadow:
+      0 0 10px rgba(255, 0, 128, 0.5),
+      0 0 20px rgba(255, 0, 128, 0.3),
+      inset 0 0 10px rgba(255, 0, 128, 0.2);
+    border-color: #ff0080;
+  }
+
+  .neon-border-melchior {
+    box-shadow:
+      0 0 10px rgba(0, 255, 159, 0.5),
+      0 0 20px rgba(0, 255, 159, 0.3),
+      inset 0 0 10px rgba(0, 255, 159, 0.2);
+    border-color: #00ff9f;
+  }
+
+  .neon-border-solomon {
+    box-shadow:
+      0 0 10px rgba(191, 64, 255, 0.5),
+      0 0 20px rgba(191, 64, 255, 0.3),
+      inset 0 0 10px rgba(191, 64, 255, 0.2);
+    border-color: #bf40ff;
+  }
+}
+
+/* === スムーズなトランジション === */
+@layer components {
+  .transition-smooth {
+    @apply transition-all duration-400 ease-apple;
+  }
+
+  .transition-elastic {
+    @apply transition-all duration-500 ease-elastic;
+  }
+}
+
+/* === Apple風ボタンスタイル === */
+@layer components {
+  .btn-magi {
+    @apply px-6 py-3 rounded-xl font-medium
+           transition-smooth
+           focus:outline-none focus:ring-2 focus:ring-offset-2
+           active:scale-95;
+  }
+
+  .btn-magi-primary {
+    @apply btn-magi
+           bg-gradient-to-r from-magi-solomon-500 to-magi-solomon-600
+           text-white shadow-elevation-md
+           hover:shadow-elevation-lg hover:from-magi-solomon-600 hover:to-magi-solomon-700
+           focus:ring-magi-solomon-500;
+  }
+
+  .btn-magi-glass {
+    @apply btn-magi glass
+           hover:bg-white/90 hover:shadow-glass-lg;
+  }
+}
+
+/* === MAGI カードスタイル === */
+@layer components {
+  .magi-card {
+    @apply rounded-2xl p-6 shadow-elevation-md
+           transition-smooth
+           hover:shadow-elevation-lg hover:-translate-y-1;
+  }
+
+  .magi-card-glass {
+    @apply magi-card glass;
+  }
+}
+
 /* MAGI Stream Interface Animations */
 @keyframes fadeIn {
   from {
