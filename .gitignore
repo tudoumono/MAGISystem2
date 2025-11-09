@@ -261,7 +261,7 @@ site/
 
 # Docker build artifacts (agents配下のみ除外、ルートは管理対象)
 agents/.dockerignore
-agents/Dockerfile
+# agents/Dockerfile は管理対象（機密情報なし）
 
 # Python virtual environments
 **/venv/
