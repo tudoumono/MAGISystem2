@@ -207,9 +207,26 @@ async def process_decision(question: str):
 
 ## ⚠️ 重要な注意事項
 
+### 実装状況（2025-11-09更新）
+
+✅ **参考記事完全準拠の実装完了**
+- `agents/backend/` - Next.jsバックエンド実装済み
+- `agents/Dockerfile` - Next.js + Python統合コンテナ完成
+- `POST /api/invocations` - spawn()パターン実装済み
+- フロントエンド - AgentCore Runtime直接呼び出しに修正済み
+
+⚠️ **PR #5で誤って実装されたファイル（非推奨）**
+- `src/app/api/magi/stream/route.ts` - AWS SDK使用（参考記事と異なる）
+- これらは学習目的のため残されていますが、使用しないでください
+
 ### 使用しないパターン
 
 以下のパターンは**使用しません**：
+
+❌ **AWS SDK経由のAgentCore Runtime呼び出し**
+- PR #5で誤って実装されたパターン
+- 参考記事のアーキテクチャとは異なる
+- `BedrockAgentCoreClient` を使用しない
 
 ❌ **Lambda Response Streaming**
 - 複雑で未実証
@@ -219,14 +236,12 @@ async def process_decision(question: str):
 - ストリーミングに対応していない
 - 参考記事のパターンと異なる
 
-❌ **独自のストリーミング実装**
-- 車輪の再発明
-- 保守コストが高い
-
 ### 採用するパターン
 
-✅ **参考記事完全準拠**
-- 実証済みのアーキテクチャ
+✅ **参考記事完全準拠（実装完了）**
+- AgentCore Runtime内でNext.jsとPythonを統合
+- spawn()で子プロセスとして呼び出し
+- フロントエンドから直接 /api/invocations を呼び出し
 - シンプルで保守しやすい
 - 既存資産を活用
 
