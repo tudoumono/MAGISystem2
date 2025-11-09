@@ -2,51 +2,46 @@
  * MAGI Decision System - ストリーミングAPI Route
  *
  * このファイルはMAGIシステムのストリーミング対応APIエンドポイントです。
- * 同一コンテナ内のPython magi_agent.pyを子プロセスとして実行します。
+ * Amazon Bedrock AgentCore Runtime（独立デプロイ）にHTTPSリクエストを送信します。
  *
  * 主要機能:
  * - Server-Sent Eventsによるストリーミングレスポンス
- * - Python子プロセス実行（spawn）
- * - 標準入出力による通信
+ * - AgentCore RuntimeへのHTTPSリクエスト
  * - 認証・権限チェック
  * - エラーハンドリングとフォールバック
  *
  * 学習ポイント:
  * - Next.js API Routesでのストリーミング実装
- * - Node.js child_process.spawn()の使用
+ * - 外部APIとの通信
  * - Server-Sent Eventsプロトコル
  *
- * アーキテクチャ（同一コンテナ内）:
- * Next.js API Route
- *   ↓ spawn('python3', ['agents/magi_agent.py'])
- * Python magi_agent.py（子プロセス）
- *   ↓ 標準出力にJSON Lines
- * Next.js（親プロセス）
- *   ↓ Server-Sent Events
- * フロントエンド
+ * アーキテクチャ:
+ * Amplify Hosting (Next.js)
+ *   ↓ HTTPS POST /invocations
+ * Amazon Bedrock AgentCore Runtime (独立デプロイ)
+ *   ↓ AWS SDK
+ * Amazon Bedrock (Claude 3.5 Sonnet)
  *
- * 参考: https://qiita.com/moritalous/items/ea695f8a328585e1313b
+ * 参考:
+ * - AgentCore Runtime: 独立したDockerコンテナとしてデプロイ
+ * - エンドポイント: /invocations, /ping
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { spawn } from 'child_process';
 import { checkRateLimit } from '@/lib/security/rate-limit';
 import { validateRequestBody } from '@/lib/security/request-validator';
-import path from 'path';
 
 /**
- * Python magi_agent.pyを子プロセスとして実行
+ * AgentCore RuntimeへHTTPSリクエストを送信
  *
  * アーキテクチャ:
- * Node.js (このAPI Route)
- *   ↓ spawn()
- * Python magi_agent.py
- *   ↓ stdout（JSON Lines形式）
- * Node.js
- *   ↓ Server-Sent Events
- * クライアント
+ * Next.js API Route
+ *   ↓ HTTPS
+ * AgentCore Runtime /invocations
+ *   ↓ AWS SDK
+ * Bedrock (Claude)
  */
-async function invokeMAGIPythonProcess(
+async function invokeAgentCoreRuntime(
   controller: ReadableStreamDefaultController,
   encoder: TextEncoder,
   question: string,
@@ -66,102 +61,117 @@ async function invokeMAGIPythonProcess(
   try {
     sendMessage('phase', 'MAGI System Initialization...');
 
-    // Pythonスクリプトのパス
-    const pythonScriptPath = path.join(process.cwd(), 'agents', 'magi_agent.py');
+    // AgentCore Runtime エンドポイント URL
+    const agentCoreUrl = process.env.AGENTCORE_RUNTIME_URL;
 
-    // Pythonプロセスを起動
-    const pythonProcess = spawn('python3', [
-      pythonScriptPath,
-      '--question', question,
-      '--session-id', sessionId || `session-${Date.now()}`
-    ]);
+    if (!agentCoreUrl) {
+      throw new Error('AGENTCORE_RUNTIME_URL environment variable is not set');
+    }
 
-    sendMessage('system', 'Python MAGI Agentプロセス起動中...');
+    const endpoint = `${agentCoreUrl}/invocations`;
 
-    // 標準出力からのデータ受信
-    pythonProcess.stdout.on('data', (data) => {
-      try {
-        const lines = data.toString().split('\n').filter((line: string) => line.trim());
+    sendMessage('system', `AgentCore Runtime に接続中: ${endpoint}`);
+
+    // AgentCore Runtime にHTTPSリクエスト送信
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // AWS Signature V4 が必要な場合はここに追加
+      },
+      body: JSON.stringify({
+        question,
+        sessionId: sessionId || `session-${Date.now()}`,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`AgentCore Runtime returned ${response.status}: ${response.statusText}`);
+    }
+
+    if (!response.body) {
+      throw new Error('AgentCore Runtime response body is empty');
+    }
+
+    sendMessage('system', 'AgentCore Runtime からストリーミング受信中...');
+
+    // ストリーミングレスポンスを読み取る
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        // チャンクをデコード
+        buffer += decoder.decode(value, { stream: true });
+
+        // 改行で分割してJSON Linesをパース
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // 最後の不完全な行はバッファに残す
 
         for (const line of lines) {
-          try {
-            const event = JSON.parse(line);
+          const trimmed = line.trim();
+          if (!trimmed) continue;
 
-            // Pythonからのイベントをそのまま転送
+          try {
+            const event = JSON.parse(trimmed);
+
+            // AgentCore Runtimeからのイベントをそのまま転送
             if (event.type && event.content) {
               sendMessage(event.type, event.content, event.agentId);
             } else {
               // フォールバック: JSON全体を送信
-              sendMessage('agent_chunk', line);
+              sendMessage('agent_chunk', trimmed);
             }
           } catch (parseError) {
             // JSON parseエラー時はテキストとして送信
-            sendMessage('agent_chunk', line);
+            console.warn('Failed to parse JSON line:', trimmed, parseError);
+            sendMessage('agent_chunk', trimmed);
           }
         }
-      } catch (error) {
-        console.error('Error processing Python output:', error);
-        sendMessage('error', `Python出力処理エラー: ${error}`);
       }
-    });
 
-    // 標準エラー出力の処理
-    pythonProcess.stderr.on('data', (data) => {
-      const errorMessage = data.toString();
-      console.error('Python stderr:', errorMessage);
-
-      // デバッグ情報として送信（開発環境のみ）
-      if (process.env.NODE_ENV !== 'production') {
-        sendMessage('debug', `Python stderr: ${errorMessage}`);
-      }
-    });
-
-    // プロセス終了処理
-    return new Promise<void>((resolve, reject) => {
-      pythonProcess.on('close', (code) => {
-        if (code === 0) {
-          sendMessage('phase', 'MAGI Decision Complete');
-          sendMessage('complete', 'MAGI Decision System: 分析が完了しました。');
-          resolve();
-        } else {
-          const errorMsg = `Python process exited with code ${code}`;
-          console.error(errorMsg);
-          sendMessage('error', errorMsg);
-
-          // 開発環境でのみフォールバック
-          if (process.env.NODE_ENV !== 'production') {
-            sendMessage('system', '開発環境: フォールバックモードで継続します');
-            sendDevelopmentFallback(controller, encoder, question).then(resolve);
-          } else {
-            reject(new Error(errorMsg));
+      // バッファに残ったデータを処理
+      if (buffer.trim()) {
+        try {
+          const event = JSON.parse(buffer.trim());
+          if (event.type && event.content) {
+            sendMessage(event.type, event.content, event.agentId);
           }
+        } catch (parseError) {
+          sendMessage('agent_chunk', buffer.trim());
         }
-      });
+      }
 
-      pythonProcess.on('error', (error) => {
-        console.error('Failed to start Python process:', error);
-        sendMessage('error', `Pythonプロセス起動エラー: ${error.message}`);
+      sendMessage('phase', 'MAGI Decision Complete');
+      sendMessage('complete', 'MAGI Decision System: 分析が完了しました。');
 
-        // 開発環境でのみフォールバック
-        if (process.env.NODE_ENV !== 'production') {
-          sendMessage('system', '開発環境: フォールバックモードで継続します');
-          sendDevelopmentFallback(controller, encoder, question).then(resolve);
-        } else {
-          reject(error);
-        }
-      });
-    });
+    } finally {
+      reader.releaseLock();
+    }
 
   } catch (error) {
-    console.error('MAGI Python process error:', error);
+    console.error('AgentCore Runtime error:', error);
 
     try {
-      sendMessage('error', `Python実行エラー: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      sendMessage('error', `AgentCore Runtime エラー: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } catch (controllerError) {
       console.error('Controller error:', controllerError);
     }
 
-    throw error;
+    // 開発環境でのみフォールバック
+    if (process.env.NODE_ENV !== 'production') {
+      sendMessage('system', '開発環境: フォールバックモードで継続します');
+      await sendDevelopmentFallback(controller, encoder, question);
+    } else {
+      throw error;
+    }
   } finally {
     try {
       controller.close();
@@ -280,7 +290,7 @@ async function sendDevelopmentFallback(
     await delay(300);
     sendMessage('complete', 'MAGI Decision System: 全ての分析が完了しました。');
     await delay(200);
-    sendMessage('note', '※ 現在はモックモードで動作しています。Python magi_agent.pyを配置してください。');
+    sendMessage('note', '※ 現在はモックモードで動作しています。AgentCore Runtime URLを設定してください。');
 
   } catch (error) {
     sendMessage('error', `Streaming simulation error: ${error}`);
@@ -362,11 +372,11 @@ export async function POST(request: NextRequest) {
             })}\n\n`)
           );
 
-          console.log('🚀 Starting Python MAGI Agent process...');
-          await invokeMAGIPythonProcess(controller, encoder, question, sessionId);
+          console.log('🚀 Invoking AgentCore Runtime...');
+          await invokeAgentCoreRuntime(controller, encoder, question, sessionId);
 
         } catch (error) {
-          console.error('Python MAGI Agent error:', error);
+          console.error('AgentCore Runtime error:', error);
 
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({
