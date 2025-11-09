@@ -105,6 +105,9 @@ class MAGIConfig:
             'balthasar_custom_prompt': os.getenv('BALTHASAR_CUSTOM_PROMPT'),
             'melchior_custom_prompt': os.getenv('MELCHIOR_CUSTOM_PROMPT'),
             'solomon_custom_prompt': os.getenv('SOLOMON_CUSTOM_PROMPT'),
+            # 文字数制限設定（カスタマイズ可能）
+            'sage_reasoning_max_length': int(os.getenv('SAGE_REASONING_MAX_LENGTH', '1000')),
+            'solomon_reasoning_max_length': int(os.getenv('SOLOMON_REASONING_MAX_LENGTH', '1500')),
         }
 
         # 2. .bedrock_agentcore.yamlから補完（ARNが未設定の場合）
