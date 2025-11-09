@@ -108,7 +108,10 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="h-screen flex bg-gray-100">
+    <div className="h-screen flex bg-gradient-to-br from-gray-900 via-gray-800 to-black relative overflow-hidden">
+      {/* 背景エフェクト - ネオングリッド */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#00d9ff08_1px,transparent_1px),linear-gradient(to_bottom,#00d9ff08_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)]" />
+
       {/* プリセット選択モーダル */}
       <PresetSelectorModal
         isOpen={showPresetSelector}
@@ -119,7 +122,7 @@ export default function ChatPage() {
       />
 
       {/* 左サイドバー: 会話履歴 */}
-      <div className="w-80 flex-shrink-0 border-r border-gray-200">
+      <div className="w-80 flex-shrink-0 border-r border-white/10 glass-dark relative z-10">
         <ConversationSidebar
           conversations={conversations}
           activeConversationId={activeConversationId}
@@ -132,7 +135,7 @@ export default function ChatPage() {
       </div>
 
       {/* 中央エリア: チャットインターフェース */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 relative z-10">
         {activeConversationId ? (
           <ChatInterface
             conversationId={activeConversationId}
@@ -140,68 +143,86 @@ export default function ChatPage() {
             onTraceView={handleTraceView}
           />
         ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center max-w-2xl px-6">
-              <Bot className="w-20 h-20 mx-auto mb-6 text-gray-300" />
-              <h2 className="text-3xl font-semibold text-gray-900 mb-4">
+          <div className="flex-1 flex items-center justify-center px-8 py-12">
+            <div className="text-center max-w-4xl animate-fade-in-up">
+              {/* MAGIロゴ - グローイングエフェクト */}
+              <div className="relative mb-12">
+                <div className="w-32 h-32 mx-auto relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-magi-caspar-neon via-magi-melchior-neon to-magi-balthasar-neon rounded-full blur-2xl opacity-50 animate-pulse-slow" />
+                  <div className="relative w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 rounded-full flex items-center justify-center border-2 border-white/20 shadow-elevation-xl">
+                    <Bot className="w-16 h-16 text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]" />
+                  </div>
+                </div>
+              </div>
+
+              <h2 className="text-6xl font-bold mb-6 bg-gradient-to-r from-white via-gray-100 to-white bg-clip-text text-transparent tracking-tight">
                 MAGI Decision System
               </h2>
-              <p className="text-lg text-gray-600 mb-8">
-                3賢者（CASPAR、BALTHASAR、MELCHIOR）とSOLOMON Judgeによる
+              <p className="text-xl text-gray-300 mb-16 max-w-2xl mx-auto leading-relaxed">
+                3賢者（CASPAR、BALTHASAR、MELCHIOR）とSOLOMON Judgeによる<br />
                 多角的な意思決定支援システムへようこそ
               </p>
-              
-              {/* 3賢者の説明 */}
-              <div className="grid grid-cols-3 gap-4 mb-8">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="w-12 h-12 bg-blue-500 rounded-full mx-auto mb-2 flex items-center justify-center text-white font-bold">
-                    C
+
+              {/* 3賢者の説明 - ネオンカード */}
+              <div className="grid grid-cols-3 gap-6 mb-16 max-w-3xl mx-auto">
+                {/* CASPAR */}
+                <div className="group magi-card-glass glass-caspar border-2 neon-border-caspar hover:scale-105 transition-smooth">
+                  <div className="relative">
+                    <div className="w-16 h-16 bg-gradient-to-br from-magi-caspar-500 to-magi-caspar-700 rounded-2xl mx-auto mb-4 flex items-center justify-center text-white font-bold text-2xl shadow-neon-caspar group-hover:shadow-neon-caspar group-hover:animate-pulse-glow">
+                      C
+                    </div>
+                    <h3 className="font-bold text-lg neon-caspar mb-2">CASPAR</h3>
+                    <p className="text-sm text-magi-caspar-200">保守的・現実的</p>
                   </div>
-                  <h3 className="font-semibold text-blue-900 mb-1">CASPAR</h3>
-                  <p className="text-xs text-blue-700">保守的・現実的</p>
                 </div>
-                
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                  <div className="w-12 h-12 bg-purple-500 rounded-full mx-auto mb-2 flex items-center justify-center text-white font-bold">
-                    B
+
+                {/* BALTHASAR */}
+                <div className="group magi-card-glass glass-balthasar border-2 neon-border-balthasar hover:scale-105 transition-smooth">
+                  <div className="relative">
+                    <div className="w-16 h-16 bg-gradient-to-br from-magi-balthasar-500 to-magi-balthasar-700 rounded-2xl mx-auto mb-4 flex items-center justify-center text-white font-bold text-2xl shadow-neon-balthasar group-hover:shadow-neon-balthasar group-hover:animate-pulse-glow">
+                      B
+                    </div>
+                    <h3 className="font-bold text-lg neon-balthasar mb-2">BALTHASAR</h3>
+                    <p className="text-sm text-magi-balthasar-200">革新的・感情的</p>
                   </div>
-                  <h3 className="font-semibold text-purple-900 mb-1">BALTHASAR</h3>
-                  <p className="text-xs text-purple-700">革新的・感情的</p>
                 </div>
-                
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="w-12 h-12 bg-green-500 rounded-full mx-auto mb-2 flex items-center justify-center text-white font-bold">
-                    M
+
+                {/* MELCHIOR */}
+                <div className="group magi-card-glass glass-melchior border-2 neon-border-melchior hover:scale-105 transition-smooth">
+                  <div className="relative">
+                    <div className="w-16 h-16 bg-gradient-to-br from-magi-melchior-500 to-magi-melchior-700 rounded-2xl mx-auto mb-4 flex items-center justify-center text-white font-bold text-2xl shadow-neon-melchior group-hover:shadow-neon-melchior group-hover:animate-pulse-glow">
+                      M
+                    </div>
+                    <h3 className="font-bold text-lg neon-melchior mb-2">MELCHIOR</h3>
+                    <p className="text-sm text-magi-melchior-200">バランス型・科学的</p>
                   </div>
-                  <h3 className="font-semibold text-green-900 mb-1">MELCHIOR</h3>
-                  <p className="text-xs text-green-700">バランス型・科学的</p>
                 </div>
               </div>
 
               {/* プリセット選択 */}
-              <div className="mb-6">
-                <Button
+              <div className="mb-8">
+                <button
                   onClick={() => setShowPresetSelector(true)}
-                  variant="outline"
-                  className="flex items-center gap-2"
+                  className="btn-magi-glass group inline-flex items-center gap-3"
                 >
-                  <Settings className="w-4 h-4" />
-                  {selectedPreset ? selectedPreset.name : 'プリセットを選択'}
-                </Button>
+                  <Settings className="w-5 h-5 text-gray-300 group-hover:text-white group-hover:rotate-90 transition-smooth" />
+                  <span className="text-gray-200 group-hover:text-white">
+                    {selectedPreset ? selectedPreset.name : 'プリセットを選択'}
+                  </span>
+                </button>
                 {selectedPreset && (
-                  <p className="text-sm text-gray-500 mt-2">
+                  <p className="text-sm text-gray-400 mt-4 animate-fade-in">
                     {selectedPreset.description}
                   </p>
                 )}
               </div>
 
-              <Button
+              <button
                 onClick={handleCreateNew}
-                size="lg"
-                className="px-8 py-4 text-lg"
+                className="btn-magi-primary text-lg px-10 py-5 shadow-elevation-xl hover:shadow-elevation-xl hover:scale-105 transition-smooth"
               >
                 新しい対話を始める
-              </Button>
+              </button>
             </div>
           </div>
         )}
@@ -209,7 +230,7 @@ export default function ChatPage() {
 
       {/* 右パネル: 推論トレース（折りたたみ可能） */}
       {showTracePanel && selectedTraceId && (
-        <div className="w-96 flex-shrink-0 border-l border-gray-200 bg-white flex flex-col">
+        <div className="w-96 flex-shrink-0 border-l border-white/10 glass-dark flex flex-col relative z-10">
           <TracePanel
             traceId={selectedTraceId}
             onClose={() => setShowTracePanel(false)}
@@ -219,25 +240,23 @@ export default function ChatPage() {
 
       {/* トレースパネル切り替えボタン */}
       {selectedTraceId && (
-        <Button
+        <button
           onClick={toggleTracePanel}
-          variant="outline"
-          size="sm"
-          className="fixed right-4 top-4 z-10 shadow-lg"
+          className="btn-magi-glass fixed right-6 top-6 z-20 !px-4 !py-2 shadow-elevation-lg hover:shadow-elevation-xl"
           aria-label={showTracePanel ? 'トレースパネルを閉じる' : 'トレースパネルを開く'}
         >
           {showTracePanel ? (
             <>
-              <ChevronRight className="w-4 h-4 mr-1" />
-              <span>トレースを閉じる</span>
+              <ChevronRight className="w-4 h-4 mr-2" />
+              <span className="text-sm">トレースを閉じる</span>
             </>
           ) : (
             <>
-              <ChevronLeft className="w-4 h-4 mr-1" />
-              <span>トレースを表示</span>
+              <ChevronLeft className="w-4 h-4 mr-2" />
+              <span className="text-sm">トレースを表示</span>
             </>
           )}
-        </Button>
+        </button>
       )}
     </div>
   );
