@@ -27,6 +27,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 // import { signOutAction } from '@/lib/auth/server-actions';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { PageTransition } from '@/components/layout/PageTransition';
 
 /**
  * DashboardPageコンポーネント
@@ -75,9 +76,10 @@ export default function DashboardPage() {
   };
   
   return (
-    <div className="min-h-screen bg-background">
-      {/* ヘッダー */}
-      <header className="border-b border-border bg-card">
+    <PageTransition variant="slide-up" duration={0.5}>
+      <div className="min-h-screen bg-background">
+        {/* ヘッダー */}
+        <header className="border-b border-border bg-card">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             {/* ロゴとタイトル */}
@@ -330,6 +332,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </main>
-    </div>
+      </div>
+    </PageTransition>
   );
 }

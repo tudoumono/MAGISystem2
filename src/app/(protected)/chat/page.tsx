@@ -31,6 +31,7 @@ import { useAgentPresets } from '@/hooks/useAgentPresets';
 import { Button } from '@/components/ui/Button';
 import { ChevronLeft, ChevronRight, Bot, Settings } from 'lucide-react';
 import type { AgentPresetConfig } from '@/types/agent-preset';
+import { PageTransition } from '@/components/layout/PageTransition';
 
 export default function ChatPage() {
   // 会話管理
@@ -108,9 +109,10 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="h-screen flex bg-gradient-to-br from-gray-900 via-gray-800 to-black relative overflow-hidden">
-      {/* 背景エフェクト - ネオングリッド */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#00d9ff08_1px,transparent_1px),linear-gradient(to_bottom,#00d9ff08_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)]" />
+    <PageTransition variant="scale" duration={0.4}>
+      <div className="h-screen flex bg-gradient-to-br from-gray-900 via-gray-800 to-black relative overflow-hidden">
+        {/* 背景エフェクト - ネオングリッド */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#00d9ff08_1px,transparent_1px),linear-gradient(to_bottom,#00d9ff08_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)]" />
 
       {/* プリセット選択モーダル */}
       <PresetSelectorModal
@@ -258,6 +260,7 @@ export default function ChatPage() {
           )}
         </button>
       )}
-    </div>
+      </div>
+    </PageTransition>
   );
 }
