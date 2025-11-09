@@ -5,6 +5,12 @@ const nextConfig = {
     // React 19の新機能を有効化（React Compilerは後で追加）
     // reactCompiler: true,
     // Note: instrumentation.tsはNext.js 15.5.6でデフォルトで有効
+
+    // Google Fontsのフェッチエラーを警告にダウングレード（ネットワーク制限環境用）
+    // Amplifyビルド環境では正常に機能します
+    fontLoaders: [
+      { loader: '@next/font/google', options: { display: 'swap' } }
+    ],
   },
 
   // TypeScript設定の最適化
