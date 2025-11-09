@@ -314,13 +314,30 @@ agents/tests/streaming_output_custom/*.json
 streaming_output/
 
 # ============================================================================
-# Next.js Backend (Phase 1 - 未完成)
+# Next.js Backend (agents/backend/)
 # 
-# Phase 1で実装予定のNext.jsバックエンドプロジェクト
-# 現在は開発中のため除外
+# ソースコードは管理対象、ビルド成果物と環境設定は除外
 # ============================================================================
 
-agents/backend/
+# ビルド成果物
+agents/backend/.next/
+agents/backend/out/
+agents/backend/dist/
+agents/backend/build/
+
+# 依存関係
+agents/backend/node_modules/
+
+# 環境設定（ローカル固有）
+agents/backend/.env.local
+agents/backend/.env.*.local
+
+# Next.js生成ファイル
+agents/backend/.next/
+agents/backend/next-env.d.ts
+
+# Docker関連（ローカルビルド用）
+agents/backend/.dockerignore
 agents/tests/streaming_output/balthasar_stream.txt
 agents/tests/streaming_output/caspar_stream.txt
 agents/tests/streaming_output/full_stream.json
