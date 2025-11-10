@@ -1077,9 +1077,9 @@ class MAGIStrandsAgent:
                     await event_queue.put((task_id, event))
             except Exception as e:
                 await event_queue.put((task_id, {
-                    'type': 'sage_error', 
+                    'type': 'error',
+                    'agentId': task_id,
                     'data': {
-                        'agent_id': task_id,
                         'error': str(e)
                     }
                 }))
