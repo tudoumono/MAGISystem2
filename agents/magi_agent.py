@@ -118,6 +118,11 @@ SAGE_JSON_FORMAT = _get_sage_json_format(1000)
 SOLOMON_JSON_FORMAT = _get_solomon_json_format(1500)
 
 # =============================================================================
+# モデル設定
+# =============================================================================
+DEFAULT_MODEL = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+
+# =============================================================================
 # デフォルトのロール説明（カスタマイズ可能）
 # 環境変数やリクエストパラメータで上書き可能
 # =============================================================================
@@ -245,27 +250,29 @@ class MAGIStrandsAgent:
         # 3賢者のエージェント作成
         self.caspar = Agent(
             name="CASPAR",
-            model="anthropic.claude-3-5-sonnet-20240620-v1:0",
+            model=DEFAULT_MODEL,
             system_prompt=caspar_prompt
         )
 
         self.balthasar = Agent(
             name="BALTHASAR",
-            model="anthropic.claude-3-5-sonnet-20240620-v1:0",
+            model=DEFAULT_MODEL,
             system_prompt=balthasar_prompt
         )
 
         self.melchior = Agent(
             name="MELCHIOR",
-            model="anthropic.claude-3-5-sonnet-20240620-v1:0",
+            model=DEFAULT_MODEL,
             system_prompt=melchior_prompt
         )
 
         # SOLOMON Judge（統括AI）
-        # 注: system_promptは実行時に3賢者の結果を含めて動的に生成
+        # 注: system_promptは実行時に3賢者の結果を含めて動的に生成するため、
+        #     _process_solomon()内で毎回新しいインスタンスを作成します
+        # このインスタンスは使用されません（後方互換性のためのみ保持）
         self.solomon = Agent(
             name="SOLOMON",
-            model="anthropic.claude-3-5-sonnet-20240620-v1:0"
+            model=DEFAULT_MODEL
         )
         
         # 賢者ごとのステートマシン（並列イベント処理用）
@@ -717,22 +724,27 @@ class MAGIStrandsAgent:
         print(f"  🤖 Consulting {agent_id.upper()}...")
 
         try:
-            # カスタムロールが指定されている場合は、動的にプロンプトを構築
+            # カスタムロールが指定されている場合は、新しいAgentインスタンスを作成
+            # （Strands Agents 1.0では、stream_async()に**kwargsでsystem_promptを
+            # 渡すAPIは非推奨のため、動的プロンプトが必要な場合は新規作成）
             if custom_role:
                 # カスタムロール + 動的JSON形式
                 sage_json_format = _get_sage_json_format(self.sage_max_length)
                 custom_prompt = custom_role + sage_json_format
-                stream_kwargs = {'system_prompt': custom_prompt}
-            else:
-                # デフォルトのエージェントプロンプトを使用
-                stream_kwargs = {}
+                # 新しいAgentインスタンスを作成（カスタムプロンプト付き）
+                agent = Agent(
+                    name=agent_id.upper(),
+                    model=DEFAULT_MODEL,
+                    system_prompt=custom_prompt
+                )
 
             # Strands Agentsのストリーミング機能を使用
             # stream_async()メソッドは思考プロセスをリアルタイムで返す
             full_response = ""
 
             # stream_async()メソッドで非同期ストリーミング
-            async for chunk in agent.stream_async(question, **stream_kwargs):
+            # （system_promptはAgent初期化時に設定済み）
+            async for chunk in agent.stream_async(question):
                 # デバッグ: チャンクの型と内容を出力
                 if DEBUG_STREAMING:
                     print(f"  🔍 {agent_id.upper()} chunk type: {type(chunk)}")
@@ -924,6 +936,16 @@ class MAGIStrandsAgent:
             solomon_json_format = _get_solomon_json_format(self.solomon_max_length)
             solomon_prompt = solomon_role_with_data + solomon_json_format
 
+            # SOLOMONエージェントを動的に作成
+            # （3賢者の結果を含む動的なsystem_promptが必要なため、毎回新規作成）
+            # Strands Agents 1.0では、stream_async()に**kwargsでsystem_promptを
+            # 渡すAPIは非推奨のため、新しいインスタンスを作成
+            solomon = Agent(
+                name="SOLOMON",
+                model=DEFAULT_MODEL,
+                system_prompt=solomon_prompt
+            )
+
             # Strands Agentsのストリーミング機能を使用
             # stream_async()メソッドで非同期ストリーミング
             full_response = ""
@@ -934,7 +956,8 @@ class MAGIStrandsAgent:
                 print(f"  🔍 DEBUG: sage_responses count: {len(sage_responses)}")
 
             # stream_async()メソッドで非同期ストリーミング
-            async for chunk in self.solomon.stream_async(question, system_prompt=solomon_prompt):
+            # （system_promptはAgent初期化時に設定済み）
+            async for chunk in solomon.stream_async(question):
                 chunk_count += 1
 
                 # チャンクからテキストを抽出
