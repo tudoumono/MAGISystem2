@@ -44,10 +44,11 @@ export interface JudgeResponse {
 
 // ストリーミングイベント型
 export interface StreamEvent {
-  type: 'start' | 'sage_start' | 'sage_thinking' | 'sage_chunk' | 'sage_complete' | 
-        'sage_error' | 'judge_start' | 'judge_thinking' | 'judge_chunk' | 
-        'judge_complete' | 'complete' | 'error';
+  type: 'start' | 'agent_start' | 'agent_thinking' | 'agent_chunk' | 'agent_complete' |
+        'error' | 'judge_start' | 'judge_thinking' | 'judge_chunk' |
+        'judge_complete' | 'complete';
   data: any;
+  agentId?: string;
   timestamp: string;
 }
 
