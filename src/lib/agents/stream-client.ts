@@ -61,9 +61,36 @@ export async function streamMAGIResponse(options: StreamOptions): Promise<string
     // let eventSource: EventSource | null = null; // 現在未使用
 
     try {
+      // ⭐ Layer 1: フロントエンドSSEタイムアウト設定
+      // 環境変数から読み込み (デフォルト: 240秒 / 4分)
+      const sseTimeoutMs = parseInt(
+        process.env.NEXT_PUBLIC_SSE_TIMEOUT_MS || '240000',
+        10
+      );
+
+      console.log(`⏱️  SSE Timeout: ${sseTimeoutMs}ms (${(sseTimeoutMs / 1000).toFixed(1)}s)`);
+
+      // ⭐ AbortController作成（fetch中断用）
+      const abortController = new AbortController();
+      let isTimedOut = false;
+
+      // ⭐ タイムアウト設定
+      const timeoutId = setTimeout(() => {
+        console.error(`❌ SSE stream timeout after ${sseTimeoutMs}ms`);
+        isTimedOut = true;
+        abortController.abort();
+
+        const timeoutError = new Error(
+          `リクエストがタイムアウトしました（${(sseTimeoutMs / 1000).toFixed(0)}秒）。` +
+          `\n処理に時間がかかりすぎています。後でもう一度お試しください。`
+        );
+        onError?.(timeoutError);
+        reject(timeoutError);
+      }, sseTimeoutMs);
+
       // Server-Sent Events接続
       const url = new URL('/api/magi/stream', window.location.origin);
-      
+
       // POSTリクエストのためにfetchを使用
       fetch(url.toString(), {
         method: 'POST',
@@ -74,6 +101,7 @@ export async function streamMAGIResponse(options: StreamOptions): Promise<string
           question,
           sessionId: sessionId || `client-session-${Date.now()}`,
         }),
+        signal: abortController.signal, // ⭐ AbortSignal追加
       })
       .then(response => {
         if (!response.ok) {
@@ -91,6 +119,8 @@ export async function streamMAGIResponse(options: StreamOptions): Promise<string
         function readStream(): Promise<void> {
           return reader.read().then(({ done, value }) => {
             if (done) {
+              // ⭐ タイムアウトをクリア（正常完了）
+              clearTimeout(timeoutId);
               onComplete?.();
               resolve(fullResponse);
               return;
@@ -140,12 +170,16 @@ export async function streamMAGIResponse(options: StreamOptions): Promise<string
                         break;
                       
                       case 'complete':
+                        // ⭐ タイムアウトをクリア（完了イベント受信）
+                        clearTimeout(timeoutId);
                         onMessage?.(message);
                         onComplete?.();
                         resolve(fullResponse);
                         return;
-                      
+
                       case 'error':
+                        // ⭐ タイムアウトをクリア（エラー受信）
+                        clearTimeout(timeoutId);
                         const error = new Error(message.error || 'Unknown streaming error');
                         onError?.(error);
                         reject(error);
@@ -166,9 +200,27 @@ export async function streamMAGIResponse(options: StreamOptions): Promise<string
         return readStream();
       })
       .catch(error => {
-        console.error('Streaming error:', error);
-        onError?.(error);
-        reject(error);
+        // ⭐ タイムアウトをクリア（エラー発生）
+        clearTimeout(timeoutId);
+
+        // ⭐ AbortErrorの場合は、タイムアウトによる中断
+        if (error.name === 'AbortError') {
+          if (isTimedOut) {
+            // タイムアウトによる中断（既にエラーハンドラーで処理済み）
+            console.log('Stream aborted due to timeout');
+            return; // reject は既に setTimeout で実行済み
+          } else {
+            // ユーザーによる手動中断
+            const abortError = new Error('ストリームが中断されました');
+            onError?.(abortError);
+            reject(abortError);
+          }
+        } else {
+          // その他のエラー
+          console.error('Streaming error:', error);
+          onError?.(error);
+          reject(error);
+        }
       });
 
     } catch (error) {
