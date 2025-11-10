@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     const stream = new ReadableStream({
       start(controller) {
         console.log('🚀 Starting Python MAGI agent process...');
-        
+
         // Pythonプロセスを起動
         const pythonProcess = spawn(PYTHON_PATH, [MAGI_SCRIPT_PATH], {
           stdio: ['pipe', 'pipe', 'pipe'],
@@ -56,27 +56,35 @@ export async function POST(request: NextRequest) {
             AGENTCORE_RUNTIME_HOST: undefined,
           }
         });
-        
+
         // 入力データをPythonプロセスに送信
         pythonProcess.stdin.write(JSON.stringify(body));
         pythonProcess.stdin.end();
-        
+
+        // 不完全な行をバッファリングするための変数
+        let buffer = '';
+
         // Pythonプロセスの標準出力を処理
         pythonProcess.stdout.on('data', (data) => {
-          const output = data.toString();
-          console.log('📤 Python output:', output);
-          
-          // ストリーミングデータとしてクライアントに送信
-          try {
-            // JSON行ごとに分割して送信
-            const lines = output.split('\n').filter((line: string) => line.trim());
-            for (const line of lines) {
-              if (line.trim()) {
+          // バッファに追加
+          buffer += data.toString();
+
+          // 行ごとに分割
+          const lines = buffer.split('\n');
+          // 最後の要素は不完全な行の可能性があるため保持
+          buffer = lines.pop() || '';
+
+          // 完全な行のみ処理
+          for (const line of lines) {
+            if (line.trim()) {
+              console.log('📤 Python output (complete line):', line);
+
+              try {
                 controller.enqueue(new TextEncoder().encode(`data: ${line}\n\n`));
+              } catch (error) {
+                console.error('❌ Error encoding line:', error);
               }
             }
-          } catch (error) {
-            console.error('❌ Error processing Python output:', error);
           }
         });
         
@@ -97,7 +105,17 @@ export async function POST(request: NextRequest) {
         // Pythonプロセス終了時の処理
         pythonProcess.on('close', (code) => {
           console.log(`🏁 Python process exited with code ${code}`);
-          
+
+          // バッファに残っている不完全な行を処理
+          if (buffer.trim()) {
+            console.log('📤 Flushing remaining buffer:', buffer);
+            try {
+              controller.enqueue(new TextEncoder().encode(`data: ${buffer}\n\n`));
+            } catch (error) {
+              console.error('❌ Error flushing buffer:', error);
+            }
+          }
+
           if (code !== 0) {
             const errorEvent = {
               type: 'error',
@@ -106,7 +124,7 @@ export async function POST(request: NextRequest) {
             };
             controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
           }
-          
+
           // ストリーム終了
           controller.close();
         });
