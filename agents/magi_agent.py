@@ -1212,8 +1212,11 @@ class MAGIStrandsAgent:
         # イベントを順次処理
         while completed_tasks < total_tasks:
             try:
-                # タイムアウト付きでイベントを取得
-                task_id, event = await asyncio.wait_for(event_queue.get(), timeout=60.0)
+                # タイムアウト付きでイベントを取得（設定されたイベントキュータイムアウトを使用）
+                task_id, event = await asyncio.wait_for(
+                    event_queue.get(),
+                    timeout=self.timeout_config.event_queue_timeout_seconds
+                )
                 
                 if event is None:  # 終了マーカー
                     completed_tasks += 1
