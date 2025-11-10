@@ -704,10 +704,9 @@ class MAGIStrandsAgent:
             custom_role: カスタムロール（省略時はエージェントのデフォルトを使用）
         """
         # 開始イベント
-        yield self._create_sse_event("sage_start", {
-            "agent_id": agent_id,
+        yield self._create_sse_event("agent_start", {
             "trace_id": trace_id
-        })
+        }, agent_id=agent_id)
         
         # ステートマシン初期化
         if agent_id in self.sage_states:
@@ -786,11 +785,10 @@ class MAGIStrandsAgent:
                 full_response += chunk_text
                 
                 # チャンクイベント（思考プロセスの一部）
-                yield self._create_sse_event("sage_thinking", {
-                    "agent_id": agent_id,
-                    "chunk": chunk_text,
+                yield self._create_sse_event("agent_thinking", {
+                    "text": chunk_text,
                     "trace_id": trace_id
-                })
+                }, agent_id=agent_id)
             
             # 最終チャンクを処理してJSONパース
             if agent_id in self.sage_states:
@@ -801,52 +799,47 @@ class MAGIStrandsAgent:
                     self.sage_states[agent_id]["completed"] = True
             
             # 最終レスポンスイベント
-            yield self._create_sse_event("sage_chunk", {
-                "agent_id": agent_id,
-                "chunk": full_response,
+            yield self._create_sse_event("agent_chunk", {
+                "text": full_response,
                 "trace_id": trace_id
-            })
+            }, agent_id=agent_id)
             
             # ステートマシンから正しい判定を取得
             if agent_id in self.sage_states and self.sage_states[agent_id]["decision"]:
                 result = self.sage_states[agent_id]["decision"]
-                result['agent_id'] = agent_id
-                
+
                 print(f"  ✅ {agent_id.upper()}: {result.get('decision')} (confidence: {result.get('confidence')})")
-                
+
                 # 完了イベント
-                yield self._create_sse_event("sage_complete", result)
+                yield self._create_sse_event("agent_complete", result, agent_id=agent_id)
             else:
                 # フォールバック: 従来の方法でパース
                 print(f"  ⚠️ {agent_id.upper()}: Using fallback parsing")
                 result = {
-                    "agent_id": agent_id,
                     "decision": "ABSTAINED",
                     "reasoning": full_response[:200],
                     "confidence": 0.5
                 }
-                yield self._create_sse_event("sage_complete", result)
+                yield self._create_sse_event("agent_complete", result, agent_id=agent_id)
                 
         except Exception as e:
             print(f"  ❌ {agent_id.upper()} failed: {e}")
-            
+
             # エラー時もデフォルト結果を返す
             default_result = {
-                "agent_id": agent_id,
                 "decision": "ABSTAINED",
                 "reasoning": f"エラーが発生しました: {str(e)}",
                 "confidence": 0.0
             }
-            
+
             # エラーイベント
-            yield self._create_sse_event("sage_error", {
-                "agent_id": agent_id,
+            yield self._create_sse_event("error", {
                 "error": str(e),
                 "trace_id": trace_id
-            })
-            
+            }, agent_id=agent_id)
+
             # 完了イベント（デフォルト結果）
-            yield self._create_sse_event("sage_complete", default_result)
+            yield self._create_sse_event("agent_complete", default_result, agent_id=agent_id)
     
     async def _solomon_judgment_stream(
         self,
@@ -981,7 +974,7 @@ class MAGIStrandsAgent:
 
                 # チャンクイベント（思考プロセスの一部）
                 yield self._create_sse_event("judge_thinking", {
-                    "chunk": chunk_text,
+                    "text": chunk_text,
                     "trace_id": trace_id
                 })
 
@@ -990,7 +983,7 @@ class MAGIStrandsAgent:
             
             # 最終レスポンスイベント
             yield self._create_sse_event("judge_chunk", {
-                "chunk": full_response,
+                "text": full_response,
                 "trace_id": trace_id
             })
             
@@ -1084,9 +1077,9 @@ class MAGIStrandsAgent:
                     await event_queue.put((task_id, event))
             except Exception as e:
                 await event_queue.put((task_id, {
-                    'type': 'sage_error', 
+                    'type': 'error',
+                    'agentId': task_id,
                     'data': {
-                        'agent_id': task_id,
                         'error': str(e)
                     }
                 }))
@@ -1134,26 +1127,42 @@ class MAGIStrandsAgent:
             except asyncio.CancelledError:
                 pass
     
-    def _create_sse_event(self, event_type: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _create_sse_event(self, event_type: str, data: Dict[str, Any], agent_id: Optional[str] = None) -> Dict[str, Any]:
         """
         イベントを作成（AgentCore Runtimeが自動的にSSE形式に変換）
-        
+
+        フロントエンドとの互換性のため、agentIdをトップレベルに配置します。
+
+        Args:
+            event_type: イベントタイプ
+            data: イベントデータ
+            agent_id: エージェントID（省略可、指定時はトップレベルに"agentId"として追加）
+
         DEBUG_STREAMING=true の場合、コンソールにイベントを表示します。
         """
         event = {
             "type": event_type,
             "data": data
         }
-        
+
+        # agentIdをトップレベルに配置（フロントエンド互換性）
+        if agent_id:
+            event["agentId"] = agent_id
+
         # デバッグモード: ストリーミングイベントをコンソールに表示
         if DEBUG_STREAMING:
-            self._log_streaming_event(event_type, data)
-        
+            self._log_streaming_event(event_type, data, agent_id)
+
         return event
     
-    def _log_streaming_event(self, event_type: str, data: Dict[str, Any]):
+    def _log_streaming_event(self, event_type: str, data: Dict[str, Any], agent_id: Optional[str] = None):
         """
         ストリーミングイベントをコンソールに表示（デバッグ用）
+
+        Args:
+            event_type: イベントタイプ
+            data: イベントデータ
+            agent_id: エージェントID（オプション）
         
         3賢者の並列処理により、イベントは到着順に表示されます。
         """
@@ -1171,57 +1180,51 @@ class MAGIStrandsAgent:
             print(f"[{timestamp}] 👥 SAGES_START")
             print(f"  Consulting {data.get('sage_count', 3)} sages in parallel...\n")
         
-        elif event_type == "sage_start":
-            agent_id = data.get('agent_id', 'unknown').upper()
-            print(f"[{timestamp}] 🤖 SAGE_START: {agent_id}")
-        
-        elif event_type == "sage_thinking":
-            agent_id = data.get('agent_id', 'unknown').upper()
-            chunk = data.get('chunk', '')
+        elif event_type == "agent_start":
+            agent_name = (agent_id or 'unknown').upper()
+            print(f"[{timestamp}] 🤖 AGENT_START: {agent_name}")
+
+        elif event_type == "agent_thinking":
+            agent_name = (agent_id or 'unknown').upper()
+            text = data.get('text', '')
             # 思考プロセスをリアルタイム表示
-            print(f"[{timestamp}] 💭 THINKING: {agent_id}")
-            print(f"  {chunk}")
-        
-        elif event_type == "sage_chunk":
-            agent_id = data.get('agent_id', 'unknown').upper()
-            chunk = data.get('chunk', '')
+            print(f"[{timestamp}] 💭 THINKING: {agent_name}")
+            print(f"  {text}")
+
+        elif event_type == "agent_chunk":
+            agent_name = (agent_id or 'unknown').upper()
+            text = data.get('text', '')
             # チャンクが長い場合は省略表示
-            display_chunk = chunk[:100] + "..." if len(chunk) > 100 else chunk
-            print(f"[{timestamp}] 💭 SAGE_CHUNK: {agent_id}")
-            print(f"  {display_chunk}\n")
-        
-        elif event_type == "sage_complete":
-            agent_id = data.get('agent_id', 'unknown').upper()
+            display_text = text[:100] + "..." if len(text) > 100 else text
+            print(f"[{timestamp}] 💭 AGENT_CHUNK: {agent_name}")
+            print(f"  {display_text}\n")
+
+        elif event_type == "agent_complete":
+            agent_name = (agent_id or 'unknown').upper()
             decision = data.get('decision', 'N/A')
             confidence = data.get('confidence', 0.0)
             reasoning = data.get('reasoning', 'N/A')
-            print(f"[{timestamp}] ✅ SAGE_COMPLETE: {agent_id}")
+            print(f"[{timestamp}] ✅ AGENT_COMPLETE: {agent_name}")
             print(f"  Decision: {decision}")
             print(f"  Confidence: {confidence:.2f}")
             print(f"  Reasoning: {reasoning[:80]}...")
             print()
-        
-        elif event_type == "sage_error":
-            agent_id = data.get('agent_id', 'unknown').upper()
-            error = data.get('error', 'N/A')
-            print(f"[{timestamp}] ❌ SAGE_ERROR: {agent_id}")
-            print(f"  Error: {error}\n")
         
         elif event_type == "judge_start":
             print(f"[{timestamp}] ⚖️  JUDGE_START")
             print(f"  SOLOMON evaluating 3 sages' responses...\n")
         
         elif event_type == "judge_thinking":
-            chunk = data.get('chunk', '')
+            text = data.get('text', '')
             # 思考プロセスをリアルタイム表示
             print(f"[{timestamp}] 💭 JUDGE_THINKING")
-            print(f"  {chunk}")
-        
+            print(f"  {text}")
+
         elif event_type == "judge_chunk":
-            chunk = data.get('chunk', '')
-            display_chunk = chunk[:100] + "..." if len(chunk) > 100 else chunk
+            text = data.get('text', '')
+            display_text = text[:100] + "..." if len(text) > 100 else text
             print(f"[{timestamp}] 💭 JUDGE_CHUNK")
-            print(f"  {display_chunk}\n")
+            print(f"  {display_text}\n")
         
         elif event_type == "judge_complete":
             final_decision = data.get('final_decision', 'N/A')

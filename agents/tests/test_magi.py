@@ -367,44 +367,44 @@ class StreamingClassificationTester:
                 print(f"   Trace ID: {event_data.get('trace_id')}")
                 print()
         
-        elif event_type == "sage_start":
-            agent_id = event_data.get("agent_id")
+        elif event_type == "agent_start":
+            agent_id = event.get("agentId")
             if self.verbose:
                 print(f"🤖 {agent_id.upper()} started thinking...")
-        
-        elif event_type == "sage_thinking":
-            agent_id = event_data.get("agent_id")
-            chunk = event_data.get("chunk", "")
-            
+
+        elif event_type == "agent_thinking":
+            agent_id = event.get("agentId")
+            text = event_data.get("text", "")
+
             # 思考プロセスをリアルタイム表示
             if self.verbose:
-                print(f"   💭 {agent_id.upper()} thinking: {chunk}", end='', flush=True)
-        
-        elif event_type == "sage_chunk":
-            agent_id = event_data.get("agent_id")
-            chunk = event_data.get("chunk", "")
-            
+                print(f"   💭 {agent_id.upper()} thinking: {text}", end='', flush=True)
+
+        elif event_type == "agent_chunk":
+            agent_id = event.get("agentId")
+            text = event_data.get("text", "")
+
             # チャンクを保存
-            self.streams[agent_id].append(chunk)
+            self.streams[agent_id].append(text)
             self.stats["chunks_by_agent"][agent_id] += 1
-            
+
             if self.verbose:
                 # リアルタイム表示（全文）
-                print(f"   💭 {agent_id.upper()}: {chunk}")
-        
-        elif event_type == "sage_complete":
-            agent_id = event_data.get("agent_id")
+                print(f"   💭 {agent_id.upper()}: {text}")
+
+        elif event_type == "agent_complete":
+            agent_id = event.get("agentId")
             decision = event_data.get("decision")
             confidence = event_data.get("confidence")
             reasoning = event_data.get("reasoning", "")
-            
+
             if self.verbose:
                 print(f"\n   ✅ {agent_id.upper()}: {decision} (confidence: {confidence:.2f})")
                 print(f"      Reasoning: {reasoning}")
                 print()
-        
-        elif event_type == "sage_error":
-            agent_id = event_data.get("agent_id")
+
+        elif event_type == "error":
+            agent_id = event.get("agentId")
             error = event_data.get("error")
             if self.verbose:
                 print(f"   ❌ {agent_id.upper()} error: {error}")
@@ -416,22 +416,22 @@ class StreamingClassificationTester:
                 print()
         
         elif event_type == "judge_thinking":
-            chunk = event_data.get("chunk", "")
-            
+            text = event_data.get("text", "")
+
             # 思考プロセスをリアルタイム表示
             if self.verbose:
-                print(f"   💭 SOLOMON thinking: {chunk}", end='', flush=True)
-        
+                print(f"   💭 SOLOMON thinking: {text}", end='', flush=True)
+
         elif event_type == "judge_chunk":
-            chunk = event_data.get("chunk", "")
-            
+            text = event_data.get("text", "")
+
             # SOLOMONのチャンクを保存
-            self.streams["solomon"].append(chunk)
+            self.streams["solomon"].append(text)
             self.stats["chunks_by_agent"]["solomon"] += 1
-            
+
             # 進捗表示
-            preview = chunk[:50].replace('\n', ' ')
-            print(f"   💭 SOLOMON: {preview}{'...' if len(chunk) > 50 else ''}")
+            preview = text[:50].replace('\n', ' ')
+            print(f"   💭 SOLOMON: {preview}{'...' if len(text) > 50 else ''}")
         
         elif event_type == "judge_complete":
             final_decision = event_data.get("final_decision")

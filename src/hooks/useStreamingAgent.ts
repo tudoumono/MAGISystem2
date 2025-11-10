@@ -93,15 +93,16 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
     });
 
     try {
-      // POSTリクエストでエージェント設定を送信
-      const response = await fetch('/api/bedrock-agents/stream', {
+      // 参考記事準拠: AgentCore Runtime の /invocations エンドポイントを直接呼び出し
+      const agentCoreUrl = process.env.NEXT_PUBLIC_AGENTCORE_URL || 'http://localhost:8080';
+      const response = await fetch(`${agentCoreUrl}/api/invocations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           question,
-          conversationId,
+          sessionId: conversationId,
           agentConfigs, // プリセット設定を送信
         }),
         signal: abortControllerRef.current.signal,

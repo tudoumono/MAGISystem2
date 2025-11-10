@@ -337,20 +337,20 @@ class CustomPromptsTester:
                 all_events.append(parsed_event)
                 
                 # チャンク収集
-                if event_type == "sage_chunk":
-                    agent_id = event_data.get("agent_id")
-                    chunk = event_data.get("chunk", "")
-                    streams[agent_id].append(chunk)
+                if event_type == "agent_chunk":
+                    agent_id = parsed_event.get("agentId")
+                    text = event_data.get("text", "")
+                    streams[agent_id].append(text)
                     stats["chunks_by_agent"][agent_id] += 1
-                
+
                 elif event_type == "judge_chunk":
-                    chunk = event_data.get("chunk", "")
-                    streams["solomon"].append(chunk)
+                    text = event_data.get("text", "")
+                    streams["solomon"].append(text)
                     stats["chunks_by_agent"]["solomon"] += 1
                 
                 # リアルタイム表示
                 if self.verbose:
-                    self._print_event(event_type, event_data)
+                    self._print_event(event_type, event_data, parsed_event)
             
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
@@ -443,25 +443,26 @@ class CustomPromptsTester:
         
         return None
     
-    def _print_event(self, event_type: str, event_data: Dict[str, Any]):
+    def _print_event(self, event_type: str, event_data: Dict[str, Any], event: Dict[str, Any]):
         """
         イベントをコンソールに表示
-        
+
         Args:
             event_type: イベントタイプ
             event_data: イベントデータ
+            event: フルイベント（agentIdを含む）
         """
-        if event_type == "sage_complete":
-            agent_id = event_data.get("agent_id")
+        if event_type == "agent_complete":
+            agent_id = event.get("agentId")
             decision = event_data.get("decision")
             confidence = event_data.get("confidence")
             print(f"   ✅ {agent_id.upper()}: {decision} (confidence: {confidence:.2f})")
-        
+
         elif event_type == "judge_complete":
             final_decision = event_data.get("final_decision")
             confidence = event_data.get("confidence")
             print(f"   ✅ SOLOMON: {final_decision} (confidence: {confidence:.2f})")
-        
+
         elif event_type == "complete":
             final_decision = event_data.get("final_decision")
             print(f"   🎉 Final Decision: {final_decision}")
@@ -537,12 +538,12 @@ class CustomPromptsTester:
             
             print(f"\n  Scenario: {scenario_name}")
             
-            # sage_complete イベントの検証
-            sage_complete_events = [e for e in all_events if e.get("type") == "sage_complete"]
-            
-            for event in sage_complete_events:
+            # agent_complete イベントの検証
+            agent_complete_events = [e for e in all_events if e.get("type") == "agent_complete"]
+
+            for event in agent_complete_events:
                 data = event.get("data", {})
-                agent_id = data.get("agent_id")
+                agent_id = event.get("agentId")
                 
                 # 必須キーの確認
                 required_keys = ["decision", "reasoning", "confidence"]
