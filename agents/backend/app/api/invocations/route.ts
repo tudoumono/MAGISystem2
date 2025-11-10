@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
 
         // ⭐⭐⭐ TIMEOUT HANDLING - Layer 2: Next.js Process Monitor ⭐⭐⭐
         let processCompleted = false;
+        let streamClosed = false; // Track if stream is already closed
         const startTime = Date.now();
 
         // プロセス監視タイムアウト設定
@@ -111,6 +112,7 @@ export async function POST(request: NextRequest) {
             }
 
             // ストリームを閉じる
+            streamClosed = true;
             controller.close();
           }
         }, timeoutConfig.processTimeoutMs);
@@ -133,10 +135,14 @@ export async function POST(request: NextRequest) {
             if (line.trim()) {
               console.log('📤 Python output (complete line):', line);
 
-              try {
-                controller.enqueue(new TextEncoder().encode(`data: ${line}\n\n`));
-              } catch (error) {
-                console.error('❌ Error encoding line:', error);
+              // ストリームが閉じられていない場合のみenqueue
+              if (!streamClosed) {
+                try {
+                  controller.enqueue(new TextEncoder().encode(`data: ${line}\n\n`));
+                } catch (error) {
+                  console.error('❌ Error encoding line (stream may be closed):', error);
+                  streamClosed = true; // Mark as closed to prevent further attempts
+                }
               }
             }
           }
@@ -146,14 +152,21 @@ export async function POST(request: NextRequest) {
         pythonProcess.stderr.on('data', (data) => {
           const error = data.toString();
           console.error('❌ Python error:', error);
-          
-          // エラーもストリーミングで送信
-          const errorEvent = {
-            type: 'error',
-            data: { error: error.trim(), code: 'PYTHON_RUNTIME_ERROR' },
-            timestamp: new Date().toISOString()
-          };
-          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
+
+          // エラーもストリーミングで送信（ストリームが閉じられていない場合のみ）
+          if (!streamClosed) {
+            const errorEvent = {
+              type: 'error',
+              data: { error: error.trim(), code: 'PYTHON_RUNTIME_ERROR' },
+              timestamp: new Date().toISOString()
+            };
+            try {
+              controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
+            } catch (error) {
+              console.error('❌ Error sending stderr event (stream may be closed):', error);
+              streamClosed = true;
+            }
+          }
         });
         
         // Pythonプロセス終了時の処理
@@ -166,39 +179,59 @@ export async function POST(request: NextRequest) {
           console.log(`🏁 Python process exited with code ${code} (elapsed: ${elapsed}ms)`);
 
           // バッファに残っている不完全な行を処理
-          if (buffer.trim()) {
+          if (buffer.trim() && !streamClosed) {
             console.log('📤 Flushing remaining buffer:', buffer);
             try {
               controller.enqueue(new TextEncoder().encode(`data: ${buffer}\n\n`));
             } catch (error) {
-              console.error('❌ Error flushing buffer:', error);
+              console.error('❌ Error flushing buffer (stream may be closed):', error);
+              streamClosed = true;
             }
           }
 
-          if (code !== 0) {
+          if (code !== 0 && !streamClosed) {
             const errorEvent = {
               type: 'error',
               data: { error: `Python process exited with code ${code}`, code: 'PYTHON_EXECUTION_ERROR' },
               timestamp: new Date().toISOString()
             };
-            controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
+            try {
+              controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
+            } catch (error) {
+              console.error('❌ Error sending exit error event (stream may be closed):', error);
+              streamClosed = true;
+            }
           }
 
           // ストリーム終了
-          controller.close();
+          if (!streamClosed) {
+            streamClosed = true;
+            controller.close();
+          }
         });
         
         // プロセス起動エラーの処理
         pythonProcess.on('error', (error) => {
           console.error('❌ Failed to start Python process:', error);
-          
-          const errorEvent = {
-            type: 'error',
-            data: { error: `Failed to start Python process: ${error.message}`, code: 'PYTHON_SPAWN_ERROR' },
-            timestamp: new Date().toISOString()
-          };
-          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
-          controller.close();
+
+          if (!streamClosed) {
+            const errorEvent = {
+              type: 'error',
+              data: { error: `Failed to start Python process: ${error.message}`, code: 'PYTHON_SPAWN_ERROR' },
+              timestamp: new Date().toISOString()
+            };
+            try {
+              controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
+            } catch (error) {
+              console.error('❌ Error sending spawn error event (stream may be closed):', error);
+              streamClosed = true;
+            }
+          }
+
+          if (!streamClosed) {
+            streamClosed = true;
+            controller.close();
+          }
         });
       }
     });
