@@ -150,31 +150,31 @@ Pythonプロセスが蓄積
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ Layer 1: フロントエンド (SSEクライアント)                     │
-│  - タイムアウト: 120秒（2分）                                │
-│  - 理由: 最悪ケースでも完了を待つ                            │
+│  - タイムアウト: 240秒（4分）                                │
+│  - 理由: 最悪ケース + 十分なバッファ                         │
 └─────────────────────────────────────────────────────────────┘
                          │
 ┌─────────────────────────────────────────────────────────────┐
 │ Layer 2: Next.js Backend (Pythonプロセス監視)                │
-│  - タイムアウト: 90秒                                        │
+│  - タイムアウト: 210秒（3.5分）                              │
 │  - アクション: プロセス強制終了 (SIGTERM → SIGKILL)          │
 └─────────────────────────────────────────────────────────────┘
                          │
 ┌─────────────────────────────────────────────────────────────┐
 │ Layer 3: Python - 全体処理                                   │
-│  - タイムアウト: 80秒                                        │
+│  - タイムアウト: 180秒（3分）                                │
 │  - アクション: 処理中断、部分結果を返す                      │
 └─────────────────────────────────────────────────────────────┘
                          │
 ┌─────────────────────────────────────────────────────────────┐
 │ Layer 4: Python - 個別賢者                                   │
-│  - タイムアウト: 45秒（各賢者）                              │
+│  - タイムアウト: 90秒（1.5分、各賢者）                       │
 │  - アクション: ABSTAINEDとして扱う                           │
 └─────────────────────────────────────────────────────────────┘
                          │
 ┌─────────────────────────────────────────────────────────────┐
 │ Layer 5: Python - SOLOMON Judge                              │
-│  - タイムアウト: 30秒                                        │
+│  - タイムアウト: 60秒（1分）                                 │
 │  - アクション: デフォルト判断を返す                          │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -203,7 +203,7 @@ export async function POST(request: NextRequest) {
         // ==========================================
         // 🕐 TIMEOUT HANDLING - Layer 2
         // ==========================================
-        const PROCESS_TIMEOUT_MS = 90000; // 90秒
+        const PROCESS_TIMEOUT_MS = 210000; // 210秒（3.5分）
         let processCompleted = false;
 
         const timeoutId = setTimeout(() => {
@@ -299,7 +299,7 @@ async def _consult_sage_stream(
         # ==========================================
         # 🕐 TIMEOUT HANDLING - Layer 4
         # ==========================================
-        SAGE_TIMEOUT_SECONDS = 45  # 各賢者45秒
+        SAGE_TIMEOUT_SECONDS = 90  # 各賢者90秒（1.5分）
 
         async def execute_with_timeout():
             """タイムアウト付きでLLM実行"""
@@ -353,7 +353,7 @@ async def _consult_sage_stream(
                     full_response = event
 
         except asyncio.TimeoutError:
-            print(f"  ⚠️ {agent_id.upper()} timeout after {SAGE_TIMEOUT_SECONDS}s")
+            print(f"  ⚠️ {agent_id.upper()} timeout after {SAGE_TIMEOUT_SECONDS}s (90s)")
 
             # タイムアウトイベント
             yield self._create_sse_event("agent_timeout", {
@@ -364,7 +364,7 @@ async def _consult_sage_stream(
             # デフォルト結果（ABSTAINED）
             default_result = {
                 "decision": "ABSTAINED",
-                "reasoning": f"タイムアウト（{SAGE_TIMEOUT_SECONDS}秒）により判断を保留しました",
+                "reasoning": f"タイムアウト（{SAGE_TIMEOUT_SECONDS}秒 / 1.5分）により判断を保留しました",
                 "confidence": 0.0
             }
 
@@ -405,7 +405,7 @@ async def _solomon_judgment_stream(
         # ==========================================
         # 🕐 TIMEOUT HANDLING - Layer 5
         # ==========================================
-        SOLOMON_TIMEOUT_SECONDS = 30
+        SOLOMON_TIMEOUT_SECONDS = 60  # 60秒（1分）
 
         # 賢者データの準備（既存のロジック）
         # ...
@@ -452,7 +452,7 @@ async def _solomon_judgment_stream(
                     full_response = event
 
         except asyncio.TimeoutError:
-            print(f"  ⚠️ SOLOMON timeout after {SOLOMON_TIMEOUT_SECONDS}s")
+            print(f"  ⚠️ SOLOMON timeout after {SOLOMON_TIMEOUT_SECONDS}s (60s / 1min)")
 
             # デフォルト判断を返す
             # 3賢者の多数決で判断
@@ -461,7 +461,7 @@ async def _solomon_judgment_stream(
 
             default_result = {
                 "final_decision": "APPROVED" if approved > rejected else "REJECTED",
-                "reasoning": f"タイムアウト（{SOLOMON_TIMEOUT_SECONDS}秒）により、3賢者の多数決で判断しました（承認{approved}、却下{rejected}）",
+                "reasoning": f"タイムアウト（{SOLOMON_TIMEOUT_SECONDS}秒 / 1分）により、3賢者の多数決で判断しました（承認{approved}、却下{rejected}）",
                 "confidence": 0.4,  # 低い信頼度
                 "sage_scores": {
                     "caspar": 50,
@@ -493,7 +493,7 @@ export function useMAGIStream() {
     // ==========================================
     // 🕐 TIMEOUT HANDLING - Layer 1
     // ==========================================
-    const SSE_TIMEOUT_MS = 120000; // 120秒（2分）
+    const SSE_TIMEOUT_MS = 240000; // 240秒（4分）
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
@@ -579,15 +579,22 @@ export function useMAGIStream() {
 
 ## 📊 タイムアウト設定の根拠
 
-### A2A設計における時間配分
+### A2A設計における時間配分（延長版）
 
-| フェーズ | 想定時間 | タイムアウト | バッファ |
-|---------|---------|------------|---------|
-| **3賢者並列実行** | 平均20秒、最悪30秒 | 45秒 | +15秒 |
-| **SOLOMON Judge** | 平均15秒、最悪20秒 | 30秒 | +10秒 |
-| **Python全体処理** | 平均35秒、最悪50秒 | 80秒 | +30秒 |
-| **Next.js監視** | - | 90秒 | Python+10秒 |
-| **フロントエンド** | - | 120秒 | Next.js+30秒 |
+| フェーズ | 想定時間 | タイムアウト | バッファ | 備考 |
+|---------|---------|------------|---------|------|
+| **3賢者並列実行** | 平均20秒、最悪40秒 | **90秒** | +50秒 | ネットワーク遅延・リトライ考慮 |
+| **SOLOMON Judge** | 平均15秒、最悪30秒 | **60秒** | +30秒 | 複雑な統合判断の余裕 |
+| **Python全体処理** | 平均35秒、最悪70秒 | **180秒** | +110秒 | 3賢者(90s) + SOLOMON(60s) + バッファ(30s) |
+| **Next.js監視** | - | **210秒** | Python+30秒 | プロセス監視の余裕 |
+| **フロントエンド** | - | **240秒** | Next.js+30秒 | ユーザー体験の最大許容時間 |
+
+### 延長の理由
+
+1. **API遅延の変動**: Bedrock APIの応答時間は10-60秒と幅がある
+2. **リトライ機構**: 将来的なリトライ実装を考慮
+3. **ネットワーク遅延**: 地域・時間帯による変動
+4. **安全マージン**: タイムアウトによる誤中断を防ぐ
 
 ### グレースフル・デグラデーション
 
@@ -672,11 +679,14 @@ class CircuitBreaker:
 
 ### Phase 1: 基本タイムアウト（即座に実施）
 
-- [ ] **Next.js Backend**: プロセス監視タイムアウト（90秒）
-- [ ] **Python - 賢者**: 個別タイムアウト（45秒）
-- [ ] **Python - SOLOMON**: タイムアウト（30秒）
-- [ ] **フロントエンド**: SSEクライアントタイムアウト（120秒）
+- [ ] **Next.js Backend**: プロセス監視タイムアウト（**210秒 / 3.5分**）
+- [ ] **Python - 賢者**: 個別タイムアウト（**90秒 / 1.5分**）
+- [ ] **Python - SOLOMON**: タイムアウト（**60秒 / 1分**）
+- [ ] **フロントエンド**: SSEクライアントタイムアウト（**240秒 / 4分**）
 - [ ] **環境変数**: タイムアウト値を設定可能に
+
+**所要時間**: 2-3時間
+**効果**: カスケード障害の防止、リソース保護、API遅延変動への対応
 
 ### Phase 2: エラーハンドリング強化
 
@@ -724,12 +734,26 @@ class CircuitBreaker:
 2. **カスケード障害**: 1つの賢者の遅延が全体に影響
 3. **リソース保護**: タイムアウトなしでは無制限にリソース消費
 
-### 推奨アプローチ
+### 推奨アプローチ（延長版タイムアウト）
 
-✅ **多層タイムアウト**: 各レイヤーで適切な時間設定
+✅ **多層タイムアウト**: 各レイヤーで十分な余裕を持った時間設定
+  - フロントエンド: 240秒（4分）
+  - Next.js Backend: 210秒（3.5分）
+  - Python全体: 180秒（3分）
+  - 個別賢者: 90秒（1.5分）
+  - SOLOMON Judge: 60秒（1分）
+
 ✅ **グレースフル・デグラデーション**: 部分結果を返す
+
 ✅ **監視とアラート**: タイムアウト発生を追跡
+
+### タイムアウト延長の効果
+
+1. **API遅延変動への対応**: Bedrock APIの応答時間（10-60秒）の変動を吸収
+2. **リトライ実装の余地**: 将来的な自動リトライ機構に対応
+3. **ネットワーク遅延考慮**: 地域・時間帯による変動に耐性
+4. **誤中断の防止**: タイムアウトによる正常処理の誤中断を最小化
 
 ### 次のアクション
 
-Phase 1の実装を開始しますか？コード実装のサポートが必要な場合はお知らせください。
+Phase 1の実装を開始しますか？延長されたタイムアウト値でコード実装のサポートが可能です。
