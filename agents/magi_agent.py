@@ -214,6 +214,10 @@ class MAGIStrandsAgent:
                     'solomon': 'あなたは統括AIです...'
                 }
         """
+        # タイムアウト設定をロード
+        from config.timeout import get_timeout_config
+        self.timeout_config = get_timeout_config()
+
         # カスタムプロンプトの読み込み（優先順位：引数 > 環境変数 > デフォルト）
         self.custom_prompts = custom_prompts or {}
 
@@ -717,6 +721,12 @@ class MAGIStrandsAgent:
         print(f"  🤖 Consulting {agent_id.upper()}...")
 
         try:
+            # タイムアウト値を取得（環境変数: MAGI_SAGE_TIMEOUT_SECONDS、デフォルト: 90秒）
+            timeout_seconds = self.timeout_config.sage_timeout_seconds
+
+            if DEBUG_STREAMING:
+                print(f"  ⏱️  {agent_id.upper()} timeout: {timeout_seconds}s")
+
             # カスタムロールが指定されている場合は、動的にプロンプトを構築
             if custom_role:
                 # カスタムロール + 動的JSON形式
@@ -731,97 +741,139 @@ class MAGIStrandsAgent:
             # stream_async()メソッドは思考プロセスをリアルタイムで返す
             full_response = ""
 
-            # stream_async()メソッドで非同期ストリーミング
-            async for chunk in agent.stream_async(question, **stream_kwargs):
-                # デバッグ: チャンクの型と内容を出力
-                if DEBUG_STREAMING:
-                    print(f"  🔍 {agent_id.upper()} chunk type: {type(chunk)}")
-                    print(f"  🔍 {agent_id.upper()} chunk content: {chunk}")
-                
-                # チャンクからテキストを抽出
-                # Strands Agentsは辞書形式でチャンクを返す
-                chunk_text = None
-                
-                if isinstance(chunk, dict):
-                    # Strands Agentsの内部イベントをフィルタリング
-                    # 'event'キーがある場合のみ処理（LLM応答イベント）
-                    if 'event' in chunk:
-                        event_data = chunk['event']
-                        
-                        # contentBlockDelta から実際のテキストを抽出
-                        if isinstance(event_data, dict) and 'contentBlockDelta' in event_data:
-                            delta = event_data['contentBlockDelta'].get('delta', {})
-                            if isinstance(delta, dict) and 'text' in delta:
-                                chunk_text = delta['text']
-                    
-                    # 'message'キーがある場合（最終メッセージ）
-                    elif 'message' in chunk:
-                        message = chunk['message']
-                        if isinstance(message, dict) and 'content' in message:
-                            content = message['content']
-                            if isinstance(content, list) and len(content) > 0:
-                                if isinstance(content[0], dict) and 'text' in content[0]:
-                                    # 最終メッセージは既にfull_responseに含まれているのでスキップ
-                                    continue
-                    
-                    # その他の内部イベント（init_event_loop, start, result等）はスキップ
-                    else:
-                        # デバッグ用にログ出力（JSONパースには含めない）
-                        if DEBUG_STREAMING:
-                            print(f"  🔍 [{agent_id.upper()}] Internal event: {list(chunk.keys())}")
+            # ⭐ タイムアウト処理付きでLLM呼び出しを実行
+            # タイムアウトトラッキング用の変数
+            start_time = asyncio.get_event_loop().time()
+
+            try:
+                # stream_async()メソッドで非同期ストリーミング
+                async for chunk in agent.stream_async(question, **stream_kwargs):
+                    # ⭐ タイムアウトチェック
+                    elapsed = asyncio.get_event_loop().time() - start_time
+                    if elapsed > timeout_seconds:
+                        raise asyncio.TimeoutError(f"Sage {agent_id} exceeded timeout of {timeout_seconds}s")
+
+                    # デバッグ: チャンクの型と内容を出力
+                    if DEBUG_STREAMING:
+                        print(f"  🔍 {agent_id.upper()} chunk type: {type(chunk)}")
+                        print(f"  🔍 {agent_id.upper()} chunk content: {chunk}")
+
+                    # チャンクからテキストを抽出
+                    # Strands Agentsは辞書形式でチャンクを返す
+                    chunk_text = None
+
+                    if isinstance(chunk, dict):
+                        # Strands Agentsの内部イベントをフィルタリング
+                        # 'event'キーがある場合のみ処理（LLM応答イベント）
+                        if 'event' in chunk:
+                            event_data = chunk['event']
+
+                            # contentBlockDelta から実際のテキストを抽出
+                            if isinstance(event_data, dict) and 'contentBlockDelta' in event_data:
+                                delta = event_data['contentBlockDelta'].get('delta', {})
+                                if isinstance(delta, dict) and 'text' in delta:
+                                    chunk_text = delta['text']
+
+                        # 'message'キーがある場合（最終メッセージ）
+                        elif 'message' in chunk:
+                            message = chunk['message']
+                            if isinstance(message, dict) and 'content' in message:
+                                content = message['content']
+                                if isinstance(content, list) and len(content) > 0:
+                                    if isinstance(content[0], dict) and 'text' in content[0]:
+                                        # 最終メッセージは既にfull_responseに含まれているのでスキップ
+                                        continue
+
+                        # その他の内部イベント（init_event_loop, start, result等）はスキップ
+                        else:
+                            # デバッグ用にログ出力（JSONパースには含めない）
+                            if DEBUG_STREAMING:
+                                print(f"  🔍 [{agent_id.upper()}] Internal event: {list(chunk.keys())}")
+                            continue
+
+                    elif isinstance(chunk, str):
+                        chunk_text = chunk
+
+                    # 空のチャンクはスキップ
+                    if not chunk_text:
                         continue
-                
-                elif isinstance(chunk, str):
-                    chunk_text = chunk
-                
-                # 空のチャンクはスキップ
-                if not chunk_text:
-                    continue
-                
-                # 賢者ごとのバッファに蓄積（ログ行を除外）
-                if agent_id in self.sage_states and self._is_content_chunk(chunk_text):
-                    self.sage_states[agent_id]["buffer"] += chunk_text
-                
-                full_response += chunk_text
-                
-                # チャンクイベント（思考プロセスの一部）
-                yield self._create_sse_event("agent_thinking", {
-                    "text": chunk_text,
+
+                    # 賢者ごとのバッファに蓄積（ログ行を除外）
+                    if agent_id in self.sage_states and self._is_content_chunk(chunk_text):
+                        self.sage_states[agent_id]["buffer"] += chunk_text
+
+                    full_response += chunk_text
+
+                    # チャンクイベント（思考プロセスの一部）
+                    yield self._create_sse_event("agent_thinking", {
+                        "text": chunk_text,
+                        "trace_id": trace_id
+                    }, agent_id=agent_id)
+
+                # ⭐ 正常完了時の処理
+                # 最終チャンクを処理してJSONパース
+                if agent_id in self.sage_states:
+                    # JSONパースを試行
+                    decision_data = self._parse_sage_decision(agent_id)
+                    if decision_data:
+                        self.sage_states[agent_id]["decision"] = decision_data
+                        self.sage_states[agent_id]["completed"] = True
+
+                # 最終レスポンスイベント
+                yield self._create_sse_event("agent_chunk", {
+                    "text": full_response,
                     "trace_id": trace_id
                 }, agent_id=agent_id)
-            
-            # 最終チャンクを処理してJSONパース
-            if agent_id in self.sage_states:
-                # JSONパースを試行
-                decision_data = self._parse_sage_decision(agent_id)
-                if decision_data:
-                    self.sage_states[agent_id]["decision"] = decision_data
-                    self.sage_states[agent_id]["completed"] = True
-            
-            # 最終レスポンスイベント
-            yield self._create_sse_event("agent_chunk", {
-                "text": full_response,
-                "trace_id": trace_id
-            }, agent_id=agent_id)
-            
-            # ステートマシンから正しい判定を取得
-            if agent_id in self.sage_states and self.sage_states[agent_id]["decision"]:
-                result = self.sage_states[agent_id]["decision"]
 
-                print(f"  ✅ {agent_id.upper()}: {result.get('decision')} (confidence: {result.get('confidence')})")
+                # ステートマシンから正しい判定を取得
+                if agent_id in self.sage_states and self.sage_states[agent_id]["decision"]:
+                    result = self.sage_states[agent_id]["decision"]
 
-                # 完了イベント
-                yield self._create_sse_event("agent_complete", result, agent_id=agent_id)
-            else:
-                # フォールバック: 従来の方法でパース
-                print(f"  ⚠️ {agent_id.upper()}: Using fallback parsing")
-                result = {
+                    print(f"  ✅ {agent_id.upper()}: {result.get('decision')} (confidence: {result.get('confidence')})")
+
+                    # 完了イベント
+                    yield self._create_sse_event("agent_complete", result, agent_id=agent_id)
+                else:
+                    # フォールバック: 従来の方法でパース
+                    print(f"  ⚠️ {agent_id.upper()}: Using fallback parsing")
+                    result = {
+                        "decision": "ABSTAINED",
+                        "reasoning": full_response[:200],
+                        "confidence": 0.5
+                    }
+                    yield self._create_sse_event("agent_complete", result, agent_id=agent_id)
+
+            # ⭐⭐⭐ タイムアウト時のグレースフルデグラデーション ⭐⭐⭐
+            except asyncio.TimeoutError:
+                print(f"  ⚠️ {agent_id.upper()} TIMEOUT after {timeout_seconds}s")
+
+                # グレースフルデグラデーション: 部分応答があればそれを使用
+                if full_response:
+                    print(f"  ℹ️  {agent_id.upper()} partial response: {len(full_response)} chars")
+                    if DEBUG_STREAMING:
+                        print(f"  🔍 Partial response preview: {full_response[:200]}...")
+
+                # タイムアウト時のデフォルト結果（ABSTAINED）
+                timeout_result = {
                     "decision": "ABSTAINED",
-                    "reasoning": full_response[:200],
-                    "confidence": 0.5
+                    "reasoning": f"Timeout after {timeout_seconds}s. " + (
+                        f"Partial response ({len(full_response)} chars): {full_response[:100]}..."
+                        if full_response else "No response received."
+                    ),
+                    "confidence": 0.0
                 }
-                yield self._create_sse_event("agent_complete", result, agent_id=agent_id)
-                
+
+                # タイムアウトイベントを送信
+                yield self._create_sse_event("agent_timeout", {
+                    "timeout": timeout_seconds,
+                    "elapsed": asyncio.get_event_loop().time() - start_time,
+                    "partial_response": full_response[:200] if full_response else None,
+                    "trace_id": trace_id
+                }, agent_id=agent_id)
+
+                # 完了イベント（ABSTAINED判定）
+                yield self._create_sse_event("agent_complete", timeout_result, agent_id=agent_id)
+
         except Exception as e:
             print(f"  ❌ {agent_id.upper()} failed: {e}")
 
