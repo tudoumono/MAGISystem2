@@ -313,6 +313,9 @@ agents/tests/streaming_output_custom/*.json
 # 旧パス（互換性のため）
 streaming_output/
 
+# test_magi4.py の出力（機密情報を含む）
+agents/tests/streaming_output_v2/
+
 # ============================================================================
 # Next.js Backend (agents/backend/)
 # 
