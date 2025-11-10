@@ -46,13 +46,19 @@ export async function POST(request: NextRequest) {
     const timeoutConfig = getTimeoutConfig();
     console.log(`⏱️  Process timeout: ${timeoutConfig.processTimeoutMs}ms (${(timeoutConfig.processTimeoutMs / 1000).toFixed(1)}s)`);
 
+    // ⭐⭐⭐ 変数をストリーム外で定義（cancelコールバックからアクセスできるようにする）
+    let pythonProcess: ReturnType<typeof spawn> | null = null;
+    let processTimeoutId: NodeJS.Timeout | null = null;
+    let processCompleted = false;
+    let streamClosed = false;
+
     // ストリーミングレスポンスを作成
     const stream = new ReadableStream({
       start(controller) {
         console.log('🚀 Starting Python MAGI agent process...');
 
         // Pythonプロセスを起動
-        const pythonProcess = spawn(PYTHON_PATH, [MAGI_SCRIPT_PATH], {
+        pythonProcess = spawn(PYTHON_PATH, [MAGI_SCRIPT_PATH], {
           stdio: ['pipe', 'pipe', 'pipe'],
           env: {
             ...process.env,
@@ -69,12 +75,10 @@ export async function POST(request: NextRequest) {
         pythonProcess.stdin.end();
 
         // ⭐⭐⭐ TIMEOUT HANDLING - Layer 2: Next.js Process Monitor ⭐⭐⭐
-        let processCompleted = false;
-        let streamClosed = false; // Track if stream is already closed
         const startTime = Date.now();
 
         // プロセス監視タイムアウト設定
-        const processTimeoutId = setTimeout(() => {
+        processTimeoutId = setTimeout(() => {
           if (!processCompleted) {
             const elapsed = Date.now() - startTime;
             console.error(`❌ Python process TIMEOUT after ${elapsed}ms (limit: ${timeoutConfig.processTimeoutMs}ms)`);
@@ -233,9 +237,40 @@ export async function POST(request: NextRequest) {
             controller.close();
           }
         });
+      },
+
+      // ⭐⭐⭐ CANCEL HANDLING - Client Disconnection ⭐⭐⭐
+      cancel(reason) {
+        console.log(`🚫 Client disconnected (reason: ${reason || 'unknown'})`);
+
+        // タイムアウトをクリア（メモリリーク防止）
+        if (processTimeoutId) {
+          clearTimeout(processTimeoutId);
+          processTimeoutId = null;
+        }
+
+        // Pythonプロセスを終了
+        if (pythonProcess && !pythonProcess.killed) {
+          console.log('🛑 Terminating Python process due to client disconnection...');
+
+          // フラグを設定してタイムアウトハンドラとの競合を防止
+          processCompleted = true;
+          streamClosed = true;
+
+          // SIGTERM送信
+          pythonProcess.kill('SIGTERM');
+
+          // 5秒後にSIGKILLで強制終了（プロセスが応答しない場合）
+          setTimeout(() => {
+            if (pythonProcess && !pythonProcess.killed) {
+              console.error('❌ Process did not respond to SIGTERM, sending SIGKILL...');
+              pythonProcess.kill('SIGKILL');
+            }
+          }, 5000);
+        }
       }
     });
-    
+
     // Server-Sent Eventsヘッダーでレスポンス
     return new NextResponse(stream, {
       headers: {
