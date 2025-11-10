@@ -51,7 +51,7 @@ export interface StreamOptions {
  * });
  * ```
  * 
- * 関連: src/app/api/magi/stream/route.ts, src/hooks/useMAGIStream.ts
+ * 関連: agents/backend/app/api/invocations/route.ts, src/hooks/useStreamingAgent.ts
  */
 export async function streamMAGIResponse(options: StreamOptions): Promise<string> {
   const { question, sessionId, onMessage, onError, onComplete } = options;
@@ -88,8 +88,8 @@ export async function streamMAGIResponse(options: StreamOptions): Promise<string
         reject(timeoutError);
       }, sseTimeoutMs);
 
-      // Server-Sent Events接続
-      const url = new URL('/api/magi/stream', window.location.origin);
+      // Server-Sent Events接続（新エンドポイント）
+      const url = new URL('/api/invocations', window.location.origin);
 
       // POSTリクエストのためにfetchを使用
       fetch(url.toString(), {
