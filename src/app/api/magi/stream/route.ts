@@ -1,41 +1,40 @@
 /**
- * MAGI Decision System - ストリーミングAPI Route
+ * ⚠️ DEPRECATED - このファイルは非推奨です ⚠️
  *
- * このファイルはMAGIシステムのストリーミング対応APIエンドポイントです。
- * AWS SDK for JavaScript (BedrockAgentCoreClient) を使用して、
- * AgentCore Runtime（独立デプロイ）と通信します。
+ * PR #5で誤って実装されたBedrockAgentCoreClient方式のAPI Routeです。
+ * 参考記事のコンセプトとMAGIの要件から逸脱しています。
  *
- * 主要機能:
- * - AWS SDK経由のAgentCore Runtime呼び出し
- * - AWS SigV4認証（自動処理）
- * - Server-Sent Eventsによるストリーミングレスポンス
- * - 認証・権限チェック
- * - エラーハンドリングとフォールバック
+ * 🎯 正しい実装:
+ * - agents/backend/app/api/invocations/route.ts を使用してください
+ * - フロントエンドは AgentCore Runtime の /api/invocations を直接呼び出します
  *
- * 学習ポイント:
- * - AWS SDKの使い方
- * - BedrockAgentCoreClientの使用方法
- * - Next.js API Routesでのストリーミング実装
- * - Server-Sent Eventsプロトコル
+ * MAGIアーキテクチャ（参考記事コンセプト + Python統合）:
+ *   Amplify Hosting (Next.js Frontend)
+ *       ↓ fetch(NEXT_PUBLIC_AGENTCORE_URL + '/api/invocations')
+ *   AgentCore Runtime (Docker Container)
+ *       ├─ Next.jsバックエンド (ポート8080)
+ *       │   └─ spawn('python', ['magi_agent.py'])
+ *       └─ Python magi_agent.py (AWS Strands Agents使用)
  *
- * アーキテクチャ:
+ * ❌ このファイルのアーキテクチャ（誤り）:
  * Amplify Hosting (Next.js)
- *   ↓ BedrockAgentCoreClient.send()
- *   ↓ AWS SigV4認証（自動）
+ *   ↓ BedrockAgentCoreClient.send() ← 誤った方向性
+ *   ↓ AWS SigV4認証
  * Amazon Bedrock AgentCore Runtime (独立デプロイ)
  *   └─ magi_agent.py
- *      ├─ CASPAR (保守的視点)
- *      ├─ BALTHASAR (革新的視点)
- *      ├─ MELCHIOR (バランス型視点)
- *      └─ SOLOMON Judge (統合評価)
- *   ↓ AWS SDK
- * Amazon Bedrock (Claude 3.5 Sonnet)
+ *
+ * 理由: MAGIシステムは既存のPythonエージェント（Strands Agents）を活用し、
+ *       参考記事のAgentCore Runtimeコンセプトを採用しています。
+ *       BedrockAgentCoreClientでの独立した呼び出しは、この方針と異なります。
  *
  * 参考:
- * - AgentCore Runtime: 独立したDockerコンテナとしてデプロイ
- * - 認証: AWS SigV4署名（SDKが自動処理）
+ * - 参考記事: https://qiita.com/moritalous/items/ea695f8a328585e1313b
+ * - 正しい実装: agents/backend/app/api/invocations/route.ts
  * - Python側実装: agents/magi_agent.py
- * - テストコード: agents/tests/test_magi.py
+ *
+ * ==========================================
+ * 以下は学習目的のため残されています（使用しないでください）
+ * ==========================================
  */
 
 import { NextRequest, NextResponse } from 'next/server';

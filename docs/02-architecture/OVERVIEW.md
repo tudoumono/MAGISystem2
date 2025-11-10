@@ -207,9 +207,37 @@ async def process_decision(question: str):
 
 ## ⚠️ 重要な注意事項
 
+### 実装状況（2025-11-09更新）
+
+✅ **参考記事のコンセプト + Python統合（実装完了）**
+- **参考記事から採用**:
+  - AgentCore Runtime（Dockerコンテナ）のコンセプト
+  - /invocations エンドポイント
+  - ポート8080での起動
+  - フロントエンドからの直接呼び出し
+
+- **MAGI独自の拡張**:
+  - `agents/backend/` - Next.jsバックエンドで spawn() を使用
+  - `agents/Dockerfile` - Next.js + Python統合コンテナ
+  - `POST /api/invocations` - spawn()でPythonプロセス起動
+  - `magi_agent.py` - AWS Strands Agentsを使用した3賢者システム
+
+⚠️ **参考記事との違い**
+- 参考記事: Next.jsから直接 `@ai-sdk/amazon-bedrock` でBedrock呼び出し
+- MAGI実装: Next.jsから spawn() でPythonエージェント起動 → Strands Agents使用
+
+⚠️ **PR #5で誤って実装されたファイル（非推奨）**
+- `src/app/api/magi/stream/route.ts` - BedrockAgentCoreClient使用（誤った方向性）
+- これらは学習目的のため残されていますが、使用しないでください
+
 ### 使用しないパターン
 
 以下のパターンは**使用しません**：
+
+❌ **AWS SDK経由のAgentCore Runtime呼び出し**
+- PR #5で誤って実装されたパターン
+- 参考記事のアーキテクチャとは異なる
+- `BedrockAgentCoreClient` を使用しない
 
 ❌ **Lambda Response Streaming**
 - 複雑で未実証
@@ -219,16 +247,17 @@ async def process_decision(question: str):
 - ストリーミングに対応していない
 - 参考記事のパターンと異なる
 
-❌ **独自のストリーミング実装**
-- 車輪の再発明
-- 保守コストが高い
-
 ### 採用するパターン
 
-✅ **参考記事完全準拠**
-- 実証済みのアーキテクチャ
-- シンプルで保守しやすい
-- 既存資産を活用
+✅ **参考記事のコンセプト + Python統合（実装完了）**
+- **参考記事のコンセプト**: AgentCore Runtime（Dockerコンテナ、/invocations）
+- **独自拡張**: Next.jsからspawn()でPythonプロセス起動
+- **既存資産活用**: AWS Strands Agentsを使用した3賢者システム（magi_agent.py）
+- **メリット**:
+  - Amplify Hostingのストリーミング制限を回避
+  - 既存のPythonコードを再利用
+  - Strands Agentsの強力な機能を活用
+  - シンプルで保守しやすい
 
 ## 📚 参考資料
 
