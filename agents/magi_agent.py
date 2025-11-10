@@ -369,9 +369,9 @@ class MAGIStrandsAgent:
             # 並列実行してストリーミング
             async for event in self._merge_streams(tasks):
                 yield event
-                
-                # 完了イベントを収集
-                if event.get('type') == 'sage_complete':
+
+                # 完了イベントを収集（agent_completeイベント）
+                if event.get('type') == 'agent_complete':
                     agent_responses.append(event.get('data', {}))
             
             # 結果を集計（ステートマシンから正確な判定を取得）
