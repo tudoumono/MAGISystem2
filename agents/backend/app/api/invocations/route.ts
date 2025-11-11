@@ -70,6 +70,11 @@ export async function POST(request: NextRequest) {
           }
         });
 
+        // ⭐ ストリームのnullチェック（TypeScript strict mode対応）
+        if (!pythonProcess.stdin || !pythonProcess.stdout || !pythonProcess.stderr) {
+          throw new Error('Failed to create Python process streams');
+        }
+
         // 入力データをPythonプロセスに送信
         pythonProcess.stdin.write(JSON.stringify(body));
         pythonProcess.stdin.end();
