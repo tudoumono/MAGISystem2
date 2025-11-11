@@ -107,13 +107,13 @@ export async function POST(request: NextRequest) {
             }
 
             // ⭐ Graceful shutdown: SIGTERM → SIGKILL
-            if (!pythonProcess.killed) {
+            if (pythonProcess && !pythonProcess.killed) {
               console.log('🛑 Sending SIGTERM to Python process...');
               pythonProcess.kill('SIGTERM');
 
               // SIGTERM後5秒待ってもプロセスが終了しない場合はSIGKILL
               setTimeout(() => {
-                if (!pythonProcess.killed) {
+                if (pythonProcess && !pythonProcess.killed) {
                   console.error('❌ Process did not respond to SIGTERM, sending SIGKILL...');
                   pythonProcess.kill('SIGKILL');
                 }
