@@ -28,7 +28,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { spawn } from 'child_process';
 import path from 'path';
-import { getTimeoutConfig, exportPythonEnv } from '@/lib/config/timeout';
+import { getTimeoutConfig, exportPythonEnv } from '../../../lib/config/timeout';
 
 // 環境変数からPythonスクリプトのパスを取得
 const MAGI_SCRIPT_PATH = process.env.MAGI_SCRIPT_PATH || '/app/magi_agent.py';
