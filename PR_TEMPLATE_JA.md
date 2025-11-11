@@ -121,7 +121,7 @@ fetch(url, { signal: abortController.signal, ... })
 ```
 
 ### レイヤー2: Next.jsプロセスモニター
-**ファイル**: `agents/backend/app/api/invocations/route.ts`
+**ファイル**: `agents/backend/src/app/api/invocations/route.ts`
 
 **変更内容**:
 - `getTimeoutConfig()`と`exportPythonEnv()`をインポート
@@ -343,7 +343,7 @@ except asyncio.TimeoutError:
 
 ```
 modified:   src/lib/agents/stream-client.ts
-modified:   agents/backend/app/api/invocations/route.ts
+modified:   agents/backend/src/app/api/invocations/route.ts
 modified:   agents/magi_agent.py
 new file:   PHASE1_STATUS_REPORT.md
 new file:   PR_TEMPLATE.md

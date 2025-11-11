@@ -8,7 +8,7 @@ Amplify CognitoとAgentCore Runtimeを統合し、認証されたユーザーの
 
 - **参考記事**: [Amplify HostingでBedrock AgentCoreを使う](https://qiita.com/moritalous/items/ea695f8a328585e1313b)
 - **既存実装**: `src/lib/auth/server-actions.ts`, `src/lib/amplify/client.ts`
-- **AgentCore Runtime**: `agents/backend/app/api/invocations/route.ts`
+- **AgentCore Runtime**: `agents/backend/src/app/api/invocations/route.ts`
 
 ## 🏗️ アーキテクチャ
 
@@ -103,7 +103,7 @@ NEXT_PUBLIC_AGENTCORE_URL=https://your-agentcore-url.amplifyapp.com
 
 ### Step 2: バックエンド - JWT検証実装
 
-**ファイル**: `agents/backend/app/api/invocations/route.ts`
+**ファイル**: `agents/backend/src/app/api/invocations/route.ts`
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';

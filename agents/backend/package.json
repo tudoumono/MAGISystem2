@@ -4,11 +4,11 @@
   "description": "MAGI System AgentCore Runtime Backend (Next.js + Python)",
   "main": "server.js",
   "scripts": {
-    "dev": "node_modules/.bin/next dev -p 8080",
-    "build": "node_modules/.bin/next build",
+    "dev": "next dev -p 8080",
+    "build": "next build",
     "start": "node .next/standalone/server.js",
-    "start:dev": "node_modules/.bin/next start -p 8080",
-    "lint": "node_modules/.bin/next lint",
+    "start:dev": "next start -p 8080",
+    "lint": "next lint",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {

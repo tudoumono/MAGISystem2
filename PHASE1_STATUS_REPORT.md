@@ -140,7 +140,7 @@ export async function streamMAGIResponse(options: StreamOptions): Promise<string
 
 ### Layer 2: Next.js Backend プロセス監視タイムアウト
 
-**ファイル**: `agents/backend/app/api/invocations/route.ts`
+**ファイル**: `agents/backend/src/app/api/invocations/route.ts`
 
 **現状**: Pythonプロセスのタイムアウト処理が一切実装されていない
 
@@ -221,7 +221,7 @@ export async function POST(request: NextRequest) {
 }
 ```
 
-**影響範囲**: `agents/backend/app/api/invocations/route.ts` (36-170行目)
+**影響範囲**: `agents/backend/src/app/api/invocations/route.ts` (36-170行目)
 
 ---
 
@@ -420,7 +420,7 @@ async def _solomon_judgment_stream(
   - [ ] 環境変数 `NEXT_PUBLIC_SSE_TIMEOUT_MS` を使用
 
 - [ ] **Layer 2: Next.js Backend プロセス監視タイムアウト**
-  - [ ] `agents/backend/app/api/invocations/route.ts` にタイムアウト処理を追加
+  - [ ] `agents/backend/src/app/api/invocations/route.ts` にタイムアウト処理を追加
   - [ ] `getTimeoutConfig()` で設定をロード
   - [ ] `exportPythonEnv()` でPythonに環境変数を渡す
   - [ ] SIGTERM → SIGKILL のグレースフルシャットダウン実装

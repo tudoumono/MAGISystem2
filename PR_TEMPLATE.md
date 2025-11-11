@@ -120,7 +120,7 @@ fetch(url, { signal: abortController.signal, ... })
 ```
 
 ### Layer 2: Next.js Process Monitor
-**File**: `agents/backend/app/api/invocations/route.ts`
+**File**: `agents/backend/src/app/api/invocations/route.ts`
 
 **Changes**:
 - Import `getTimeoutConfig()` and `exportPythonEnv()`
@@ -342,7 +342,7 @@ Watch for these log messages:
 
 ```
 modified:   src/lib/agents/stream-client.ts
-modified:   agents/backend/app/api/invocations/route.ts
+modified:   agents/backend/src/app/api/invocations/route.ts
 modified:   agents/magi_agent.py
 new file:   PHASE1_STATUS_REPORT.md
 ```

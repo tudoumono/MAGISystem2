@@ -9,10 +9,17 @@
 ```
 agents/backend/
 ├── src/
-│   ├── app/api/invocations/   # メインAPI エンドポイント
-│   ├── lib/python-bridge.ts   # Python統合ブリッジ
+│   ├── app/                   # Next.js App Router
+│   │   ├── api/invocations/   # メインAPI エンドポイント
+│   │   ├── api/ping/          # ヘルスチェック
+│   │   ├── layout.tsx         # ルートレイアウト
+│   │   └── page.tsx           # ホームページ
+│   ├── lib/
+│   │   ├── config/timeout.ts  # タイムアウト設定
+│   │   └── python-bridge.ts   # Python統合ブリッジ
 │   └── types/magi.ts          # MAGI型定義
 ├── package.json               # Node.js依存関係
+├── tsconfig.json              # TypeScript設定
 └── next.config.js             # Next.js設定
 ```
 
@@ -64,7 +71,7 @@ SSE形式でフロントエンドに配信
 
 ### Python統合ブリッジ
 ```typescript
-// lib/python-bridge.ts
+// src/lib/python-bridge.ts
 export async function executePythonAgent(question: string) {
   const pythonProcess = spawn('python', ['../magi_agent.py'], {
     stdio: ['pipe', 'pipe', 'pipe']
@@ -83,7 +90,7 @@ export async function executePythonAgent(question: string) {
 
 ### API Route実装
 ```typescript
-// app/api/invocations/route.ts
+// src/app/api/invocations/route.ts
 export async function POST(request: Request) {
   const { question } = await request.json();
   

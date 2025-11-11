@@ -174,7 +174,7 @@ resource "aws_apprunner_service" "agentcore_runtime" {
 
 ### Next.js Backend (TypeScript)
 
-**`agents/backend/app/api/invocations/route.ts`**
+**`agents/backend/src/app/api/invocations/route.ts`**
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
