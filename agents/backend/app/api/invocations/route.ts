@@ -182,7 +182,10 @@ export async function POST(request: NextRequest) {
         pythonProcess.on('close', (code) => {
           // ⭐ プロセス完了フラグを設定してタイムアウトをクリア
           processCompleted = true;
-          clearTimeout(processTimeoutId);
+          if (processTimeoutId) {
+            clearTimeout(processTimeoutId);
+            processTimeoutId = null;
+          }
 
           const elapsed = Date.now() - startTime;
           console.log(`🏁 Python process exited with code ${code} (elapsed: ${elapsed}ms)`);
