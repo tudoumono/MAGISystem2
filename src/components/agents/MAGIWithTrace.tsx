@@ -210,9 +210,9 @@ export default function MAGIWithTrace({
     try {
       // 会話履歴にメッセージを保存（useMessagesフックを使用）
       await sendMessage({ content: question });
-      
-      // 実際のMAGIシステムの実行
-      const response = await fetch('/api/magi/stream', {
+
+      // 実際のMAGIシステムの実行（新エンドポイント）
+      const response = await fetch('/api/invocations', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

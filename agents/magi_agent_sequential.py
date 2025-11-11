@@ -132,11 +132,6 @@ MELCHIOR_PROMPT = """あなたはMELCHIOR（メルキオール）です。
   "confidence": 0.0-1.0
 }"""
 
-# =============================================================================
-# モデル設定
-# =============================================================================
-DEFAULT_MODEL = "anthropic.claude-3-5-sonnet-20240620-v1:0"
-
 SOLOMON_PROMPT = """あなたはSOLOMON（ソロモン）です。
 3賢者（CASPAR、BALTHASAR、MELCHIOR）の判断を統合評価する統括AIとして、
 最終的な意思決定を行います。
@@ -180,29 +175,27 @@ class MAGIStrandsAgent:
         # 3賢者のエージェント作成
         self.caspar = Agent(
             name="CASPAR",
-            model=DEFAULT_MODEL,
+            model="anthropic.claude-3-5-sonnet-20240620-v1:0",
             system_prompt=CASPAR_PROMPT
         )
-
+        
         self.balthasar = Agent(
             name="BALTHASAR",
-            model=DEFAULT_MODEL,
+            model="anthropic.claude-3-5-sonnet-20240620-v1:0",
             system_prompt=BALTHASAR_PROMPT
         )
-
+        
         self.melchior = Agent(
             name="MELCHIOR",
-            model=DEFAULT_MODEL,
+            model="anthropic.claude-3-5-sonnet-20240620-v1:0",
             system_prompt=MELCHIOR_PROMPT
         )
-
+        
         # SOLOMON Judge（統括AI）
-        # 注: system_promptは実行時に3賢者の結果を含めて動的に生成するため、
-        #     _process_solomon()内で毎回新しいインスタンスを作成します
-        # このインスタンスは使用されません（後方互換性のためのみ保持）
+        # 注: system_promptは実行時に3賢者の結果を含めて動的に生成
         self.solomon = Agent(
             name="SOLOMON",
-            model=DEFAULT_MODEL
+            model="anthropic.claude-3-5-sonnet-20240620-v1:0"
         )
         
         print("✅ 3賢者 + SOLOMON Judge 初期化完了")
@@ -497,24 +490,13 @@ class MAGIStrandsAgent:
             
             # SOLOMONプロンプトに3賢者の結果を埋め込み
             solomon_prompt = SOLOMON_PROMPT.format(sage_responses=sage_summary)
-
-            # SOLOMONエージェントを動的に作成
-            # （3賢者の結果を含む動的なsystem_promptが必要なため、毎回新規作成）
-            # Strands Agents 1.0では、stream_async()に**kwargsでsystem_promptを
-            # 渡すAPIは非推奨のため、新しいインスタンスを作成
-            solomon = Agent(
-                name="SOLOMON",
-                model=DEFAULT_MODEL,
-                system_prompt=solomon_prompt
-            )
-
+            
             # Strands Agentsのストリーミング機能を使用
             # stream_async()メソッドで非同期ストリーミング
             full_response = ""
-
+            
             # stream_async()メソッドで非同期ストリーミング
-            # （system_promptはAgent初期化時に設定済み）
-            async for chunk in solomon.stream_async(question):
+            async for chunk in self.solomon.stream_async(question, system_prompt=solomon_prompt):
                 # チャンクからテキストを抽出
                 if isinstance(chunk, dict):
                     if 'data' in chunk:

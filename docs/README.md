@@ -34,6 +34,7 @@ MAGI Decision Systemの技術ドキュメントへようこそ。
 
 - **[学習リソース](99-reference/learning/)** - 技術学習資料
 - **[アーカイブ](99-reference/archive-deployment/)** - 過去のドキュメント
+- **[実装アーカイブ](99-reference/archive-implementation/)** - 非推奨・参考実装
 
 ## 🎯 ドキュメント構成
 
@@ -71,9 +72,26 @@ docs/
 
 ドキュメントの改善提案は[GitHub Issues](https://github.com/tudoumono/MAGISystem2/issues)へお願いします。
 
+## 🔄 アーキテクチャの進化
+
+MAGIシステムは段階的に進化してきました：
+
+- **❌ PR #5 (2025-11)**: BedrockAgentCoreClient方式を試行
+  - AWS SDKを使用した直接呼び出しアプローチ
+  - 参考記事のコンセプトと異なることが判明
+  - 詳細: [deprecated-bedrock-client-approach.ts](99-reference/archive-implementation/deprecated-bedrock-client-approach.ts)
+
+- **✅ PR #6以降 (2025-11)**: AgentCore Runtime方式に統一
+  - Next.js → Python子プロセス → Strands Agents
+  - 参考記事準拠のアーキテクチャ
+  - 実装: `agents/backend/app/api/invocations/route.ts`
+
+詳細な比較は[アーキテクチャ設計判断](02-architecture/DESIGN_DECISIONS.md)を参照してください。
+
 ## 📝 ドキュメント更新履歴
 
 - **2025-11-10**: ドキュメント構造を大幅リファクタリング（17→10ファイル）
+- **2025-11-10**: 非推奨実装をアーカイブディレクトリに移動
 - **2025-11**: Phase 2完了、AgentCore Runtime統合
 - **2024**: プロジェクト開始、初期ドキュメント作成
 

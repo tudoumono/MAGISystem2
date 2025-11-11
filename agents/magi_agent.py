@@ -118,11 +118,6 @@ SAGE_JSON_FORMAT = _get_sage_json_format(1000)
 SOLOMON_JSON_FORMAT = _get_solomon_json_format(1500)
 
 # =============================================================================
-# モデル設定
-# =============================================================================
-DEFAULT_MODEL = "anthropic.claude-3-5-sonnet-20240620-v1:0"
-
-# =============================================================================
 # デフォルトのロール説明（カスタマイズ可能）
 # 環境変数やリクエストパラメータで上書き可能
 # =============================================================================
@@ -219,6 +214,10 @@ class MAGIStrandsAgent:
                     'solomon': 'あなたは統括AIです...'
                 }
         """
+        # タイムアウト設定をロード
+        from config.timeout import get_timeout_config
+        self.timeout_config = get_timeout_config()
+
         # カスタムプロンプトの読み込み（優先順位：引数 > 環境変数 > デフォルト）
         self.custom_prompts = custom_prompts or {}
 
@@ -250,29 +249,27 @@ class MAGIStrandsAgent:
         # 3賢者のエージェント作成
         self.caspar = Agent(
             name="CASPAR",
-            model=DEFAULT_MODEL,
+            model="anthropic.claude-3-5-sonnet-20240620-v1:0",
             system_prompt=caspar_prompt
         )
 
         self.balthasar = Agent(
             name="BALTHASAR",
-            model=DEFAULT_MODEL,
+            model="anthropic.claude-3-5-sonnet-20240620-v1:0",
             system_prompt=balthasar_prompt
         )
 
         self.melchior = Agent(
             name="MELCHIOR",
-            model=DEFAULT_MODEL,
+            model="anthropic.claude-3-5-sonnet-20240620-v1:0",
             system_prompt=melchior_prompt
         )
 
         # SOLOMON Judge（統括AI）
-        # 注: system_promptは実行時に3賢者の結果を含めて動的に生成するため、
-        #     _process_solomon()内で毎回新しいインスタンスを作成します
-        # このインスタンスは使用されません（後方互換性のためのみ保持）
+        # 注: system_promptは実行時に3賢者の結果を含めて動的に生成
         self.solomon = Agent(
             name="SOLOMON",
-            model=DEFAULT_MODEL
+            model="anthropic.claude-3-5-sonnet-20240620-v1:0"
         )
         
         # 賢者ごとのステートマシン（並列イベント処理用）
@@ -372,9 +369,9 @@ class MAGIStrandsAgent:
             # 並列実行してストリーミング
             async for event in self._merge_streams(tasks):
                 yield event
-                
-                # 完了イベントを収集
-                if event.get('type') == 'sage_complete':
+
+                # 完了イベントを収集（agent_completeイベント）
+                if event.get('type') == 'agent_complete':
                     agent_responses.append(event.get('data', {}))
             
             # 結果を集計（ステートマシンから正確な判定を取得）
@@ -724,116 +721,157 @@ class MAGIStrandsAgent:
         print(f"  🤖 Consulting {agent_id.upper()}...")
 
         try:
-            # カスタムロールが指定されている場合は、新しいAgentインスタンスを作成
-            # （Strands Agents 1.0では、stream_async()に**kwargsでsystem_promptを
-            # 渡すAPIは非推奨のため、動的プロンプトが必要な場合は新規作成）
+            # タイムアウト値を取得（環境変数: MAGI_SAGE_TIMEOUT_SECONDS、デフォルト: 90秒）
+            timeout_seconds = self.timeout_config.sage_timeout_seconds
+
+            if DEBUG_STREAMING:
+                print(f"  ⏱️  {agent_id.upper()} timeout: {timeout_seconds}s")
+
+            # カスタムロールが指定されている場合は、動的にプロンプトを構築
             if custom_role:
                 # カスタムロール + 動的JSON形式
                 sage_json_format = _get_sage_json_format(self.sage_max_length)
                 custom_prompt = custom_role + sage_json_format
-                # 新しいAgentインスタンスを作成（カスタムプロンプト付き）
-                agent = Agent(
-                    name=agent_id.upper(),
-                    model=DEFAULT_MODEL,
-                    system_prompt=custom_prompt
-                )
+                stream_kwargs = {'system_prompt': custom_prompt}
+            else:
+                # デフォルトのエージェントプロンプトを使用
+                stream_kwargs = {}
 
             # Strands Agentsのストリーミング機能を使用
             # stream_async()メソッドは思考プロセスをリアルタイムで返す
             full_response = ""
 
-            # stream_async()メソッドで非同期ストリーミング
-            # （system_promptはAgent初期化時に設定済み）
-            async for chunk in agent.stream_async(question):
-                # デバッグ: チャンクの型と内容を出力
-                if DEBUG_STREAMING:
-                    print(f"  🔍 {agent_id.upper()} chunk type: {type(chunk)}")
-                    print(f"  🔍 {agent_id.upper()} chunk content: {chunk}")
-                
-                # チャンクからテキストを抽出
-                # Strands Agentsは辞書形式でチャンクを返す
-                chunk_text = None
-                
-                if isinstance(chunk, dict):
-                    # Strands Agentsの内部イベントをフィルタリング
-                    # 'event'キーがある場合のみ処理（LLM応答イベント）
-                    if 'event' in chunk:
-                        event_data = chunk['event']
-                        
-                        # contentBlockDelta から実際のテキストを抽出
-                        if isinstance(event_data, dict) and 'contentBlockDelta' in event_data:
-                            delta = event_data['contentBlockDelta'].get('delta', {})
-                            if isinstance(delta, dict) and 'text' in delta:
-                                chunk_text = delta['text']
-                    
-                    # 'message'キーがある場合（最終メッセージ）
-                    elif 'message' in chunk:
-                        message = chunk['message']
-                        if isinstance(message, dict) and 'content' in message:
-                            content = message['content']
-                            if isinstance(content, list) and len(content) > 0:
-                                if isinstance(content[0], dict) and 'text' in content[0]:
-                                    # 最終メッセージは既にfull_responseに含まれているのでスキップ
-                                    continue
-                    
-                    # その他の内部イベント（init_event_loop, start, result等）はスキップ
-                    else:
-                        # デバッグ用にログ出力（JSONパースには含めない）
+            # ⭐ タイムアウト処理付きでLLM呼び出しを実行
+            # asyncio.timeout()でストリーム全体を保護（チャンクが来ない場合にも対応）
+            start_time = asyncio.get_event_loop().time()
+
+            try:
+                # stream_async()全体にタイムアウトを適用
+                # これにより、ストリームがハングしてチャンクが1つも来ない場合でもタイムアウトが発動
+                async with asyncio.timeout(timeout_seconds):
+                    # stream_async()メソッドで非同期ストリーミング
+                    async for chunk in agent.stream_async(question, **stream_kwargs):
+                        # デバッグ: チャンクの型と内容を出力
                         if DEBUG_STREAMING:
-                            print(f"  🔍 [{agent_id.upper()}] Internal event: {list(chunk.keys())}")
-                        continue
-                
-                elif isinstance(chunk, str):
-                    chunk_text = chunk
-                
-                # 空のチャンクはスキップ
-                if not chunk_text:
-                    continue
-                
-                # 賢者ごとのバッファに蓄積（ログ行を除外）
-                if agent_id in self.sage_states and self._is_content_chunk(chunk_text):
-                    self.sage_states[agent_id]["buffer"] += chunk_text
-                
-                full_response += chunk_text
-                
-                # チャンクイベント（思考プロセスの一部）
-                yield self._create_sse_event("agent_thinking", {
-                    "text": chunk_text,
+                            print(f"  🔍 {agent_id.upper()} chunk type: {type(chunk)}")
+                            print(f"  🔍 {agent_id.upper()} chunk content: {chunk}")
+
+                        # チャンクからテキストを抽出
+                        # Strands Agentsは辞書形式でチャンクを返す
+                        chunk_text = None
+
+                        if isinstance(chunk, dict):
+                            # Strands Agentsの内部イベントをフィルタリング
+                            # 'event'キーがある場合のみ処理（LLM応答イベント）
+                            if 'event' in chunk:
+                                event_data = chunk['event']
+
+                                # contentBlockDelta から実際のテキストを抽出
+                                if isinstance(event_data, dict) and 'contentBlockDelta' in event_data:
+                                    delta = event_data['contentBlockDelta'].get('delta', {})
+                                    if isinstance(delta, dict) and 'text' in delta:
+                                        chunk_text = delta['text']
+
+                            # 'message'キーがある場合（最終メッセージ）
+                            elif 'message' in chunk:
+                                message = chunk['message']
+                                if isinstance(message, dict) and 'content' in message:
+                                    content = message['content']
+                                    if isinstance(content, list) and len(content) > 0:
+                                        if isinstance(content[0], dict) and 'text' in content[0]:
+                                            # 最終メッセージは既にfull_responseに含まれているのでスキップ
+                                            continue
+
+                            # その他の内部イベント（init_event_loop, start, result等）はスキップ
+                            else:
+                                # デバッグ用にログ出力（JSONパースには含めない）
+                                if DEBUG_STREAMING:
+                                    print(f"  🔍 [{agent_id.upper()}] Internal event: {list(chunk.keys())}")
+                                continue
+
+                        elif isinstance(chunk, str):
+                            chunk_text = chunk
+
+                        # 空のチャンクはスキップ
+                        if not chunk_text:
+                            continue
+
+                        # 賢者ごとのバッファに蓄積（ログ行を除外）
+                        if agent_id in self.sage_states and self._is_content_chunk(chunk_text):
+                            self.sage_states[agent_id]["buffer"] += chunk_text
+
+                        full_response += chunk_text
+
+                        # チャンクイベント（思考プロセスの一部）
+                        yield self._create_sse_event("agent_thinking", {
+                            "text": chunk_text,
+                            "trace_id": trace_id
+                        }, agent_id=agent_id)
+
+                    # ⭐ 正常完了時の処理
+                    # 最終チャンクを処理してJSONパース
+                    if agent_id in self.sage_states:
+                        # JSONパースを試行
+                        decision_data = self._parse_sage_decision(agent_id)
+                        if decision_data:
+                            self.sage_states[agent_id]["decision"] = decision_data
+                            self.sage_states[agent_id]["completed"] = True
+
+                    # 最終レスポンスイベント
+                    yield self._create_sse_event("agent_chunk", {
+                        "text": full_response,
+                        "trace_id": trace_id
+                    }, agent_id=agent_id)
+
+                    # ステートマシンから正しい判定を取得
+                    if agent_id in self.sage_states and self.sage_states[agent_id]["decision"]:
+                        result = self.sage_states[agent_id]["decision"]
+
+                        print(f"  ✅ {agent_id.upper()}: {result.get('decision')} (confidence: {result.get('confidence')})")
+
+                        # 完了イベント
+                        yield self._create_sse_event("agent_complete", result, agent_id=agent_id)
+                    else:
+                        # フォールバック: 従来の方法でパース
+                        print(f"  ⚠️ {agent_id.upper()}: Using fallback parsing")
+                        result = {
+                            "decision": "ABSTAINED",
+                            "reasoning": full_response[:200],
+                            "confidence": 0.5
+                        }
+                        yield self._create_sse_event("agent_complete", result, agent_id=agent_id)
+
+                # ⭐⭐⭐ タイムアウト時のグレースフルデグラデーション ⭐⭐⭐
+            except asyncio.TimeoutError:
+                print(f"  ⚠️ {agent_id.upper()} TIMEOUT after {timeout_seconds}s")
+
+                # グレースフルデグラデーション: 部分応答があればそれを使用
+                if full_response:
+                    print(f"  ℹ️  {agent_id.upper()} partial response: {len(full_response)} chars")
+                    if DEBUG_STREAMING:
+                        print(f"  🔍 Partial response preview: {full_response[:200]}...")
+
+                # タイムアウト時のデフォルト結果（ABSTAINED）
+                timeout_result = {
+                    "decision": "ABSTAINED",
+                    "reasoning": f"Timeout after {timeout_seconds}s. " + (
+                        f"Partial response ({len(full_response)} chars): {full_response[:100]}..."
+                        if full_response else "No response received."
+                    ),
+                    "confidence": 0.0
+                }
+
+                # タイムアウトイベントを送信
+                yield self._create_sse_event("agent_timeout", {
+                    "timeout": timeout_seconds,
+                    "elapsed": asyncio.get_event_loop().time() - start_time,
+                    "partial_response": full_response[:200] if full_response else None,
                     "trace_id": trace_id
                 }, agent_id=agent_id)
-            
-            # 最終チャンクを処理してJSONパース
-            if agent_id in self.sage_states:
-                # JSONパースを試行
-                decision_data = self._parse_sage_decision(agent_id)
-                if decision_data:
-                    self.sage_states[agent_id]["decision"] = decision_data
-                    self.sage_states[agent_id]["completed"] = True
-            
-            # 最終レスポンスイベント
-            yield self._create_sse_event("agent_chunk", {
-                "text": full_response,
-                "trace_id": trace_id
-            }, agent_id=agent_id)
-            
-            # ステートマシンから正しい判定を取得
-            if agent_id in self.sage_states and self.sage_states[agent_id]["decision"]:
-                result = self.sage_states[agent_id]["decision"]
 
-                print(f"  ✅ {agent_id.upper()}: {result.get('decision')} (confidence: {result.get('confidence')})")
+                # 完了イベント（ABSTAINED判定）
+                yield self._create_sse_event("agent_complete", timeout_result, agent_id=agent_id)
 
-                # 完了イベント
-                yield self._create_sse_event("agent_complete", result, agent_id=agent_id)
-            else:
-                # フォールバック: 従来の方法でパース
-                print(f"  ⚠️ {agent_id.upper()}: Using fallback parsing")
-                result = {
-                    "decision": "ABSTAINED",
-                    "reasoning": full_response[:200],
-                    "confidence": 0.5
-                }
-                yield self._create_sse_event("agent_complete", result, agent_id=agent_id)
-                
         except Exception as e:
             print(f"  ❌ {agent_id.upper()} failed: {e}")
 
@@ -936,15 +974,11 @@ class MAGIStrandsAgent:
             solomon_json_format = _get_solomon_json_format(self.solomon_max_length)
             solomon_prompt = solomon_role_with_data + solomon_json_format
 
-            # SOLOMONエージェントを動的に作成
-            # （3賢者の結果を含む動的なsystem_promptが必要なため、毎回新規作成）
-            # Strands Agents 1.0では、stream_async()に**kwargsでsystem_promptを
-            # 渡すAPIは非推奨のため、新しいインスタンスを作成
-            solomon = Agent(
-                name="SOLOMON",
-                model=DEFAULT_MODEL,
-                system_prompt=solomon_prompt
-            )
+            # ⭐ タイムアウト値を取得（環境変数: MAGI_SOLOMON_TIMEOUT_SECONDS、デフォルト: 60秒）
+            timeout_seconds = self.timeout_config.solomon_timeout_seconds
+
+            if DEBUG_STREAMING:
+                print(f"  ⏱️  SOLOMON timeout: {timeout_seconds}s")
 
             # Strands Agentsのストリーミング機能を使用
             # stream_async()メソッドで非同期ストリーミング
@@ -955,99 +989,144 @@ class MAGIStrandsAgent:
                 print(f"  🔍 DEBUG: Starting Solomon stream_async()...")
                 print(f"  🔍 DEBUG: sage_responses count: {len(sage_responses)}")
 
-            # stream_async()メソッドで非同期ストリーミング
-            # （system_promptはAgent初期化時に設定済み）
-            async for chunk in solomon.stream_async(question):
-                chunk_count += 1
+            # ⭐ タイムアウト処理付きでLLM呼び出しを実行
+            # asyncio.timeout()でストリーム全体を保護（チャンクが来ない場合にも対応）
+            start_time = asyncio.get_event_loop().time()
 
-                # チャンクからテキストを抽出
-                chunk_text = None
-                
-                if isinstance(chunk, dict):
-                    # Strands Agentsの内部イベントをフィルタリング
-                    # 'event'キーがある場合のみ処理（LLM応答イベント）
-                    if 'event' in chunk:
-                        event_data = chunk['event']
-                        
-                        # contentBlockDelta から実際のテキストを抽出
-                        if isinstance(event_data, dict) and 'contentBlockDelta' in event_data:
-                            delta = event_data['contentBlockDelta'].get('delta', {})
-                            if isinstance(delta, dict) and 'text' in delta:
-                                chunk_text = delta['text']
-                    
-                    # 'message'キーがある場合（最終メッセージ）
-                    elif 'message' in chunk:
-                        # 最終メッセージは既にfull_responseに含まれているのでスキップ
-                        continue
-                    
-                    # その他の内部イベント（init_event_loop, start, result等）はスキップ
-                    else:
-                        # デバッグ用にログ出力（JSONパースには含めない）
+            try:
+                # stream_async()全体にタイムアウトを適用
+                # これにより、ストリームがハングしてチャンクが1つも来ない場合でもタイムアウトが発動
+                async with asyncio.timeout(timeout_seconds):
+                    # stream_async()メソッドで非同期ストリーミング
+                    async for chunk in self.solomon.stream_async(question, system_prompt=solomon_prompt):
+                        chunk_count += 1
+
+                        # チャンクからテキストを抽出
+                        chunk_text = None
+
+                        if isinstance(chunk, dict):
+                            # Strands Agentsの内部イベントをフィルタリング
+                            # 'event'キーがある場合のみ処理（LLM応答イベント）
+                            if 'event' in chunk:
+                                event_data = chunk['event']
+
+                                # contentBlockDelta から実際のテキストを抽出
+                                if isinstance(event_data, dict) and 'contentBlockDelta' in event_data:
+                                    delta = event_data['contentBlockDelta'].get('delta', {})
+                                    if isinstance(delta, dict) and 'text' in delta:
+                                        chunk_text = delta['text']
+
+                            # 'message'キーがある場合（最終メッセージ）
+                            elif 'message' in chunk:
+                                # 最終メッセージは既にfull_responseに含まれているのでスキップ
+                                continue
+
+                            # その他の内部イベント（init_event_loop, start, result等）はスキップ
+                            else:
+                                # デバッグ用にログ出力（JSONパースには含めない）
+                                if DEBUG_STREAMING:
+                                    print(f"  🔍 [SOLOMON] Internal event: {list(chunk.keys())}")
+                                continue
+
+                        elif isinstance(chunk, str):
+                            chunk_text = chunk
+
+                        # 空のチャンクはスキップ
+                        if not chunk_text:
+                            continue
+
+                        full_response += chunk_text
+
+                        # チャンクイベント（思考プロセスの一部）
+                        yield self._create_sse_event("judge_thinking", {
+                            "text": chunk_text,
+                            "trace_id": trace_id
+                        })
+
+                    # ⭐ 正常完了時の処理
+                    if DEBUG_STREAMING:
+                        print(f"  🔍 DEBUG: Solomon stream completed. Chunks: {chunk_count}, Response length: {len(full_response)}")
+
+                    # 最終レスポンスイベント
+                    yield self._create_sse_event("judge_chunk", {
+                        "text": full_response,
+                        "trace_id": trace_id
+                    })
+
+                    # JSON部分を抽出
+                    try:
                         if DEBUG_STREAMING:
-                            print(f"  🔍 [SOLOMON] Internal event: {list(chunk.keys())}")
-                        continue
-                
-                elif isinstance(chunk, str):
-                    chunk_text = chunk
-                # 空のチャンクはスキップ
-                if not chunk_text:
-                    continue
+                            print(f"  🔍 DEBUG: Attempting to parse JSON from response (length: {len(full_response)})")
 
-                full_response += chunk_text
+                        if not full_response or len(full_response) < 10:
+                            raise ValueError(f"Solomon response too short or empty: '{full_response}'")
 
-                # チャンクイベント（思考プロセスの一部）
-                yield self._create_sse_event("judge_thinking", {
-                    "text": chunk_text,
+                        json_text = self._extract_json_block(full_response, '"final_decision"')
+
+                        if not json_text and '{' in full_response:
+                            json_start = full_response.find('{')
+                            json_end = full_response.rfind('}') + 1
+                            json_text = full_response[json_start:json_end]
+
+                        if not json_text:
+                            json_text = full_response.strip()
+
+                        if DEBUG_STREAMING:
+                            print(f"  🔍 DEBUG: Extracted JSON text (length: {len(json_text)}): {json_text[:100]}...")
+
+                        result = json.loads(json_text)
+
+                        print(f"  ✅ SOLOMON: {result.get('final_decision')} (confidence: {result.get('confidence')})")
+
+                        # 完了イベント
+                        yield self._create_sse_event("judge_complete", result)
+
+                    except json.JSONDecodeError:
+                        print(f"  ⚠️ SOLOMON: JSON parse failed, using default")
+                        result = {
+                            "final_decision": "REJECTED",
+                            "reasoning": full_response[:300],
+                            "confidence": 0.5,
+                            "sage_scores": {}
+                        }
+                        yield self._create_sse_event("judge_complete", result)
+
+                # ⭐⭐⭐ タイムアウト時のグレースフルデグラデーション ⭐⭐⭐
+            except asyncio.TimeoutError:
+                print(f"  ⚠️ SOLOMON TIMEOUT after {timeout_seconds}s")
+
+                # グレースフルデグラデーション: 部分応答があればそれを使用
+                if full_response:
+                    print(f"  ℹ️  SOLOMON partial response: {len(full_response)} chars")
+                    if DEBUG_STREAMING:
+                        print(f"  🔍 Partial response preview: {full_response[:200]}...")
+
+                # タイムアウト時のデフォルト結果（REJECTED、confidence=0.5）
+                timeout_result = {
+                    "final_decision": "REJECTED",
+                    "reasoning": f"SOLOMON evaluation timed out after {timeout_seconds}s. " + (
+                        f"Partial response ({len(full_response)} chars): {full_response[:100]}..."
+                        if full_response else "No response received."
+                    ),
+                    "confidence": 0.5,
+                    "sage_scores": {
+                        "caspar": 50,
+                        "balthasar": 50,
+                        "melchior": 50
+                    }
+                }
+
+                # タイムアウトイベントを送信
+                yield self._create_sse_event("judge_timeout", {
+                    "timeout": timeout_seconds,
+                    "elapsed": asyncio.get_event_loop().time() - start_time,
+                    "partial_response": full_response[:200] if full_response else None,
                     "trace_id": trace_id
                 })
 
-            if DEBUG_STREAMING:
-                print(f"  🔍 DEBUG: Solomon stream completed. Chunks: {chunk_count}, Response length: {len(full_response)}")
-            
-            # 最終レスポンスイベント
-            yield self._create_sse_event("judge_chunk", {
-                "text": full_response,
-                "trace_id": trace_id
-            })
-            
-            # JSON部分を抽出
-            try:
-                if DEBUG_STREAMING:
-                    print(f"  🔍 DEBUG: Attempting to parse JSON from response (length: {len(full_response)})")
+                # 完了イベント（REJECTED判定）
+                yield self._create_sse_event("judge_complete", timeout_result)
 
-                if not full_response or len(full_response) < 10:
-                    raise ValueError(f"Solomon response too short or empty: '{full_response}'")
-
-                json_text = self._extract_json_block(full_response, '"final_decision"')
-
-                if not json_text and '{' in full_response:
-                    json_start = full_response.find('{')
-                    json_end = full_response.rfind('}') + 1
-                    json_text = full_response[json_start:json_end]
-
-                if not json_text:
-                    json_text = full_response.strip()
-
-                if DEBUG_STREAMING:
-                    print(f"  🔍 DEBUG: Extracted JSON text (length: {len(json_text)}): {json_text[:100]}...")
-
-                result = json.loads(json_text)
-                
-                print(f"  ✅ SOLOMON: {result.get('final_decision')} (confidence: {result.get('confidence')})")
-                
-                # 完了イベント
-                yield self._create_sse_event("judge_complete", result)
-                
-            except json.JSONDecodeError:
-                print(f"  ⚠️ SOLOMON: JSON parse failed, using default")
-                result = {
-                    "final_decision": "REJECTED",
-                    "reasoning": full_response[:300],
-                    "confidence": 0.5,
-                    "sage_scores": {}
-                }
-                yield self._create_sse_event("judge_complete", result)
-                
         except Exception as e:
             import traceback
             error_detail = traceback.format_exc()
@@ -1129,8 +1208,11 @@ class MAGIStrandsAgent:
         # イベントを順次処理
         while completed_tasks < total_tasks:
             try:
-                # タイムアウト付きでイベントを取得
-                task_id, event = await asyncio.wait_for(event_queue.get(), timeout=60.0)
+                # タイムアウト付きでイベントを取得（設定されたイベントキュータイムアウトを使用）
+                task_id, event = await asyncio.wait_for(
+                    event_queue.get(),
+                    timeout=self.timeout_config.event_queue_timeout_seconds
+                )
                 
                 if event is None:  # 終了マーカー
                     completed_tasks += 1

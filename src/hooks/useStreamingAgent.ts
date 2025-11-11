@@ -151,6 +151,12 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
       }
 
     } catch (error) {
+      // ⭐ AbortErrorの場合は状態をリセットしない（新しいストリームが開始された可能性がある）
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('Stream aborted (likely replaced by new request)');
+        return; // 状態を更新せず、新しいストリームが続行できるようにする
+      }
+
       console.error('Failed to start streaming:', error);
       setStreamingState(prev => ({
         ...prev,

@@ -28,6 +28,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { spawn } from 'child_process';
 import path from 'path';
+import { getTimeoutConfig, exportPythonEnv } from '@/lib/config/timeout';
 
 // 環境変数からPythonスクリプトのパスを取得
 const MAGI_SCRIPT_PATH = process.env.MAGI_SCRIPT_PATH || '/app/magi_agent.py';
@@ -41,25 +42,89 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log('📥 Request payload:', JSON.stringify(body, null, 2));
     
+    // ⭐ タイムアウト設定をロード
+    const timeoutConfig = getTimeoutConfig();
+    console.log(`⏱️  Process timeout: ${timeoutConfig.processTimeoutMs}ms (${(timeoutConfig.processTimeoutMs / 1000).toFixed(1)}s)`);
+
+    // ⭐⭐⭐ 変数をストリーム外で定義（cancelコールバックからアクセスできるようにする）
+    let pythonProcess: ReturnType<typeof spawn> | null = null;
+    let processTimeoutId: NodeJS.Timeout | null = null;
+    let processCompleted = false;
+    let streamClosed = false;
+
     // ストリーミングレスポンスを作成
     const stream = new ReadableStream({
       start(controller) {
         console.log('🚀 Starting Python MAGI agent process...');
 
         // Pythonプロセスを起動
-        const pythonProcess = spawn(PYTHON_PATH, [MAGI_SCRIPT_PATH], {
+        pythonProcess = spawn(PYTHON_PATH, [MAGI_SCRIPT_PATH], {
           stdio: ['pipe', 'pipe', 'pipe'],
           env: {
             ...process.env,
+            // ⭐ Python環境変数としてタイムアウト設定を渡す
+            ...exportPythonEnv(timeoutConfig),
             // AgentCore Runtime環境変数を設定しない（子プロセスなので）
             AGENTCORE_RUNTIME_PORT: undefined,
             AGENTCORE_RUNTIME_HOST: undefined,
           }
         });
 
+        // ⭐ ストリームのnullチェック（TypeScript strict mode対応）
+        if (!pythonProcess.stdin || !pythonProcess.stdout || !pythonProcess.stderr) {
+          throw new Error('Failed to create Python process streams');
+        }
+
         // 入力データをPythonプロセスに送信
         pythonProcess.stdin.write(JSON.stringify(body));
         pythonProcess.stdin.end();
+
+        // ⭐⭐⭐ TIMEOUT HANDLING - Layer 2: Next.js Process Monitor ⭐⭐⭐
+        const startTime = Date.now();
+
+        // プロセス監視タイムアウト設定
+        processTimeoutId = setTimeout(() => {
+          if (!processCompleted) {
+            const elapsed = Date.now() - startTime;
+            console.error(`❌ Python process TIMEOUT after ${elapsed}ms (limit: ${timeoutConfig.processTimeoutMs}ms)`);
+
+            // タイムアウトイベントを送信
+            const timeoutEvent = {
+              type: 'error',
+              data: {
+                error: 'Python process timeout',
+                code: 'PROCESS_TIMEOUT',
+                timeout: timeoutConfig.processTimeoutMs,
+                elapsed: elapsed
+              },
+              timestamp: new Date().toISOString()
+            };
+
+            try {
+              controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(timeoutEvent)}\n\n`));
+            } catch (error) {
+              console.error('❌ Error sending timeout event:', error);
+            }
+
+            // ⭐ Graceful shutdown: SIGTERM → SIGKILL
+            if (!pythonProcess.killed) {
+              console.log('🛑 Sending SIGTERM to Python process...');
+              pythonProcess.kill('SIGTERM');
+
+              // SIGTERM後5秒待ってもプロセスが終了しない場合はSIGKILL
+              setTimeout(() => {
+                if (!pythonProcess.killed) {
+                  console.error('❌ Process did not respond to SIGTERM, sending SIGKILL...');
+                  pythonProcess.kill('SIGKILL');
+                }
+              }, 5000); // 5秒待機
+            }
+
+            // ストリームを閉じる
+            streamClosed = true;
+            controller.close();
+          }
+        }, timeoutConfig.processTimeoutMs);
 
         // 不完全な行をバッファリングするための変数
         let buffer = '';
@@ -79,10 +144,14 @@ export async function POST(request: NextRequest) {
             if (line.trim()) {
               console.log('📤 Python output (complete line):', line);
 
-              try {
-                controller.enqueue(new TextEncoder().encode(`data: ${line}\n\n`));
-              } catch (error) {
-                console.error('❌ Error encoding line:', error);
+              // ストリームが閉じられていない場合のみenqueue
+              if (!streamClosed) {
+                try {
+                  controller.enqueue(new TextEncoder().encode(`data: ${line}\n\n`));
+                } catch (error) {
+                  console.error('❌ Error encoding line (stream may be closed):', error);
+                  streamClosed = true; // Mark as closed to prevent further attempts
+                }
               }
             }
           }
@@ -92,58 +161,124 @@ export async function POST(request: NextRequest) {
         pythonProcess.stderr.on('data', (data) => {
           const error = data.toString();
           console.error('❌ Python error:', error);
-          
-          // エラーもストリーミングで送信
-          const errorEvent = {
-            type: 'error',
-            data: { error: error.trim(), code: 'PYTHON_RUNTIME_ERROR' },
-            timestamp: new Date().toISOString()
-          };
-          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
+
+          // エラーもストリーミングで送信（ストリームが閉じられていない場合のみ）
+          if (!streamClosed) {
+            const errorEvent = {
+              type: 'error',
+              data: { error: error.trim(), code: 'PYTHON_RUNTIME_ERROR' },
+              timestamp: new Date().toISOString()
+            };
+            try {
+              controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
+            } catch (error) {
+              console.error('❌ Error sending stderr event (stream may be closed):', error);
+              streamClosed = true;
+            }
+          }
         });
         
         // Pythonプロセス終了時の処理
         pythonProcess.on('close', (code) => {
-          console.log(`🏁 Python process exited with code ${code}`);
+          // ⭐ プロセス完了フラグを設定してタイムアウトをクリア
+          processCompleted = true;
+          if (processTimeoutId) {
+            clearTimeout(processTimeoutId);
+            processTimeoutId = null;
+          }
+
+          const elapsed = Date.now() - startTime;
+          console.log(`🏁 Python process exited with code ${code} (elapsed: ${elapsed}ms)`);
 
           // バッファに残っている不完全な行を処理
-          if (buffer.trim()) {
+          if (buffer.trim() && !streamClosed) {
             console.log('📤 Flushing remaining buffer:', buffer);
             try {
               controller.enqueue(new TextEncoder().encode(`data: ${buffer}\n\n`));
             } catch (error) {
-              console.error('❌ Error flushing buffer:', error);
+              console.error('❌ Error flushing buffer (stream may be closed):', error);
+              streamClosed = true;
             }
           }
 
-          if (code !== 0) {
+          if (code !== 0 && !streamClosed) {
             const errorEvent = {
               type: 'error',
               data: { error: `Python process exited with code ${code}`, code: 'PYTHON_EXECUTION_ERROR' },
               timestamp: new Date().toISOString()
             };
-            controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
+            try {
+              controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
+            } catch (error) {
+              console.error('❌ Error sending exit error event (stream may be closed):', error);
+              streamClosed = true;
+            }
           }
 
           // ストリーム終了
-          controller.close();
+          if (!streamClosed) {
+            streamClosed = true;
+            controller.close();
+          }
         });
         
         // プロセス起動エラーの処理
         pythonProcess.on('error', (error) => {
           console.error('❌ Failed to start Python process:', error);
-          
-          const errorEvent = {
-            type: 'error',
-            data: { error: `Failed to start Python process: ${error.message}`, code: 'PYTHON_SPAWN_ERROR' },
-            timestamp: new Date().toISOString()
-          };
-          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
-          controller.close();
+
+          if (!streamClosed) {
+            const errorEvent = {
+              type: 'error',
+              data: { error: `Failed to start Python process: ${error.message}`, code: 'PYTHON_SPAWN_ERROR' },
+              timestamp: new Date().toISOString()
+            };
+            try {
+              controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
+            } catch (error) {
+              console.error('❌ Error sending spawn error event (stream may be closed):', error);
+              streamClosed = true;
+            }
+          }
+
+          if (!streamClosed) {
+            streamClosed = true;
+            controller.close();
+          }
         });
+      },
+
+      // ⭐⭐⭐ CANCEL HANDLING - Client Disconnection ⭐⭐⭐
+      cancel(reason) {
+        console.log(`🚫 Client disconnected (reason: ${reason || 'unknown'})`);
+
+        // タイムアウトをクリア（メモリリーク防止）
+        if (processTimeoutId) {
+          clearTimeout(processTimeoutId);
+          processTimeoutId = null;
+        }
+
+        // Pythonプロセスを終了
+        if (pythonProcess && !pythonProcess.killed) {
+          console.log('🛑 Terminating Python process due to client disconnection...');
+
+          // フラグを設定してタイムアウトハンドラとの競合を防止
+          processCompleted = true;
+          streamClosed = true;
+
+          // SIGTERM送信
+          pythonProcess.kill('SIGTERM');
+
+          // 5秒後にSIGKILLで強制終了（プロセスが応答しない場合）
+          setTimeout(() => {
+            if (pythonProcess && !pythonProcess.killed) {
+              console.error('❌ Process did not respond to SIGTERM, sending SIGKILL...');
+              pythonProcess.kill('SIGKILL');
+            }
+          }, 5000);
+        }
       }
     });
-    
+
     // Server-Sent Eventsヘッダーでレスポンス
     return new NextResponse(stream, {
       headers: {
