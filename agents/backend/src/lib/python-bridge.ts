@@ -49,6 +49,15 @@ export class PythonBridge {
         throw new Error('Failed to create Python process streams');
       }
 
+      // ⭐⭐⭐ リクエストペイロードをstdinに書き込む ⭐⭐⭐
+      // magi_agent.pyは標準入力からのみリクエストを読み取る
+      if (pythonProcess.stdin) {
+        pythonProcess.stdin.write(JSON.stringify(request));
+        pythonProcess.stdin.end();
+      } else {
+        throw new Error('Failed to access Python process stdin');
+      }
+
       // 開始イベントを送信
       yield {
         type: 'start',
