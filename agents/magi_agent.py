@@ -1505,6 +1505,11 @@ async def main():
             print(f"   - custom_prompts: {list(request_custom_prompts.keys())}")
             print(f"   - model_configs: {request_model_configs}")
             print(f"   - runtime_configs: {list(request_runtime_configs.keys())}")
+
+            # ⭐ payloadを更新して、process_decision_streamで使用できるようにする
+            payload['custom_prompts'] = request_custom_prompts
+            payload['model_configs'] = request_model_configs
+            payload['runtime_configs'] = request_runtime_configs
         else:
             # 新形式: custom_prompts, model_configs, runtime_configs
             request_custom_prompts = payload.get('custom_prompts', {})
@@ -1515,6 +1520,7 @@ async def main():
         # 環境変数のカスタムプロンプトは __init__ で自動的に読み込まれる
         # リクエストレベルの設定は __init__ で使用される
         magi_strands = MAGIStrandsAgent(
+            custom_prompts=request_custom_prompts,
             model_configs=request_model_configs,
             runtime_configs=request_runtime_configs
         )
