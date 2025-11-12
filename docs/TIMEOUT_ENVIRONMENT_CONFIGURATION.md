@@ -107,7 +107,8 @@ services:
       - MAGI_EVENT_QUEUE_TIMEOUT_SECONDS=120
 
       # その他の設定
-      - AWS_REGION=ap-northeast-1
+      # Amplify Hostingでは「AWS_」で始まる環境変数は設定不可のため「APP_」を使用
+      - APP_AWS_REGION=ap-northeast-1
       - PYTHON_PATH=python
       - MAGI_SCRIPT_PATH=/app/magi_agent.py
 

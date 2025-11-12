@@ -24,7 +24,7 @@ MAGIカスタムプロンプトテスト
 
 環境変数:
     MAGI_AGENT_ARN - AgentCore RuntimeのARN
-    AWS_REGION - AWSリージョン（デフォルト: ap-northeast-1）
+    APP_AWS_REGION または AWS_REGION - AWSリージョン（デフォルト: ap-northeast-1）
     DEBUG_STREAMING - デバッグ出力の有効化
     
     # カスタムプロンプト設定（オプション）
@@ -660,7 +660,7 @@ def main():
     agent_arn = config.get_agent_arn()
     
     # AWSリージョン
-    region = os.environ.get('AWS_REGION', 'ap-northeast-1')
+    region = os.environ.get('APP_AWS_REGION') or os.environ.get('AWS_REGION', 'ap-northeast-1')
     
     # テスト質問
     test_question = "新しいAIシステムを全社に導入すべきか？コスト削減と効率化が期待されるが、従業員の反発も予想される。"

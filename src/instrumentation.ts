@@ -46,10 +46,18 @@ export async function register() {
  * 開発時のトラブルシューティングに役立ちます。
  */
 function validateEnvironment(): void {
-  const requiredEnvVars = [
-    'AWS_REGION',
-  ];
-  
+  // リージョン設定の確認（複数の候補から1つでもあればOK）
+  // Amplify Hosting互換: NEXT_PUBLIC_AWS_REGION, APP_AWS_REGION を優先
+  const regionVars = ['NEXT_PUBLIC_AWS_REGION', 'APP_AWS_REGION', 'AWS_REGION', 'AWS_DEFAULT_REGION'];
+  const hasRegion = regionVars.some(envVar => process.env[envVar]);
+  const activeRegion = regionVars.find(envVar => process.env[envVar]);
+
+  if (!hasRegion) {
+    console.warn('⚠️ No AWS region configured. Using default: ap-northeast-1');
+    console.warn(`   Set one of: ${regionVars.join(', ')}`);
+    console.warn('   Observability features may not work correctly if your stack is in a different region');
+  }
+
   const optionalEnvVars = [
     'OTEL_SERVICE_NAME',
     'OTEL_SERVICE_VERSION',
@@ -57,18 +65,15 @@ function validateEnvironment(): void {
     'CLOUDWATCH_ENABLED',
     'OBSERVABILITY_DEBUG',
   ];
-  
-  // 必須環境変数のチェック
-  const missingRequired = requiredEnvVars.filter(envVar => !process.env[envVar]);
-  if (missingRequired.length > 0) {
-    console.warn('⚠️ Missing required environment variables:', missingRequired);
-    console.warn('   Observability features may not work correctly');
-  }
-  
+
   // 開発環境での設定確認
   if (process.env.NODE_ENV === 'development') {
     console.log('🔍 Environment configuration:');
-    console.log('   Required variables:', requiredEnvVars.map(v => `${v}=${process.env[v] || 'NOT_SET'}`));
+    if (activeRegion) {
+      console.log(`   Active region: ${activeRegion}=${process.env[activeRegion] || 'NOT_SET'}`);
+    } else {
+      console.log('   Active region: none (using default: ap-northeast-1)');
+    }
     console.log('   Optional variables:', optionalEnvVars.map(v => `${v}=${process.env[v] || 'NOT_SET'}`));
   }
 }

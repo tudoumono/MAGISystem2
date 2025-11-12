@@ -7,7 +7,7 @@ AgentCore Runtime GET /ping エンドポイントテスト
   
 設定方法:
   1. agents/.env ファイル
-  2. 環境変数 MAGI_AGENT_ARN, AWS_REGION
+  2. 環境変数 MAGI_AGENT_ARN, APP_AWS_REGION (または AWS_REGION)
   3. .bedrock_agentcore.yaml ファイル（自動フォールバック）
 """
 

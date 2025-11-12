@@ -24,7 +24,7 @@ MAGI AgentCore Runtime Test (New Event Format)
 
 環境変数:
     MAGI_AGENT_ARN - AgentCore RuntimeのARN（必須）
-    AWS_REGION - AWSリージョン（デフォルト: ap-northeast-1）
+    APP_AWS_REGION または AWS_REGION - AWSリージョン（デフォルト: ap-northeast-1）
     DEBUG_STREAMING - デバッグ出力の有効化（デフォルト: true）
 
 出力ファイル:
@@ -523,7 +523,7 @@ def main():
         sys.exit(1)
     
     # AWSリージョン
-    region = os.environ.get('AWS_REGION', 'ap-northeast-1')
+    region = os.environ.get('APP_AWS_REGION') or os.environ.get('AWS_REGION', 'ap-northeast-1')
     
     # デバッグモード設定
     verbose = os.environ.get('DEBUG_STREAMING', 'true').lower() == 'true'

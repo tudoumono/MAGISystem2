@@ -91,7 +91,7 @@ class MAGIConfig:
 
         # 1. 環境変数から基本設定を取得
         config = {
-            'aws_region': os.getenv('AWS_REGION', 'ap-northeast-1'),
+            'aws_region': os.getenv('APP_AWS_REGION') or os.getenv('AWS_REGION', 'ap-northeast-1'),
             'magi_agent_arn': os.getenv('MAGI_AGENT_ARN'),
             'magi_agent_id': os.getenv('MAGI_AGENT_ID'),
             'debug_streaming': os.getenv('DEBUG_STREAMING', 'false').lower() == 'true',
