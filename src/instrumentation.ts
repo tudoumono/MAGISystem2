@@ -69,7 +69,11 @@ function validateEnvironment(): void {
   // 開発環境での設定確認
   if (process.env.NODE_ENV === 'development') {
     console.log('🔍 Environment configuration:');
-    console.log(`   Active region: ${activeRegion}=${process.env[activeRegion] || 'NOT_SET'}`);
+    if (activeRegion) {
+      console.log(`   Active region: ${activeRegion}=${process.env[activeRegion] || 'NOT_SET'}`);
+    } else {
+      console.log('   Active region: none (using default: ap-northeast-1)');
+    }
     console.log('   Optional variables:', optionalEnvVars.map(v => `${v}=${process.env[v] || 'NOT_SET'}`));
   }
 }
