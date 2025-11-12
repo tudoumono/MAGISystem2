@@ -296,13 +296,17 @@ async function handleStreamRequest(
         };
 
         console.log('Converted agent configs:', {
-          customPrompts: Object.keys(backendPayload.custom_prompts).filter(
-            k => backendPayload.custom_prompts[k]
-          ),
+          customPrompts: backendPayload.custom_prompts 
+            ? Object.keys(backendPayload.custom_prompts).filter(
+                k => backendPayload.custom_prompts?.[k]
+              )
+            : [],
           modelConfigs: backendPayload.model_configs,
-          runtimeConfigs: Object.keys(backendPayload.runtime_configs).map(
-            k => `${k}: temp=${backendPayload.runtime_configs[k].temperature}`
-          ),
+          runtimeConfigs: backendPayload.runtime_configs
+            ? Object.keys(backendPayload.runtime_configs).map(
+                k => `${k}: temp=${backendPayload.runtime_configs?.[k]?.temperature}`
+              )
+            : [],
         });
       }
 
