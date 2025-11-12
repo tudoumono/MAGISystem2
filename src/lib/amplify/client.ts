@@ -41,16 +41,36 @@ import { getAmplifyConfig, getCurrentEnvironmentMode } from './config';
 
 /**
  * Amplify設定の初期化
- * 
+ *
  * 学習ポイント:
  * - Amplify.configure(): グローバル設定の初期化
  * - 環境に応じた設定の自動切り替え
  * - SSR対応（サーバーサイドでの安全な初期化）
+ *
+ * NOTE: AmplifyProviderが既に設定している場合はスキップします。
+ * これにより "Amplify has not been configured" 警告を防ぎます。
  */
 let isConfigured = false;
 
 function initializeAmplify() {
+  // クライアントサイドでのみ実行
+  if (typeof window === 'undefined') return;
+
+  // 既に設定済みの場合はスキップ（AmplifyProviderによる設定を尊重）
   if (isConfigured) return;
+
+  // Amplify.getConfig()で既存の設定を確認
+  try {
+    const existingConfig = Amplify.getConfig();
+    if (existingConfig && Object.keys(existingConfig).length > 0) {
+      console.log('✅ Amplify already configured (by AmplifyProvider), skipping client.ts initialization');
+      isConfigured = true;
+      return;
+    }
+  } catch (error) {
+    // getConfig()が失敗した場合は設定を試みる
+    console.log('⚠️ Amplify.getConfig() failed, attempting to configure...');
+  }
 
   try {
     const config = getAmplifyConfig();
