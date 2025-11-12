@@ -569,7 +569,7 @@ def main():
     agent_arn = config.get_agent_arn()
     
     # AWSリージョン
-    region = os.environ.get('AWS_REGION', 'ap-northeast-1')
+    region = os.environ.get('APP_AWS_REGION') or os.environ.get('AWS_REGION', 'ap-northeast-1')
     
     # テスト質問
     test_question = "新しいAIシステムを全社に導入すべきか？コスト削減と効率化が期待されるが、従業員の反発も予想される。"
