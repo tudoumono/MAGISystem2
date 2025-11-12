@@ -19,7 +19,11 @@
  */
 
 import { NextRequest } from 'next/server';
-import type { BackendRequestPayload } from '@/types/backend-request';
+import type { 
+  BackendRequestPayload,
+  BackendCustomPrompts,
+  BackendRuntimeConfigs
+} from '@/types/backend-request';
 
 /**
  * ストリーミングイベントの送信
@@ -298,13 +302,13 @@ async function handleStreamRequest(
         console.log('Converted agent configs:', {
           customPrompts: backendPayload.custom_prompts 
             ? Object.keys(backendPayload.custom_prompts).filter(
-                k => backendPayload.custom_prompts?.[k]
+                k => backendPayload.custom_prompts?.[k as keyof BackendCustomPrompts]
               )
             : [],
           modelConfigs: backendPayload.model_configs,
           runtimeConfigs: backendPayload.runtime_configs
             ? Object.keys(backendPayload.runtime_configs).map(
-                k => `${k}: temp=${backendPayload.runtime_configs?.[k]?.temperature}`
+                k => `${k}: temp=${backendPayload.runtime_configs?.[k as keyof BackendRuntimeConfigs]?.temperature}`
               )
             : [],
         });
