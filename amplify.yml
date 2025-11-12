@@ -10,10 +10,13 @@ frontend:
     preBuild:
       commands:
         - npm ci
+        # キャッシュをクリア
+        - rm -rf .next
     build:
       commands:
-        # メモリ不足対策: Node.jsのヒープサイズを増やす
-        - export NODE_OPTIONS="--max-old-space-size=4096"
+        # メモリ不足対策とビルド最適化
+        - export NODE_OPTIONS="--max-old-space-size=6144"
+        - export NODE_ENV=production
         - npm run build
   artifacts:
     baseDirectory: .next
@@ -22,4 +25,3 @@ frontend:
   cache:
     paths:
       - node_modules/**/*
-      - .next/cache/**/*
