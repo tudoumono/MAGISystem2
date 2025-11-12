@@ -95,6 +95,18 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
     try {
       // 参考記事準拠: AgentCore Runtime の /invocations エンドポイントを直接呼び出し
       const agentCoreUrl = process.env.NEXT_PUBLIC_AGENTCORE_URL || 'http://localhost:8080';
+
+      // ⭐ 環境変数の検証と警告
+      if (!process.env.NEXT_PUBLIC_AGENTCORE_URL) {
+        console.warn('⚠️ NEXT_PUBLIC_AGENTCORE_URL is not set - using fallback:', agentCoreUrl);
+        if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+          console.error('❌ CRITICAL: NEXT_PUBLIC_AGENTCORE_URL must be set in production!');
+          console.error('📖 See: docs/03-deployment/AMPLIFY_HOSTING_ENV_VARS.md');
+        }
+      }
+
+      console.log(`🔗 Connecting to AgentCore Runtime: ${agentCoreUrl}/api/invocations`);
+
       const response = await fetch(`${agentCoreUrl}/api/invocations`, {
         method: 'POST',
         headers: {
@@ -158,10 +170,23 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
       }
 
       console.error('Failed to start streaming:', error);
+
+      // ⭐ より詳細なエラーメッセージ
+      let errorMessage = 'ストリーミング開始エラー';
+      if (error instanceof Error) {
+        if (error.message.includes('Failed to fetch')) {
+          errorMessage = 'AgentCore Runtimeに接続できません。環境変数 NEXT_PUBLIC_AGENTCORE_URL が正しく設定されているか確認してください。';
+          console.error('❌ Connection failed. Check NEXT_PUBLIC_AGENTCORE_URL environment variable.');
+          console.error('📖 Documentation: docs/03-deployment/AMPLIFY_HOSTING_ENV_VARS.md');
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
       setStreamingState(prev => ({
         ...prev,
         isStreaming: false,
-        error: error instanceof Error ? error : new Error('ストリーミング開始エラー')
+        error: new Error(errorMessage)
       }));
     }
   }, []);
