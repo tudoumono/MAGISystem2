@@ -1,243 +1,10 @@
-/**
- * Global Styles for MAGI Decision System
- * 
- * このファイルはアプリケーション全体で使用されるグローバルスタイルを定義します。
- * Tailwind CSSのベーススタイルとカスタムCSS変数を含みます。
- * 
- * 学習ポイント:
- * - Tailwind CSSのディレクティブ
- * - CSS変数によるテーマ管理
- * - ダークモード対応
- * - カスタムスクロールバー
- */
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ========================================
-   MAGI System - World-Class Design System
-   ======================================== */
-
-/* === ガラスモーフィズム効果 === */
-@layer components {
-  .glass {
-    @apply bg-white/80 backdrop-blur-xl border border-white/20 shadow-glass;
-  }
-
-  .glass-dark {
-    @apply bg-gray-900/80 backdrop-blur-xl border border-white/10 shadow-glass;
-  }
-
-  .glass-caspar {
-    @apply bg-gradient-to-br from-magi-caspar-500/10 to-magi-caspar-600/5 backdrop-blur-xl border border-magi-caspar-500/20 shadow-glass;
-  }
-
-  .glass-balthasar {
-    @apply bg-gradient-to-br from-magi-balthasar-500/10 to-magi-balthasar-600/5 backdrop-blur-xl border border-magi-balthasar-500/20 shadow-glass;
-  }
-
-  .glass-melchior {
-    @apply bg-gradient-to-br from-magi-melchior-500/10 to-magi-melchior-600/5 backdrop-blur-xl border border-magi-melchior-500/20 shadow-glass;
-  }
-
-  .glass-solomon {
-    @apply bg-gradient-to-br from-magi-solomon-500/10 to-magi-solomon-600/5 backdrop-blur-xl border border-magi-solomon-500/20 shadow-glass;
-  }
-}
-
-/* === ネオンエフェクト === */
-@layer components {
-  .neon-caspar {
-    text-shadow:
-      0 0 10px rgba(0, 217, 255, 0.8),
-      0 0 20px rgba(0, 217, 255, 0.6),
-      0 0 30px rgba(0, 217, 255, 0.4);
-    color: #00d9ff;
-  }
-
-  .neon-balthasar {
-    text-shadow:
-      0 0 10px rgba(255, 0, 128, 0.8),
-      0 0 20px rgba(255, 0, 128, 0.6),
-      0 0 30px rgba(255, 0, 128, 0.4);
-    color: #ff0080;
-  }
-
-  .neon-melchior {
-    text-shadow:
-      0 0 10px rgba(0, 255, 159, 0.8),
-      0 0 20px rgba(0, 255, 159, 0.6),
-      0 0 30px rgba(0, 255, 159, 0.4);
-    color: #00ff9f;
-  }
-
-  .neon-solomon {
-    text-shadow:
-      0 0 10px rgba(191, 64, 255, 0.8),
-      0 0 20px rgba(191, 64, 255, 0.6),
-      0 0 30px rgba(191, 64, 255, 0.4);
-    color: #bf40ff;
-  }
-
-  .neon-border-caspar {
-    box-shadow:
-      0 0 10px rgba(0, 217, 255, 0.5),
-      0 0 20px rgba(0, 217, 255, 0.3),
-      inset 0 0 10px rgba(0, 217, 255, 0.2);
-    border-color: #00d9ff;
-  }
-
-  .neon-border-balthasar {
-    box-shadow:
-      0 0 10px rgba(255, 0, 128, 0.5),
-      0 0 20px rgba(255, 0, 128, 0.3),
-      inset 0 0 10px rgba(255, 0, 128, 0.2);
-    border-color: #ff0080;
-  }
-
-  .neon-border-melchior {
-    box-shadow:
-      0 0 10px rgba(0, 255, 159, 0.5),
-      0 0 20px rgba(0, 255, 159, 0.3),
-      inset 0 0 10px rgba(0, 255, 159, 0.2);
-    border-color: #00ff9f;
-  }
-
-  .neon-border-solomon {
-    box-shadow:
-      0 0 10px rgba(191, 64, 255, 0.5),
-      0 0 20px rgba(191, 64, 255, 0.3),
-      inset 0 0 10px rgba(191, 64, 255, 0.2);
-    border-color: #bf40ff;
-  }
-}
-
-/* === スムーズなトランジション === */
-@layer components {
-  .transition-smooth {
-    @apply transition-all duration-400 ease-apple;
-  }
-
-  .transition-elastic {
-    @apply transition-all duration-500 ease-elastic;
-  }
-}
-
-/* === Apple風ボタンスタイル === */
-@layer components {
-  .btn-magi {
-    @apply px-6 py-3 rounded-xl font-medium
-           transition-smooth
-           focus:outline-none focus:ring-2 focus:ring-offset-2
-           active:scale-95;
-  }
-
-  .btn-magi-primary {
-    @apply btn-magi
-           bg-gradient-to-r from-magi-solomon-500 to-magi-solomon-600
-           text-white shadow-elevation-md
-           hover:shadow-elevation-lg hover:from-magi-solomon-600 hover:to-magi-solomon-700
-           focus:ring-magi-solomon-500;
-  }
-
-  .btn-magi-glass {
-    @apply btn-magi glass
-           hover:bg-white/90 hover:shadow-glass-lg;
-  }
-}
-
-/* === MAGI カードスタイル === */
-@layer components {
-  .magi-card {
-    @apply rounded-2xl p-6 shadow-elevation-md
-           transition-smooth
-           hover:shadow-elevation-lg hover:-translate-y-1;
-  }
-
-  .magi-card-glass {
-    @apply magi-card glass;
-  }
-}
-
-/* MAGI Stream Interface Animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-@keyframes bounce {
-  0%, 20%, 53%, 80%, 100% {
-    transform: translate3d(0, 0, 0);
-  }
-  40%, 43% {
-    transform: translate3d(0, -8px, 0);
-  }
-  70% {
-    transform: translate3d(0, -4px, 0);
-  }
-  90% {
-    transform: translate3d(0, -2px, 0);
-  }
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.5s ease-out forwards;
-}
-
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-.animate-bounce {
-  animation: bounce 1s infinite;
-}
-
-/* Thought History Scrollbar Styling */
-.thought-history::-webkit-scrollbar {
-  width: 4px;
-}
-
-.thought-history::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
-}
-
-.thought-history::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 2px;
-}
-
-.thought-history::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
-}
-
-/**
- * CSS変数の定義
- * 
- * 学習ポイント:
- * - :root セレクターでグローバル変数を定義
- * - HSL色空間の使用（色の調整が容易）
- * - ライトモードとダークモードの切り替え対応
- */
+/* CSS Variables */
 @layer base {
   :root {
-    /* ライトモードの色定義 */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
@@ -261,7 +28,6 @@
   }
 
   .dark {
-    /* ダークモードの色定義 */
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
     --card: 222.2 84% 4.9%;
@@ -282,164 +48,60 @@
     --input: 217.2 32.6% 17.5%;
     --ring: 262.1 83.3% 57.8%;
   }
-}
 
-/**
- * ベーススタイルの設定
- * 
- * 学習ポイント:
- * - * セレクターでボックスサイジングを統一
- * - html, body要素の基本設定
- * - スクロール動作の最適化
- */
-@layer base {
   * {
     @apply border-border;
   }
-  
+
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
-  
+
   html {
     scroll-behavior: smooth;
   }
 }
 
-/**
- * カスタムコンポーネントスタイル
- * 
- * 学習ポイント:
- * - @layer components でコンポーネント固有のスタイルを定義
- * - 再利用可能なスタイルパターンの作成
- */
-@layer components {
-  /* カスタムスクロールバー */
-  .custom-scrollbar {
-    scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted-foreground)) hsl(var(--muted));
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-track {
-    @apply bg-muted rounded-full;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-muted-foreground rounded-full;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    @apply bg-foreground/60;
-  }
-
-  /* MAGI システム固有のスタイル */
-  .magi-panel {
-    @apply bg-card border border-border rounded-lg shadow-sm;
-  }
-  
-  .magi-panel-header {
-    @apply px-6 py-4 border-b border-border;
-  }
-  
-  .magi-panel-content {
-    @apply px-6 py-4;
-  }
-  
-  /* エージェント固有の色分け */
-  .agent-caspar {
-    @apply border-l-4 border-l-magi-caspar-500;
-  }
-  
-  .agent-balthasar {
-    @apply border-l-4 border-l-magi-balthasar-500;
-  }
-  
-  .agent-melchior {
-    @apply border-l-4 border-l-magi-melchior-500;
-  }
-  
-  .agent-solomon {
-    @apply border-l-4 border-l-magi-solomon-500;
-  }
-  
-  /* 判定結果のスタイル */
-  .decision-approved {
-    @apply bg-green-50 border-green-200 text-green-800;
-  }
-  
-  .decision-rejected {
-    @apply bg-red-50 border-red-200 text-red-800;
-  }
-  
-  .decision-pending {
-    @apply bg-yellow-50 border-yellow-200 text-yellow-800;
-  }
-}
-
-/**
- * ユーティリティクラス
- * 
- * 学習ポイント:
- * - @layer utilities で独自のユーティリティクラスを定義
- * - アニメーションやトランジションの統一
- */
-@layer utilities {
-  /* テキスト選択の無効化 */
-  .select-none {
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-  }
-  
-  /* フォーカス表示の統一 */
-  .focus-visible-ring {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
-  }
-  
-  /* グラデーション背景 */
-  .gradient-magi {
-    background: linear-gradient(
-      135deg,
-      hsl(var(--magi-caspar-500)) 0%,
-      hsl(var(--magi-balthasar-500)) 50%,
-      hsl(var(--magi-melchior-500)) 100%
-    );
-  }
-  
-  /* アニメーション */
-  .animate-fade-in {
-    animation: fade-in 0.3s ease-out;
-  }
-  
-  .animate-slide-up {
-    animation: slideUp 0.3s ease-out;
-  }
-  
-  .animate-thinking {
-    animation: thinking 2s ease-in-out infinite;
-  }
-}
-
-/**
- * キーフレームアニメーション
- * 
- * 学習ポイント:
- * - @keyframes でカスタムアニメーションを定義
- * - エージェント実行中の視覚的フィードバック
- */
+/* Animations */
 @keyframes fadeIn {
   from {
     opacity: 0;
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes bounce {
+  0%,
+  20%,
+  53%,
+  80%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  40%,
+  43% {
+    transform: translate3d(0, -8px, 0);
+  }
+  70% {
+    transform: translate3d(0, -4px, 0);
+  }
+  90% {
+    transform: translate3d(0, -2px, 0);
   }
 }
 
@@ -455,7 +117,8 @@
 }
 
 @keyframes thinking {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.5;
   }
   50% {
@@ -463,120 +126,30 @@
   }
 }
 
-@keyframes fade-in {
-  from { 
-    opacity: 0; 
-    transform: translateY(10px); 
-  }
-  to { 
-    opacity: 1; 
-    transform: translateY(0); 
-  }
+/* Scrollbar Styling */
+.thought-history::-webkit-scrollbar {
+  width: 4px;
 }
 
-/**
- * プリント用スタイル
- * 
- * 学習ポイント:
- * - @media print でプリント時の最適化
- * - 不要な要素の非表示
- * - 色の調整
- */
-@media print {
-  .no-print {
-    display: none !important;
-  }
-  
-  .print-break-before {
-    page-break-before: always;
-  }
-  
-  .print-break-after {
-    page-break-after: always;
-  }
-  
-  /* プリント時は背景色を削除 */
-  .magi-panel {
-    @apply bg-white border border-gray-300;
-  }
+.thought-history::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
 }
 
-/**
- * 高コントラストモード対応
- * 
- * 学習ポイント:
- * - アクセシビリティ向上のための設定
- * - 視覚的な区別を強化
- */
-@media (prefers-contrast: high) {
-  .magi-panel {
-    @apply border-2;
-  }
-  
-  .decision-approved {
-    @apply bg-green-100 border-green-400;
-  }
-  
-  .decision-rejected {
-    @apply bg-red-100 border-red-400;
-  }
+.thought-history::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
 }
 
-/**
- * 動きを抑制する設定
- * 
- * 学習ポイント:
- * - prefers-reduced-motion でアニメーションを制御
- * - アクセシビリティ配慮
- */
+.thought-history::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Accessibility */
 @media (prefers-reduced-motion: reduce) {
-  .animate-fade-in,
-  .animate-slide-up,
-  .animate-thinking {
-    animation: none;
-  }
-  
   * {
-    transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-  }
-}
-
-/* Tailwind scrollbar utilities */
-@layer utilities {
-  .scrollbar-thin::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 3px;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: 3px;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: #999;
-  }
-
-  .scrollbar-track-gray-100::-webkit-scrollbar-track {
-    background: #f3f4f6;
-  }
-
-  .scrollbar-track-gray-200::-webkit-scrollbar-track {
-    background: #e5e7eb;
-  }
-
-  .scrollbar-thumb-gray-300::-webkit-scrollbar-thumb {
-    background: #d1d5db;
-  }
-
-  .scrollbar-thumb-gray-400::-webkit-scrollbar-thumb {
-    background: #9ca3af;
+    transition-duration: 0.01ms !important;
   }
 }
