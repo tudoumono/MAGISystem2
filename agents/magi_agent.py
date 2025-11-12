@@ -201,7 +201,12 @@ SOLOMON_PROMPT = DEFAULT_SOLOMON_ROLE + SOLOMON_JSON_FORMAT
 class MAGIStrandsAgent:
     """MAGI Strands Agent - 3賢者システム"""
 
-    def __init__(self, custom_prompts: Optional[Dict[str, str]] = None):
+    def __init__(
+        self,
+        custom_prompts: Optional[Dict[str, str]] = None,
+        model_configs: Optional[Dict[str, str]] = None,
+        runtime_configs: Optional[Dict[str, Dict[str, Any]]] = None
+    ):
         """
         初期化
 
@@ -212,6 +217,20 @@ class MAGIStrandsAgent:
                     'balthasar': 'あなたは革新的な賢者です...',
                     'melchior': 'あなたはバランス型の賢者です...',
                     'solomon': 'あなたは統括AIです...'
+                }
+            model_configs: モデル設定辞書（省略時はデフォルトモデル）
+                例: {
+                    'caspar': 'anthropic.claude-3-7-sonnet-20250219-v1:0',
+                    'balthasar': 'amazon.nova-pro-v1:0',
+                    'melchior': 'anthropic.claude-sonnet-4-5-20250929-v1:0',
+                    'solomon': 'anthropic.claude-opus-4-1-20250805-v1:0'
+                }
+            runtime_configs: ランタイム設定辞書（temperature, maxTokens等）
+                例: {
+                    'caspar': {'temperature': 0.3, 'max_tokens': 2000, 'top_p': 0.9},
+                    'balthasar': {'temperature': 0.7, 'max_tokens': 2000, 'top_p': 0.95},
+                    'melchior': {'temperature': 0.5, 'max_tokens': 2000, 'top_p': 0.92},
+                    'solomon': {'temperature': 0.4, 'max_tokens': 3000, 'top_p': 0.9}
                 }
         """
         # タイムアウト設定をロード
@@ -228,6 +247,12 @@ class MAGIStrandsAgent:
                     env_prompt = config.get_custom_prompt(agent_name)
                     if env_prompt:
                         self.custom_prompts[agent_name] = env_prompt
+
+        # モデル設定の読み込み（優先順位：引数 > デフォルト）
+        self.model_configs = model_configs or {}
+
+        # ランタイム設定の読み込み（優先順位：引数 > デフォルト）
+        self.runtime_configs = runtime_configs or {}
 
         # 文字数制限を設定から読み込み
         sage_max_length = config.get('sage_reasoning_max_length', 1000) if config else 1000
@@ -246,22 +271,30 @@ class MAGIStrandsAgent:
         balthasar_prompt = self._build_prompt('balthasar', DEFAULT_BALTHASAR_ROLE, sage_json_format)
         melchior_prompt = self._build_prompt('melchior', DEFAULT_MELCHIOR_ROLE, sage_json_format)
 
-        # 3賢者のエージェント作成
+        # デフォルトモデルIDを定義
+        default_models = {
+            'caspar': 'anthropic.claude-3-7-sonnet-20250219-v1:0',
+            'balthasar': 'amazon.nova-pro-v1:0',
+            'melchior': 'anthropic.claude-sonnet-4-5-20250929-v1:0',
+            'solomon': 'anthropic.claude-opus-4-1-20250805-v1:0'
+        }
+
+        # 3賢者のエージェント作成（動的モデル設定）
         self.caspar = Agent(
             name="CASPAR",
-            model="anthropic.claude-3-5-sonnet-20240620-v1:0",
+            model=self.model_configs.get('caspar', default_models['caspar']),
             system_prompt=caspar_prompt
         )
 
         self.balthasar = Agent(
             name="BALTHASAR",
-            model="anthropic.claude-3-5-sonnet-20240620-v1:0",
+            model=self.model_configs.get('balthasar', default_models['balthasar']),
             system_prompt=balthasar_prompt
         )
 
         self.melchior = Agent(
             name="MELCHIOR",
-            model="anthropic.claude-3-5-sonnet-20240620-v1:0",
+            model=self.model_configs.get('melchior', default_models['melchior']),
             system_prompt=melchior_prompt
         )
 
@@ -269,7 +302,7 @@ class MAGIStrandsAgent:
         # 注: system_promptは実行時に3賢者の結果を含めて動的に生成
         self.solomon = Agent(
             name="SOLOMON",
-            model="anthropic.claude-3-5-sonnet-20240620-v1:0"
+            model=self.model_configs.get('solomon', default_models['solomon'])
         )
         
         # 賢者ごとのステートマシン（並列イベント処理用）
@@ -737,6 +770,16 @@ class MAGIStrandsAgent:
                 # デフォルトのエージェントプロンプトを使用
                 stream_kwargs = {}
 
+            # ランタイム設定（temperature, max_tokens, top_p）を追加
+            if agent_id in self.runtime_configs:
+                runtime_config = self.runtime_configs[agent_id]
+                if 'temperature' in runtime_config:
+                    stream_kwargs['temperature'] = runtime_config['temperature']
+                if 'max_tokens' in runtime_config:
+                    stream_kwargs['max_tokens'] = runtime_config['max_tokens']
+                if 'top_p' in runtime_config:
+                    stream_kwargs['top_p'] = runtime_config['top_p']
+
             # Strands Agentsのストリーミング機能を使用
             # stream_async()メソッドは思考プロセスをリアルタイムで返す
             full_response = ""
@@ -989,6 +1032,17 @@ class MAGIStrandsAgent:
                 print(f"  🔍 DEBUG: Starting Solomon stream_async()...")
                 print(f"  🔍 DEBUG: sage_responses count: {len(sage_responses)}")
 
+            # ランタイム設定（temperature, max_tokens, top_p）を準備
+            solomon_kwargs = {'system_prompt': solomon_prompt}
+            if 'solomon' in self.runtime_configs:
+                runtime_config = self.runtime_configs['solomon']
+                if 'temperature' in runtime_config:
+                    solomon_kwargs['temperature'] = runtime_config['temperature']
+                if 'max_tokens' in runtime_config:
+                    solomon_kwargs['max_tokens'] = runtime_config['max_tokens']
+                if 'top_p' in runtime_config:
+                    solomon_kwargs['top_p'] = runtime_config['top_p']
+
             # ⭐ タイムアウト処理付きでLLM呼び出しを実行
             # asyncio.timeout()でストリーム全体を保護（チャンクが来ない場合にも対応）
             start_time = asyncio.get_event_loop().time()
@@ -998,7 +1052,7 @@ class MAGIStrandsAgent:
                 # これにより、ストリームがハングしてチャンクが1つも来ない場合でもタイムアウトが発動
                 async with asyncio.timeout(timeout_seconds):
                     # stream_async()メソッドで非同期ストリーミング
-                    async for chunk in self.solomon.stream_async(question, system_prompt=solomon_prompt):
+                    async for chunk in self.solomon.stream_async(question, **solomon_kwargs):
                         chunk_count += 1
 
                         # チャンクからテキストを抽出
@@ -1411,13 +1465,65 @@ async def main():
             }), flush=True)
             return
         
-        # カスタムプロンプトの取得（リクエストレベルで指定可能）
-        request_custom_prompts = payload.get('custom_prompts', {})
+        # ⭐ 後方互換性: agentConfigs形式をサポート
+        # フロントエンド形式（agentConfigs）からバックエンド形式への変換
+        if 'agentConfigs' in payload:
+            agent_configs = payload.get('agentConfigs', {})
+
+            # custom_prompts辞書に変換
+            request_custom_prompts = {}
+            # model_configs辞書に変換
+            request_model_configs = {}
+            # runtime_configs辞書に変換
+            request_runtime_configs = {}
+
+            for agent_id in ['caspar', 'balthasar', 'melchior', 'solomon']:
+                if agent_id in agent_configs:
+                    agent_config = agent_configs[agent_id]
+
+                    # システムプロンプト
+                    if 'systemPrompt' in agent_config:
+                        request_custom_prompts[agent_id] = agent_config['systemPrompt']
+
+                    # モデルID
+                    if 'model' in agent_config:
+                        request_model_configs[agent_id] = agent_config['model']
+
+                    # ランタイム設定（temperature, maxTokens, topP）
+                    runtime_config = {}
+                    if 'temperature' in agent_config:
+                        runtime_config['temperature'] = agent_config['temperature']
+                    if 'maxTokens' in agent_config:
+                        runtime_config['max_tokens'] = agent_config['maxTokens']
+                    if 'topP' in agent_config:
+                        runtime_config['top_p'] = agent_config['topP']
+
+                    if runtime_config:
+                        request_runtime_configs[agent_id] = runtime_config
+
+            print(f"✅ Converted agentConfigs format to backend format")
+            print(f"   - custom_prompts: {list(request_custom_prompts.keys())}")
+            print(f"   - model_configs: {request_model_configs}")
+            print(f"   - runtime_configs: {list(request_runtime_configs.keys())}")
+
+            # ⭐ payloadを更新して、process_decision_streamで使用できるようにする
+            payload['custom_prompts'] = request_custom_prompts
+            payload['model_configs'] = request_model_configs
+            payload['runtime_configs'] = request_runtime_configs
+        else:
+            # 新形式: custom_prompts, model_configs, runtime_configs
+            request_custom_prompts = payload.get('custom_prompts', {})
+            request_model_configs = payload.get('model_configs', {})
+            request_runtime_configs = payload.get('runtime_configs', {})
 
         # MAGI決定プロセスを実行
         # 環境変数のカスタムプロンプトは __init__ で自動的に読み込まれる
-        # リクエストレベルのカスタムプロンプトは process_decision_stream で使用される
-        magi_strands = MAGIStrandsAgent()
+        # リクエストレベルの設定は __init__ で使用される
+        magi_strands = MAGIStrandsAgent(
+            custom_prompts=request_custom_prompts,
+            model_configs=request_model_configs,
+            runtime_configs=request_runtime_configs
+        )
 
         async for event in magi_strands.process_decision_stream(payload):
             # 各イベントをJSON行として出力

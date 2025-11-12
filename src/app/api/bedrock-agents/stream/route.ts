@@ -1,24 +1,25 @@
 /**
  * Bedrock Agents Streaming API Route
- * 
+ *
  * Server-Sent Events (SSE)を使用してエージェントの応答をストリーミング配信します。
  * Lambda Response Streamingを使用して、Bedrock AgentCoreからの応答を
  * リアルタイムで転送します。
- * 
+ *
  * エンドポイント: GET /api/bedrock-agents/stream
- * 
+ *
  * クエリパラメータ:
  * - question: ユーザーの質問
  * - conversationId: 会話ID
- * 
+ *
  * レスポンス形式: Server-Sent Events (text/event-stream)
- * 
+ *
  * アーキテクチャ:
  * 1. 開発環境: モックデータでストリーミング
  * 2. 本番環境: Lambda関数URLを使用してストリーミング
  */
 
 import { NextRequest } from 'next/server';
+import type { BackendRequestPayload } from '@/types/backend-request';
 
 /**
  * ストリーミングイベントの送信
@@ -246,18 +247,72 @@ async function handleStreamRequest(
       console.log('Using Lambda Function URL for streaming', {
         hasAgentConfigs: !!agentConfigs,
       });
-      
-      // Lambda関数URLにリクエストを転送（エージェント設定を含む）
+
+      // フロントエンド形式からバックエンド形式への変換
+      const backendPayload: BackendRequestPayload = {
+        question,
+        conversationId,
+      };
+
+      if (agentConfigs) {
+        // custom_prompts: システムプロンプト辞書
+        backendPayload.custom_prompts = {
+          caspar: agentConfigs.caspar?.systemPrompt,
+          balthasar: agentConfigs.balthasar?.systemPrompt,
+          melchior: agentConfigs.melchior?.systemPrompt,
+          solomon: agentConfigs.solomon?.systemPrompt,
+        };
+
+        // model_configs: モデルID辞書
+        backendPayload.model_configs = {
+          caspar: agentConfigs.caspar?.model,
+          balthasar: agentConfigs.balthasar?.model,
+          melchior: agentConfigs.melchior?.model,
+          solomon: agentConfigs.solomon?.model,
+        };
+
+        // runtime_configs: LLMパラメータ辞書
+        backendPayload.runtime_configs = {
+          caspar: {
+            temperature: agentConfigs.caspar?.temperature,
+            max_tokens: agentConfigs.caspar?.maxTokens,
+            top_p: agentConfigs.caspar?.topP,
+          },
+          balthasar: {
+            temperature: agentConfigs.balthasar?.temperature,
+            max_tokens: agentConfigs.balthasar?.maxTokens,
+            top_p: agentConfigs.balthasar?.topP,
+          },
+          melchior: {
+            temperature: agentConfigs.melchior?.temperature,
+            max_tokens: agentConfigs.melchior?.maxTokens,
+            top_p: agentConfigs.melchior?.topP,
+          },
+          solomon: {
+            temperature: agentConfigs.solomon?.temperature,
+            max_tokens: agentConfigs.solomon?.maxTokens,
+            top_p: agentConfigs.solomon?.topP,
+          },
+        };
+
+        console.log('Converted agent configs:', {
+          customPrompts: Object.keys(backendPayload.custom_prompts).filter(
+            k => backendPayload.custom_prompts[k]
+          ),
+          modelConfigs: backendPayload.model_configs,
+          runtimeConfigs: Object.keys(backendPayload.runtime_configs).map(
+            k => `${k}: temp=${backendPayload.runtime_configs[k].temperature}`
+          ),
+        });
+      }
+
+      // Lambda関数URLにリクエストを転送（変換後の形式で送信）
       const response = await fetch(lambdaUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          question,
-          conversationId,
-          agentConfigs, // エージェント設定を送信
-        }),
+        body: JSON.stringify(backendPayload),
       });
 
       if (!response.ok) {
