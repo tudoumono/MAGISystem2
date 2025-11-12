@@ -21,16 +21,17 @@ import { CloudWatchLogsClient, PutLogEventsCommand, CreateLogGroupCommand, Creat
 
 /**
  * CloudWatch Client Configuration
- * 
+ *
  * AWS CloudWatchクライアントの設定。
  * リージョンと認証情報は環境変数から自動取得されます。
+ * Amplify Hosting互換: NEXT_PUBLIC_AWS_REGION, APP_AWS_REGION を優先的に使用
  */
 const cloudWatchClient = new CloudWatchClient({
-  region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1',
+  region: process.env.NEXT_PUBLIC_AWS_REGION || process.env.APP_AWS_REGION || process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'ap-northeast-1',
 });
 
 const cloudWatchLogsClient = new CloudWatchLogsClient({
-  region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1',
+  region: process.env.NEXT_PUBLIC_AWS_REGION || process.env.APP_AWS_REGION || process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'ap-northeast-1',
 });
 
 /**

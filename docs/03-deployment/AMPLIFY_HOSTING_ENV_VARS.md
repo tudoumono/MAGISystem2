@@ -36,9 +36,21 @@ NEXT_PUBLIC_AGENTCORE_URL=https://your-agentcore-runtime.example.com
 
 | 変数名 | 説明 | 値の例 |
 |--------|------|--------|
-| `NEXT_PUBLIC_AWS_REGION` | フロントエンドで使用するAWSリージョン | `ap-northeast-1` |
+| `NEXT_PUBLIC_AWS_REGION` | フロントエンドで使用するAWSリージョン（Observability含む） | `ap-northeast-1` |
 | `APP_AWS_REGION` | バックエンド（Python）で使用するAWSリージョン | `ap-northeast-1` |
 | `NEXT_PUBLIC_AGENTCORE_URL` | AgentCore RuntimeのエンドポイントURL | `https://agentcore.example.com` |
+
+#### リージョン設定の優先順位
+
+Observability機能（CloudWatch、X-Ray、OpenTelemetry）は以下の優先順位で環境変数を読み込みます：
+
+1. `NEXT_PUBLIC_AWS_REGION` - Amplify Hosting推奨（最優先）
+2. `APP_AWS_REGION` - バックエンド用（2番目）
+3. `AWS_REGION` - 後方互換性（ローカル開発のみ）
+4. `AWS_DEFAULT_REGION` - 後方互換性（ローカル開発のみ）
+5. `ap-northeast-1` - デフォルト値
+
+**重要**: `NEXT_PUBLIC_AWS_REGION`を設定しないと、CloudWatch/OTelのトラフィックがデフォルトリージョン（`ap-northeast-1`）に送信されます。スタックが別のリージョンにある場合は、必ず正しいリージョンを設定してください。
 
 ## 推奨環境変数
 

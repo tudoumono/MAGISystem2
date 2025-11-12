@@ -131,7 +131,7 @@ const getObservabilityConfig = (): ObservabilityConfig => {
     environment,
     serviceName: process.env.SERVICE_NAME || 'magi-decision-ui',
     serviceVersion: process.env.SERVICE_VERSION || '1.0.0',
-    awsRegion: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1',
+    awsRegion: process.env.NEXT_PUBLIC_AWS_REGION || process.env.APP_AWS_REGION || process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'ap-northeast-1',
 
     // 本番環境では全機能を有効化、開発環境では選択的に有効化
     otelEnabled: process.env.OTEL_ENABLED !== 'false',

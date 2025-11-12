@@ -49,7 +49,7 @@ const getOTELConfig = (): OTELConfig => ({
   serviceName: process.env.OTEL_SERVICE_NAME || 'magi-decision-ui',
   serviceVersion: process.env.OTEL_SERVICE_VERSION || '1.0.0',
   environment: process.env.NODE_ENV || 'development',
-  awsRegion: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1',
+  awsRegion: process.env.NEXT_PUBLIC_AWS_REGION || process.env.APP_AWS_REGION || process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'ap-northeast-1',
   traceExporterEndpoint: process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
   metricsExporterEndpoint: process.env.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,
   enableConsoleExporter: process.env.NODE_ENV === 'development',
