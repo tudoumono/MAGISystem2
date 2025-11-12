@@ -1465,14 +1465,51 @@ async def main():
             }), flush=True)
             return
         
-        # カスタムプロンプトの取得（リクエストレベルで指定可能）
-        request_custom_prompts = payload.get('custom_prompts', {})
+        # ⭐ 後方互換性: agentConfigs形式をサポート
+        # フロントエンド形式（agentConfigs）からバックエンド形式への変換
+        if 'agentConfigs' in payload:
+            agent_configs = payload.get('agentConfigs', {})
 
-        # モデル設定の取得（リクエストレベルで指定可能）
-        request_model_configs = payload.get('model_configs', {})
+            # custom_prompts辞書に変換
+            request_custom_prompts = {}
+            # model_configs辞書に変換
+            request_model_configs = {}
+            # runtime_configs辞書に変換
+            request_runtime_configs = {}
 
-        # ランタイム設定の取得（リクエストレベルで指定可能）
-        request_runtime_configs = payload.get('runtime_configs', {})
+            for agent_id in ['caspar', 'balthasar', 'melchior', 'solomon']:
+                if agent_id in agent_configs:
+                    agent_config = agent_configs[agent_id]
+
+                    # システムプロンプト
+                    if 'systemPrompt' in agent_config:
+                        request_custom_prompts[agent_id] = agent_config['systemPrompt']
+
+                    # モデルID
+                    if 'model' in agent_config:
+                        request_model_configs[agent_id] = agent_config['model']
+
+                    # ランタイム設定（temperature, maxTokens, topP）
+                    runtime_config = {}
+                    if 'temperature' in agent_config:
+                        runtime_config['temperature'] = agent_config['temperature']
+                    if 'maxTokens' in agent_config:
+                        runtime_config['max_tokens'] = agent_config['maxTokens']
+                    if 'topP' in agent_config:
+                        runtime_config['top_p'] = agent_config['topP']
+
+                    if runtime_config:
+                        request_runtime_configs[agent_id] = runtime_config
+
+            print(f"✅ Converted agentConfigs format to backend format")
+            print(f"   - custom_prompts: {list(request_custom_prompts.keys())}")
+            print(f"   - model_configs: {request_model_configs}")
+            print(f"   - runtime_configs: {list(request_runtime_configs.keys())}")
+        else:
+            # 新形式: custom_prompts, model_configs, runtime_configs
+            request_custom_prompts = payload.get('custom_prompts', {})
+            request_model_configs = payload.get('model_configs', {})
+            request_runtime_configs = payload.get('runtime_configs', {})
 
         # MAGI決定プロセスを実行
         # 環境変数のカスタムプロンプトは __init__ で自動的に読み込まれる
