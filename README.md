@@ -59,8 +59,19 @@ MAGI Decision Systemは、3賢者（CASPAR、BALTHASAR、MELCHIOR）による多
 - **[開発ガイド](docs/01-getting-started/DEVELOPMENT_SETUP.md)** - 詳細な開発環境構築
 - **[アーキテクチャ](docs/02-architecture/OVERVIEW.md)** - システム設計
 - **[デプロイ](docs/03-deployment/CHECKLIST.md)** - 本番環境へのデプロイ
+- **[接続デバッグ](docs/03-deployment/DEBUGGING_CONNECTIVITY.md)** - フロントエンド ⇔ AgentCore Runtime の接続問題をデバッグ
 
 すべてのドキュメントは [docs/](docs/) ディレクトリを参照してください。
+
+### 🔍 デバッグツール
+
+本番環境で問題が発生した場合は、以下のデバッグページで診断できます：
+
+- **環境変数確認ページ**: `https://your-domain/debug/environment-check`
+  - 環境変数の設定確認
+  - AgentCore Runtimeへの接続テスト（/ping）
+  - APIエンドポイントテスト（/api/invocations）
+  - 詳細なトラブルシューティングガイド
 - **Authentication**: AWS Amplify Auth (Amazon Cognito)
 - **Data Management**: AWS Amplify Data/AI Kit
 - **Database**: Amazon DynamoDB
