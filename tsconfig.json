@@ -2,7 +2,7 @@
   "compilerOptions": {
     // TypeScript 5.7の最新機能を活用
     "target": "ES2022",
-    "lib": ["dom", "dom.iterable", "es6"],
+    "lib": ["dom", "dom.iterable", "ES2015", "ES2016", "ES2017", "ES2018", "ES2019", "ES2020", "ES2021", "ES2022"],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -14,7 +14,7 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    
+
     // 型安全性を最大化する設定
     "noUncheckedIndexedAccess": true,
     // exactOptionalPropertyTypesを無効化（OpenTelemetry SDK互換性のため）
@@ -22,18 +22,18 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
-    
+
     // パフォーマンス最適化
     "skipDefaultLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    
+
     // Next.js App Router対応
     "plugins": [
       {
         "name": "next"
       }
     ],
-    
+
     // パスエイリアス設定（インポートを簡潔にするため）
     "baseUrl": ".",
     "paths": {
@@ -49,13 +49,15 @@
   "include": [
     "next-env.d.ts",
     "src/types/globals.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "amplify/**/*.ts",
     ".next/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
     ".next",
-    "out"
+    "out",
+    "agents/backend"
   ]
 }
