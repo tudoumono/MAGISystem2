@@ -1,62 +1,10 @@
 # ============================================================================
-# MAGI Decision System - .gitignore
-# 
-# このファイルはMAGI Decision Systemプロジェクトで除外すべきファイルを定義します。
-# - AWS Amplify Gen2 関連ファイル
-# - 生成されたTypeScript型定義
-# - 開発環境固有の設定
-# - セキュリティ関連ファイル
+# MAGI Decision System - Root .gitignore
+#
+# モノレポ全体で共通して除外すべきファイルを定義
 # ============================================================================
 
-# Dependencies
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Next.js
-.next/
-out/
-dist/
-build/
-.vercel/
-.turbo/
-
-# TypeScript
-*.tsbuildinfo
-.tscache/
-
-# Environment variables
-.env
-.env.local
-.env.local.backup.*
-.env.development.local
-.env.test.local
-.env.production.local
-
-# AWS Amplify Gen2
-.amplify/
-amplify_outputs.json
-amplify/backend/amplify-meta.json
-amplify/backend/awscloudformation/
-amplify/mock-data/
-amplify/mock-api-resources/
-amplify/team-provider-info.json
-amplify/.config/
-
-# AWS credentials and config
-.aws/
-aws-exports.js
-aws-exports.ts
-
-# Amplify Gen2 generated files
-src/types/amplify-generated.ts
-amplify/data/schema.graphql
-amplify/functions/**/dist/
-amplify/functions/**/node_modules/
-
-# IDE and editor files
+# IDEs
 .vscode/settings.json
 .vscode/launch.json
 .idea/
@@ -78,270 +26,38 @@ ehthumbs.db
 Thumbs.db
 
 # Logs
-logs/
 *.log
-log/
-log.txt
-debug.log
-error.log
-access.log
-application.log
-server.log
-npm-debug.log
-yarn-debug.log
-pnpm-debug.log
-*.log.*
-*.log.gz
+logs/
 
-# Deployment logs
-ログ/
-Deployment-*-logs*
-*Deployment-*-logs*
-
-# Runtime data
-pids/
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage directory used by tools like istanbul
-coverage/
-*.lcov
-
-# nyc test coverage
-.nyc_output/
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-.pytest_cache/
-*.pyc
-.python-version
-
-# Python virtual environments
-agents/venv/
-agents/env/
-agents/.venv/
-
-# Python build artifacts
-agents/dist/
-agents/build/
-agents/*.egg-info/
-
-# Python test artifacts
-agents/.coverage
-agents/htmlcov/
-agents/.tox/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# pyenv
-.python-version
-
-# MAGI Decision System - Strands Agents
-agents/.env
-!agents/.env.template
-agents/logs/
-agents/cache/
-agents/temp/
-agents/*/node_modules/
-agents/*/dist/
-agents/*/.env
-agents/*/logs/
-
-# MAGI Decision System - AgentCore Runtime
-agents/.bedrock_agentcore.yaml
-agents/.bedrock_agentcore/
-agents/.dockerignore
-agents/Dockerfile
-agents/venv/
-agents/*.pyc
-agents/__pycache__/
-agents/response.json
-agents/test_request.json
-
-# MAGI Decision System - Agent Gateway (disabled)
-amplify/functions/agent-gateway-disabled/
-
-# MAGI Decision System - Development artifacts
-.kiro/
-docs/build/
-docs/generated/
-
-# OpenTelemetry
-otel-traces/
-*.otlp
+# Environment
+.env
+.env.local
+.env.*.local
 
 # Temporary files
-tmp/
-temp/
 *.tmp
-*.temp
-.pr_body.md
+*.bak
+structure_before.txt
+structure_after.txt
+
+# Development artifacts
+.kiro/
 
 # Security and secrets
 *.pem
 *.key
 *.crt
 secrets.json
-config.json
-.env.*.local
-.env.production
-.env.staging
-
-# AgentCore Runtime sensitive files
-agents/.bedrock_agentcore.yaml
-agents/agentcore_test.py
-agents/local_server.py
-agents/test_local_server.py
-
-# AWS and cloud credentials
-.aws/credentials
-.aws/config
-aws-credentials.json
-gcp-credentials.json
-azure-credentials.json
-
-# API keys and tokens
-api-keys.json
-tokens.json
 .secrets/
 
-# Database
-*.db
-*.sqlite
-*.sqlite3
+# Build outputs (managed in subdirectories)
+frontend/.next/
+frontend/out/
+frontend/.amplify/
+backend/agents/.next/
+backend/agents/backend/.next/
+backend/dist/
+backend/build/
 
 # Cache
 .cache/
-.parcel-cache/
-
-# Testing
-test-results/
-playwright-report/
-playwright/.cache/
-tests/e2e/
-tests/integration/
-
-# Backup files
-*.bak
-*.backup
-
-# Local development
-.local/
-local-config.json
-
-# Cost optimization - exclude large files
-*.zip
-*.tar.gz
-*.rar
-*.7z
-
-# Documentation builds
-docs/build/
-site/
-
-# ============================================================================
-# AgentCore Runtime - AWS Deployment Files
-# 
-# これらのファイルはAWS環境固有の設定や機密情報を含むため除外
-# ============================================================================
-
-# AgentCore configuration (contains AWS account info)
-**/.bedrock_agentcore.yaml
-
-# Docker build artifacts (agents配下のみ除外、ルートは管理対象)
-agents/.dockerignore
-# agents/Dockerfile は管理対象（機密情報なし）
-
-# Python virtual environments
-**/venv/
-**/env/
-
-# AgentCore build artifacts
-**/.bedrock_agentcore/
-
-# Test and development files
-**/test_*.json
-**/response.json
-**/agentcore_test.py
-**/local_server.py
-**/test_local_server.py
-
-
-# Archive directory (deprecated implementations)
-agents/archive/
-
-# ============================================================================
-# Test Output Files
-# 
-# テスト実行時に生成される出力ファイルを除外
-# summary.txtのみ動作確認の証拠として保持
-# ============================================================================
-
-# Streaming test outputs - オリジナル版（test_magi.py）
-agents/tests/streaming_output/*.txt
-agents/tests/streaming_output/*.json
-!agents/tests/streaming_output/summary.txt
-
-# Streaming test outputs - Phase 2版（test_magi2.py）
-agents/tests/streaming_output_phase2/*.txt
-agents/tests/streaming_output_phase2/*.json
-!agents/tests/streaming_output_phase2/summary.txt
-
-# Streaming test outputs - 並列版（test_magi_parallel.py）
-agents/tests/streaming_output_parallel/*.txt
-agents/tests/streaming_output_parallel/*.json
-!agents/tests/streaming_output_parallel/summary.txt
-!agents/tests/streaming_output_parallel/performance_comparison.txt
-
-# Streaming test outputs - カスタムプロンプト版（test_magi3.py）
-agents/tests/streaming_output_custom/*.txt
-agents/tests/streaming_output_custom/*.json
-!agents/tests/streaming_output_custom/comparison.txt
-!agents/tests/streaming_output_custom/json_format_validation.json
-
-# 旧パス（互換性のため）
-streaming_output/
-
-# ============================================================================
-# Next.js Backend (agents/backend/)
-# 
-# ソースコードは管理対象、ビルド成果物と環境設定は除外
-# ============================================================================
-
-# ビルド成果物
-agents/backend/.next/
-agents/backend/out/
-agents/backend/dist/
-agents/backend/build/
-
-# 依存関係
-agents/backend/node_modules/
-
-# 環境設定（ローカル固有）
-agents/backend/.env.local
-agents/backend/.env.*.local
-
-# Next.js生成ファイル
-agents/backend/.next/
-agents/backend/next-env.d.ts
-
-# Docker関連（ローカルビルド用）
-agents/backend/.dockerignore
-agents/tests/streaming_output/balthasar_stream.txt
-agents/tests/streaming_output/caspar_stream.txt
-agents/tests/streaming_output/full_stream.json
-agents/tests/streaming_output/melchior_stream.txt
-agents/tests/streaming_output/summary.txt
-agents/tests/streaming_output_v2/summary.txt
-agents/tests/streaming_output_v2/full_stream.json
