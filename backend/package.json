@@ -1,0 +1,39 @@
+{
+  "name": "magi-agentcore-backend",
+  "version": "1.0.0",
+  "description": "MAGI System AgentCore Runtime Backend (Next.js + Python)",
+  "main": "server.js",
+  "scripts": {
+    "dev": "next dev -p 8080",
+    "build": "next build",
+    "start": "node .next/standalone/server.js",
+    "start:dev": "next start -p 8080",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "^15.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "eslint": "^8.0.0",
+    "eslint-config-next": "^15.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "magi",
+    "agentcore",
+    "bedrock",
+    "strands-agents",
+    "next.js"
+  ],
+  "author": "MAGI System",
+  "license": "MIT"
+}

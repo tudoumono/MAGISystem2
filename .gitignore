@@ -54,10 +54,17 @@ secrets.json
 frontend/.next/
 frontend/out/
 frontend/.amplify/
+backend/.next/
 backend/agents/.next/
 backend/agents/backend/.next/
 backend/dist/
 backend/build/
+
+# Dependencies
+frontend/node_modules/
+backend/node_modules/
+backend/agents/node_modules/
+backend/agents/backend/node_modules/
 
 # Cache
 .cache/

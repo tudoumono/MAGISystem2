@@ -127,13 +127,11 @@ temp/
 *.bak
 
 
-# Next.js Backend (backend/)
-backend/.next/
-backend/out/
-backend/dist/
-backend/build/
-backend/node_modules/
-backend/.env.local
-backend/.env.*.local
-backend/next-env.d.ts
-backend/.dockerignore
+# Next.js Backend (このディレクトリ)
+.next/
+out/
+node_modules/
+.env.local
+.env.*.local
+next-env.d.ts
+.dockerignore
