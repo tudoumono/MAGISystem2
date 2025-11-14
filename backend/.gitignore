@@ -125,3 +125,15 @@ tmp/
 temp/
 *.tmp
 *.bak
+
+
+# Next.js Backend (backend/)
+backend/.next/
+backend/out/
+backend/dist/
+backend/build/
+backend/node_modules/
+backend/.env.local
+backend/.env.*.local
+backend/next-env.d.ts
+backend/.dockerignore
