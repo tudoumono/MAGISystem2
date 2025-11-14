@@ -35,7 +35,6 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
 COPY requirements.txt pyproject.toml ./
 COPY shared/ ./shared/
 COPY config/ ./config/
-COPY .env* ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Pythonエージェントファイルのコピー
