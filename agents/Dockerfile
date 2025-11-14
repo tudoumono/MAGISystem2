@@ -3,6 +3,9 @@
 #
 # このDockerfileは1つのコンテナ内でNext.jsバックエンドとPythonエージェントを統合します。
 # AgentCore Runtime仕様に準拠（ポート8080、/invocations、/ping）
+#
+# ⚠️ ビルド時は必ず --platform linux/arm64 を指定してください
+# 例: docker build --platform linux/arm64 -t magi-agentcore-runtime .
 
 # ベースイメージ: Ubuntu 22.04 (glibc 2.35対応)
 FROM ubuntu:22.04
@@ -75,9 +78,9 @@ ENV PYTHON_PATH=python
 # ポート8080を公開（AgentCore Runtime標準）
 EXPOSE 8080
 
-# ヘルスチェック
+# ヘルスチェック（AgentCore Runtime標準: /ping エンドポイント）
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/api/ping || exit 1
+    CMD curl -f http://localhost:8080/ping || exit 1
 
 # Next.jsバックエンドを起動
 CMD ["npm", "start"]
