@@ -16,16 +16,14 @@ MAGI AgentCore Runtime Test (New Event Format)
     │  └─ spawn('python', ['magi_agent.py'])
     └─ magi_agent.py → Strands Agents → Bedrock
 
-このテストはデプロイ済みのAgentCore Runtimeを使用します。
-
 実行方法:
     cd agents/tests
     python test_magi4.py
 
-環境変数:
-    MAGI_AGENT_ARN - AgentCore RuntimeのARN（必須）
-    APP_AWS_REGION または AWS_REGION - AWSリージョン（デフォルト: ap-northeast-1）
-    DEBUG_STREAMING - デバッグ出力の有効化（デフォルト: true）
+設定方法:
+    1. agents/.env ファイル
+    2. 環境変数 MAGI_AGENT_ARN, APP_AWS_REGION (または AWS_REGION)
+    3. .bedrock_agentcore.yaml ファイル（自動フォールバック）
 
 出力ファイル:
     - agents/tests/streaming_output_v2/caspar_stream.txt
@@ -37,13 +35,20 @@ MAGI AgentCore Runtime Test (New Event Format)
 """
 
 import json
-import os
 import sys
-import uuid
-import asyncio
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List
+from datetime import datetime
+from typing import Dict, Any
+
+# 共通設定モジュールをインポート
+sys.path.append(str(Path(__file__).parent.parent))
+
+try:
+    from shared.config import get_config
+except ImportError as e:
+    print(f"❌ インポートエラー: {e}")
+    print(f"   shared/config.py が存在することを確認してください")
+    sys.exit(1)
 
 # AWS SDK
 import boto3
@@ -136,7 +141,8 @@ class AgentCoreRuntimeTester:
                 "question": question
             }
             
-            # セッションID生成（最小33文字必要）
+            # セッションID生成（UUID使用）
+            import uuid
             runtime_session_id = f"test-v2-{int(datetime.now().timestamp())}-{uuid.uuid4().hex}"
             
             print(f"📡 Sending request to AgentCore Runtime...")
@@ -160,14 +166,7 @@ class AgentCoreRuntimeTester:
                 raise Exception(f"Unexpected response structure: {list(response.keys())}")
             
             # ストリーミング処理（同期版）
-            import asyncio
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            
-            try:
-                loop.run_until_complete(self._process_event_stream_async(event_stream))
-            finally:
-                loop.close()
+            self._process_event_stream(event_stream)
             
             self.stats["end_time"] = datetime.now()
             
@@ -180,30 +179,23 @@ class AgentCoreRuntimeTester:
             import traceback
             traceback.print_exc()
     
-    async def _process_event_stream_async(self, event_stream):
+    def _process_event_stream(self, event_stream):
         """
-        AgentCore Runtimeのイベントストリームを非同期処理
+        AgentCore Runtimeのイベントストリームを処理
         
         Args:
             event_stream: Boto3のイベントストリーム（StreamingBody）
         """
-        buffer = ""
         line_count = 0
         
         try:
             print(f"🔍 Stream type: {type(event_stream).__name__}")
-            print(f"🔍 Stream methods: {[m for m in dir(event_stream) if not m.startswith('_')][:10]}")
+            print("✅ Using iter_lines() for streaming...")
             print()
             
             # StreamingBodyの場合、iter_lines()を使用
             if hasattr(event_stream, 'iter_lines'):
-                print("✅ Using iter_lines() for streaming...")
-                print()
-                
                 for line in event_stream.iter_lines():
-                    # 非同期処理を挟む
-                    await asyncio.sleep(0)
-                    
                     line_count += 1
                     
                     if line:
@@ -281,7 +273,6 @@ class AgentCoreRuntimeTester:
                 
         except json.JSONDecodeError as e:
             # JSONパースエラーは無視（ログメッセージや不完全なチャンクなど）
-            # agent_thinkingイベントは文字単位で送信されるため、大量のパースエラーが発生する
             pass
         
         return None
@@ -325,8 +316,9 @@ class AgentCoreRuntimeTester:
             text = event_data.get("text", "")
             
             # チャンクを保存
-            self.streams[agent_id].append(text)
-            self.stats["chunks_by_agent"][agent_id] += 1
+            if agent_id in self.streams:
+                self.streams[agent_id].append(text)
+                self.stats["chunks_by_agent"][agent_id] += 1
             
             if self.verbose:
                 print(f"   💭 {agent_id.upper()}: {text}")
@@ -363,9 +355,10 @@ class AgentCoreRuntimeTester:
             self.streams["solomon"].append(text)
             self.stats["chunks_by_agent"]["solomon"] += 1
             
-            # 進捗表示
-            preview = text[:50].replace('\n', ' ')
-            print(f"   💭 SOLOMON: {preview}{'...' if len(text) > 50 else ''}")
+            if self.verbose:
+                # 進捗表示
+                preview = text[:50].replace('\n', ' ')
+                print(f"   💭 SOLOMON: {preview}{'...' if len(text) > 50 else ''}")
         
         elif event_type == "judge_complete":
             final_decision = event_data.get("final_decision")
@@ -508,34 +501,51 @@ def main():
     """
     メイン関数
     """
-    # AgentCore Runtime ARN
-    agent_arn = os.environ.get('MAGI_AGENT_ARN')
-    
-    if not agent_arn:
-        print("❌ MAGI_AGENT_ARN environment variable is required")
+    try:
+        # 設定読み込み
+        config = get_config()
+        
+        # 設定表示
+        print("🚀 MAGI AgentCore Runtime Test")
+        print("=" * 80)
+        config.print_config()
+        print("=" * 80)
         print()
-        print("Usage:")
-        print("  export MAGI_AGENT_ARN='arn:aws:bedrock-agentcore:...'")
-        print("  python test_magi4.py")
+        
+        # AgentCore Runtime ARNとリージョン取得
+        agent_arn = config.get_agent_arn()
+        region = config.get_region()
+        
+        # デバッグモード設定
+        verbose = True
+        
+        # テスト質問
+        test_question = "新しいAIシステムを全社に導入すべきか？コスト削減と効率化が期待されるが、従業員の反発も予想される。"
+        
+        # テスター初期化
+        tester = AgentCoreRuntimeTester(agent_arn, region, verbose=verbose)
+        
+        # テスト実行
+        tester.test_streaming(test_question)
+        
+    except ValueError as e:
+        print(f"❌ 設定エラー: {e}")
         print()
-        print("Or get it from agentcore status:")
-        print("  agentcore status")
+        print("設定方法:")
+        print("  1. agents/.env ファイルに以下を設定:")
+        print("     MAGI_AGENT_ARN=arn:aws:bedrock-agentcore:...")
+        print("     APP_AWS_REGION=ap-northeast-1")
+        print()
+        print("  2. または環境変数を設定:")
+        print("     export MAGI_AGENT_ARN='arn:aws:bedrock-agentcore:...'")
+        print("     export APP_AWS_REGION='ap-northeast-1'")
         sys.exit(1)
     
-    # AWSリージョン
-    region = os.environ.get('APP_AWS_REGION') or os.environ.get('AWS_REGION', 'ap-northeast-1')
-    
-    # デバッグモード設定
-    verbose = os.environ.get('DEBUG_STREAMING', 'true').lower() == 'true'
-    
-    # テスト質問
-    test_question = "新しいAIシステムを全社に導入すべきか？コスト削減と効率化が期待されるが、従業員の反発も予想される。"
-    
-    # テスター初期化
-    tester = AgentCoreRuntimeTester(agent_arn, region, verbose=verbose)
-    
-    # テスト実行
-    tester.test_streaming(test_question)
+    except Exception as e:
+        print(f"❌ 予期しないエラー: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == "__main__":

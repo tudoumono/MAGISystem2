@@ -343,3 +343,5 @@ agents/tests/streaming_output/caspar_stream.txt
 agents/tests/streaming_output/full_stream.json
 agents/tests/streaming_output/melchior_stream.txt
 agents/tests/streaming_output/summary.txt
+agents/tests/streaming_output_v2/summary.txt
+agents/tests/streaming_output_v2/full_stream.json
