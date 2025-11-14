@@ -1,0 +1,127 @@
+# ============================================================================
+# MAGI Decision System - Backend .gitignore
+#
+# Python Agents とバックエンドサービス固有の除外ファイル
+# ============================================================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+env.bak/
+venv.bak/
+*.pyc
+.python-version
+
+# Python virtual environments
+agents/venv/
+agents/env/
+agents/.venv/
+
+# Python build artifacts
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+*.lcov
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+log/
+log.txt
+
+# MAGI Decision System - Strands Agents
+agents/.env
+!agents/.env.template
+agents/logs/
+agents/cache/
+agents/temp/
+
+# MAGI Decision System - AgentCore Runtime
+agents/.bedrock_agentcore.yaml
+agents/.bedrock_agentcore/
+agents/.dockerignore
+agents/venv/
+agents/*.pyc
+agents/__pycache__/
+agents/response.json
+agents/test_request.json
+
+# AgentCore test files
+agents/agentcore_test.py
+agents/local_server.py
+agents/test_local_server.py
+**/test_*.json
+**/response.json
+
+# Archive directory
+agents/archive/
+
+# Test Output Files
+agents/tests/streaming_output/*.txt
+agents/tests/streaming_output/*.json
+!agents/tests/streaming_output/summary.txt
+
+agents/tests/streaming_output_phase2/*.txt
+agents/tests/streaming_output_phase2/*.json
+!agents/tests/streaming_output_phase2/summary.txt
+
+agents/tests/streaming_output_parallel/*.txt
+agents/tests/streaming_output_parallel/*.json
+!agents/tests/streaming_output_parallel/summary.txt
+!agents/tests/streaming_output_parallel/performance_comparison.txt
+
+agents/tests/streaming_output_custom/*.txt
+agents/tests/streaming_output_custom/*.json
+!agents/tests/streaming_output_custom/comparison.txt
+!agents/tests/streaming_output_custom/json_format_validation.json
+
+agents/tests/streaming_output_v2/*.txt
+agents/tests/streaming_output_v2/*.json
+!agents/tests/streaming_output_v2/summary.txt
+
+# Next.js Backend (agents/backend/)
+agents/backend/.next/
+agents/backend/out/
+agents/backend/dist/
+agents/backend/build/
+agents/backend/node_modules/
+agents/backend/.env.local
+agents/backend/.env.*.local
+agents/backend/next-env.d.ts
+agents/backend/.dockerignore
+
+# AWS
+.aws-sam/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak

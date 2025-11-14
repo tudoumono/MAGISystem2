@@ -1,0 +1,89 @@
+# ============================================================================
+# MAGI Decision System - Frontend .gitignore
+#
+# Next.js フロントエンドアプリケーション固有の除外ファイル
+# ============================================================================
+
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Testing
+/coverage
+.nyc_output/
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Next.js
+/.next/
+/out/
+.next/
+out/
+dist/
+build/
+.vercel/
+.turbo/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+.tscache/
+
+# Local env files
+.env
+.env.local
+.env.local.backup.*
+.env.development.local
+.env.test.local
+.env.production.local
+.env.production
+.env.staging
+
+# Misc
+.DS_Store
+*.pem
+
+# AWS Amplify Gen2
+.amplify/
+amplify_outputs.json
+amplify/backend/amplify-meta.json
+amplify/backend/awscloudformation/
+amplify/mock-data/
+amplify/mock-api-resources/
+amplify/team-provider-info.json
+amplify/.config/
+
+# AWS credentials and config
+.aws/
+aws-exports.js
+aws-exports.ts
+
+# Amplify Gen2 generated files
+src/types/amplify-generated.ts
+amplify/data/schema.graphql
+amplify/functions/**/dist/
+amplify/functions/**/node_modules/
+
+# Amplify Gateway (disabled)
+amplify/functions/agent-gateway-disabled/
+
+# OpenTelemetry
+otel-traces/
+*.otlp
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+.pr_body.md
+
+# Cache
+.cache/
+.parcel-cache/
