@@ -14,25 +14,7 @@ const nextConfig = {
   
   // 静的ファイル最適化
   compress: true,
-  
-  // AgentCore Runtime標準エンドポイント + ヘルスチェック
-  async rewrites() {
-    return [
-      {
-        source: '/invocations',
-        destination: '/api/invocations'
-      },
-      {
-        source: '/ping',
-        destination: '/api/ping'
-      },
-      {
-        source: '/health',
-        destination: '/api/ping'
-      }
-    ];
-  },
-  
+
   // CORS設定（AgentCore Runtime用 - 参考記事準拠）
   async headers() {
     return [
