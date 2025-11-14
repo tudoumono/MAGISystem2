@@ -8,7 +8,7 @@ Amplify CognitoとAgentCore Runtimeを統合し、認証されたユーザーの
 
 - **参考記事**: [Amplify HostingでBedrock AgentCoreを使う](https://qiita.com/moritalous/items/ea695f8a328585e1313b)
 - **既存実装**: `src/lib/auth/server-actions.ts`, `src/lib/amplify/client.ts`
-- **AgentCore Runtime**: `agents/backend/app/api/invocations/route.ts`
+- **AgentCore Runtime**: `agents/backend/src/app/api/invocations/route.ts`
 
 ## 🏗️ アーキテクチャ
 
@@ -103,7 +103,7 @@ NEXT_PUBLIC_AGENTCORE_URL=https://your-agentcore-url.amplifyapp.com
 
 ### Step 2: バックエンド - JWT検証実装
 
-**ファイル**: `agents/backend/app/api/invocations/route.ts`
+**ファイル**: `agents/backend/src/app/api/invocations/route.ts`
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
 import { createRemoteJWKSet, jwtVerify, JWTPayload } from 'jose';
 
 // Cognito公開鍵のエンドポイント
-const COGNITO_JWKS_URL = `https://cognito-idp.${process.env.NEXT_PUBLIC_AWS_REGION}.amazonaws.com/${process.env.COGNITO_USER_POOL_ID}/.well-known/jwks.json`;
+const COGNITO_JWKS_URL = `https://cognito-idp.${process.env.AWS_REGION}.amazonaws.com/${process.env.COGNITO_USER_POOL_ID}/.well-known/jwks.json`;
 
 // 公開鍵セット（キャッシュ）
 const JWKS = createRemoteJWKSet(new URL(COGNITO_JWKS_URL));
@@ -211,7 +211,7 @@ export async function verifyJWT(token: string): Promise<JWTPayload> {
   try {
     // JWT検証（署名、有効期限、発行者等）
     const { payload } = await jwtVerify(token, JWKS, {
-      issuer: `https://cognito-idp.${process.env.NEXT_PUBLIC_AWS_REGION}.amazonaws.com/${process.env.COGNITO_USER_POOL_ID}`,
+      issuer: `https://cognito-idp.${process.env.AWS_REGION}.amazonaws.com/${process.env.COGNITO_USER_POOL_ID}`,
       audience: process.env.COGNITO_CLIENT_ID, // オプション: クライアントIDチェック
     });
 

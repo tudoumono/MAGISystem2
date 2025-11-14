@@ -77,7 +77,7 @@ async def _merge_streams(self, tasks):
 
 ### ❌ 未実装
 
-#### Next.js Backend: `agents/backend/app/api/invocations/route.ts`
+#### Next.js Backend: `agents/backend/src/app/api/invocations/route.ts`
 
 ```typescript
 pythonProcess.on('close', (code) => {
@@ -185,7 +185,7 @@ Pythonプロセスが蓄積
 
 ### 1. Next.js Backend - プロセス監視タイムアウト
 
-**ファイル**: `agents/backend/app/api/invocations/route.ts`
+**ファイル**: `agents/backend/src/app/api/invocations/route.ts`
 
 ```typescript
 export async function POST(request: NextRequest) {
