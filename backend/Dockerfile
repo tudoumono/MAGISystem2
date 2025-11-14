@@ -41,19 +41,20 @@ COPY config/ ./config/
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Pythonエージェントファイルのコピー
-COPY magi_agent.py ./
+COPY magi_agent.py magi_agent_sequential.py ./
 COPY shared/ ./shared/
 COPY config/ ./config/
 
 # Next.jsバックエンドのコピーとビルド
-COPY backend/package*.json ./backend/
+COPY package*.json ./backend/
 WORKDIR /app/backend
 
 # 開発依存関係を含めてインストール（ビルドに必要）
 RUN npm ci
 
 # Next.jsソースコードのコピー
-COPY backend/ ./
+COPY app/ ./app/
+COPY next.config.js tsconfig.json ./
 
 # 実行権限を付与してNext.jsビルド
 RUN chmod +x node_modules/.bin/* && npm run build
