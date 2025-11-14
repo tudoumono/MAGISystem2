@@ -34,11 +34,13 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
 # Python依存関係のコピーとインストール
 COPY requirements.txt pyproject.toml ./
 COPY shared/ ./shared/
+COPY config/ ./config/
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Pythonエージェントファイルのコピー
 COPY magi_agent.py ./
 COPY shared/ ./shared/
+COPY config/ ./config/
 
 # Next.jsバックエンドのコピーとビルド
 COPY backend/package*.json ./backend/
