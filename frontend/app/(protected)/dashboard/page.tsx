@@ -178,6 +178,107 @@ export default function DashboardPage() {
           </Card>
         </div>
 
+        {/* 開発用ナビゲーション */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <span className="text-sm px-2 py-1 bg-amber-100 text-amber-800 rounded">開発</span>
+              すべてのページ
+            </CardTitle>
+            <CardDescription>
+              開発・デバッグ用のページナビゲーション
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* メインページ */}
+              <div>
+                <h4 className="font-medium text-foreground mb-2">メインページ</h4>
+                <div className="space-y-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => router.push('/')}
+                  >
+                    🏠 ホーム
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => router.push('/dashboard')}
+                  >
+                    📊 ダッシュボード
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => router.push('/chat')}
+                  >
+                    💬 チャット
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => router.push('/settings/agents')}
+                  >
+                    ⚙️ エージェント設定
+                  </Button>
+                </div>
+              </div>
+
+              {/* 認証ページ */}
+              <div>
+                <h4 className="font-medium text-foreground mb-2">認証ページ</h4>
+                <div className="space-y-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => router.push('/signin')}
+                  >
+                    🔑 サインイン
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => router.push('/signup')}
+                  >
+                    📝 サインアップ
+                  </Button>
+                </div>
+              </div>
+
+              {/* 開発/デバッグページ */}
+              <div>
+                <h4 className="font-medium text-foreground mb-2">開発/デバッグ</h4>
+                <div className="space-y-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => router.push('/test')}
+                  >
+                    🧪 テストダッシュボード
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => router.push('/debug/environment-check')}
+                  >
+                    🔧 環境変数デバッグ
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* システム情報 */}
         <Card>
           <CardHeader>
@@ -197,7 +298,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
-              
+
               <div>
                 <h4 className="font-medium text-foreground mb-2">実装状況</h4>
                 <div className="space-y-1 text-sm">
