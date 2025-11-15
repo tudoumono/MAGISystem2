@@ -77,11 +77,11 @@ export default function EnvironmentDebugPage() {
     setTestResults('');
     const results: string[] = [];
 
-    results.push('🔍 Testing /api/invocations endpoint...');
-    console.log('🔍 Testing /api/invocations endpoint...');
+    results.push('🔍 Testing /invocations endpoint...');
+    console.log('🔍 Testing /invocations endpoint...');
 
     try {
-      const invocationUrl = `${agentCoreUrl}/api/invocations`;
+      const invocationUrl = `${agentCoreUrl}/invocations`;
       results.push(`\n📡 POST to: ${invocationUrl}`);
 
       const testPayload = {
@@ -144,7 +144,7 @@ export default function EnvironmentDebugPage() {
           results.push(`\n📄 Response: ${text.substring(0, 500)}${text.length > 500 ? '...' : ''}`);
         }
 
-        alert(`✅ /api/invocations 接続成功!\n\nStatus: ${response.status}\nTime: ${duration}ms\nContent-Type: ${contentType}`);
+        alert(`✅ /invocations 接続成功!\n\nStatus: ${response.status}\nTime: ${duration}ms\nContent-Type: ${contentType}`);
       } else {
         results.push(`\n⚠️ APIエラー (Status: ${response.status})`);
         const text = await response.text();
@@ -161,7 +161,7 @@ export default function EnvironmentDebugPage() {
         results.push(`\n💡 ヒント: TypeError は通常、CORS設定の問題またはネットワークエラーです`);
       }
 
-      alert(`❌ /api/invocations 接続失敗\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      alert(`❌ /invocations 接続失敗\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 
     setTestResults(results.join('\n'));
@@ -254,7 +254,7 @@ export default function EnvironmentDebugPage() {
                 disabled={isLoading}
                 className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                {isLoading ? '⏳ テスト中...' : '2️⃣ API エンドポイントテスト（/api/invocations）'}
+                {isLoading ? '⏳ テスト中...' : '2️⃣ API エンドポイントテスト（/invocations）'}
               </button>
               <p className="text-sm text-gray-600 mt-2">実際のAPIエンドポイントとSSEストリーミングを確認します</p>
             </div>
@@ -319,7 +319,7 @@ export default function EnvironmentDebugPage() {
             </div>
 
             <div>
-              <h3 className="font-semibold mb-2">3. /pingは成功するが/api/invocationsが失敗する場合</h3>
+              <h3 className="font-semibold mb-2">3. /pingは成功するが/invocationsが失敗する場合</h3>
               <ul className="list-disc list-inside text-gray-700 space-y-1 ml-4">
                 <li><strong>Pythonプロセス:</strong> DockerコンテナにPython環境が正しく設定されているか</li>
                 <li><strong>依存関係:</strong> requirements.txtのパッケージがインストールされているか</li>

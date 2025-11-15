@@ -12,9 +12,10 @@ import { data } from './data/resource';
  * - data: DynamoDB + GraphQL API設定（UserSettings含む）
  *
  * アーキテクチャ:
- * - Next.js API Routes: src/app/api/
- * - AgentCore Runtime: agents/magi_agent.py
- * - バックエンドAPI → AgentCore Runtime → Bedrock
+ * - Frontend (Amplify): Next.js UI
+ * - AgentCore Runtime (Docker): backend/app/invocations, backend/app/ping
+ * - Python Agent: backend/magi_agent.py (Strands Agents)
+ * - フロー: Frontend → AgentCore Runtime → Python Agent → Bedrock
  *
  * 参考記事: https://qiita.com/moritalous/items/ea695f8a328585e1313b
  * 実装方針: Next.js API RoutesからPython magi_agent.pyを直接呼び出す

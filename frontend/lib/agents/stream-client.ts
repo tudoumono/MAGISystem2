@@ -51,7 +51,7 @@ export interface StreamOptions {
  * });
  * ```
  * 
- * 関連: agents/backend/app/api/invocations/route.ts, src/hooks/useStreamingAgent.ts
+ * 関連: backend/app/invocations/route.ts, hooks/useStreamingAgent.ts
  */
 export async function streamMAGIResponse(options: StreamOptions): Promise<string> {
   const { question, sessionId, onMessage, onError, onComplete } = options;

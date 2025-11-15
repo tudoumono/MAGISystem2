@@ -105,9 +105,9 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
         }
       }
 
-      console.log(`🔗 Connecting to AgentCore Runtime: ${agentCoreUrl}/api/invocations`);
+      console.log(`🔗 Connecting to AgentCore Runtime: ${agentCoreUrl}/invocations`);
 
-      const response = await fetch(`${agentCoreUrl}/api/invocations`, {
+      const response = await fetch(`${agentCoreUrl}/invocations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

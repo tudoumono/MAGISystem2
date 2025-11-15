@@ -133,10 +133,13 @@ export default function AdminTestDashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <TestCard
                   title="API Health Check"
-                  description="Next.js APIルートの動作状態を確認"
+                  description="AgentCore Runtime /ping エンドポイントの動作状態を確認"
                   icon="💚"
                   status="available"
-                  onClick={() => window.open('/api/health', '_blank')}
+                  onClick={() => {
+                    const backendUrl = process.env.NEXT_PUBLIC_AGENTCORE_URL || 'http://localhost:8080';
+                    window.open(`${backendUrl}/ping`, '_blank');
+                  }}
                 />
 
                 <TestCard
