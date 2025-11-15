@@ -3,9 +3,9 @@ import type { Config } from 'tailwindcss'
 const config: Config = {
   // Tailwind CSSが適用されるファイルパスを指定
   content: [
-    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    './pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
 
   // ダークモード設定（将来のテーマ切り替えに対応）

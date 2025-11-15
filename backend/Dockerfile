@@ -45,11 +45,8 @@ COPY magi_agent.py magi_agent_sequential.py ./
 COPY shared/ ./shared/
 COPY config/ ./config/
 
-# Next.jsバックエンドのコピーとビルド
-COPY package*.json ./backend/
-WORKDIR /app/backend
-
-# 開発依存関係を含めてインストール（ビルドに必要）
+# Next.jsバックエンドの依存関係インストール
+COPY package*.json ./
 RUN npm ci
 
 # Next.jsソースコードのコピー
