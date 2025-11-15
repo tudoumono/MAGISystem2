@@ -184,6 +184,36 @@ for (const line of lines) {
 
 ---
 
+### 7. 接続先 & 環境変数の整合性
+
+- ✅ フロントエンドは `NEXT_PUBLIC_AGENTCORE_URL` を参照し、未設定時は `http://localhost:8080` へフォールバック（`frontend/hooks/useStreamingAgent.ts`）。
+- ✅ バックエンドDockerは `PORT=8080`, `HOSTNAME=0.0.0.0` を公開し、AgentCore標準ポートで待機（`backend/Dockerfile`）。
+- ✅ `/invocations` へのPOST時に `question`, `sessionId`, `agentConfigs` を同一フォーマットで連携。
+
+**整合性: フロント/バックエンド間のURL・ポート設定が一致** ✅
+
+---
+
+### 8. Python MAGIエージェントの入力変換
+
+- ✅ `magi_agent.py` は stdin のJSONをパースし、`agentConfigs` が渡された場合は `custom_prompts` / `model_configs` / `runtime_configs` へ変換する後方互換レイヤーを持つ。
+- ✅ 変換後の設定を `MAGIStrandsAgent` 初期化に使用し、そのままストリーミングイベントを生成。
+- ✅ これによりフロントエンドは常に `agentConfigs` 形式だけを送信すればよく、Python側は追加設定の変更にも追従可能。
+
+**整合性: Python層とのデータモデル互換性を確認** ✅
+
+---
+
+### 9. デバッグ/ヘルスチェックパス
+
+- ✅ `frontend/app/(admin)/debug/environment/page.tsx` の診断UIから `/ping` と `/invocations` の疎通確認が可能。
+- ✅ `backend/app/ping/route.ts` は単純なJSONを返し、Docker HEALTHCHECK でも使用される。
+- ✅ `/invocations` 実行結果は同ページのログで確認でき、接続失敗時はフロント側で警告を表示。
+
+**整合性: 監視・診断経路も相互参照済み** ✅
+
+---
+
 ## 🎯 総合評価
 
 ### ✅ フロントエンド ⇔ バックエンド統合: **完璧**
