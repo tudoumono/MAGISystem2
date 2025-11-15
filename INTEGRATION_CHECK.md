@@ -197,17 +197,35 @@ for (const line of lines) {
 
 ---
 
-### 7. 接続先 & 環境変数の整合性
+### 7. 環境変数・ネットワークレイヤーの整合性
 
-- ✅ フロントエンドは `NEXT_PUBLIC_AGENTCORE_URL` を参照し、未設定時は `http://localhost:8080` へフォールバック（`frontend/hooks/useStreamingAgent.ts`）。
-- ✅ バックエンドDockerは `PORT=8080`, `HOSTNAME=0.0.0.0` を公開し、AgentCore標準ポートで待機（`backend/Dockerfile`）。
-- ✅ `/invocations` へのPOST時に `question`, `sessionId`, `agentConfigs` を同一フォーマットで連携。
+| レイヤー | 役割 | 参照ファイル | 必須設定 |
+| --- | --- | --- | --- |
+| Frontend (Amplify Next.js) | AgentCore Runtime のURLを解決し、`/invocations`へPOST | `frontend/hooks/useStreamingAgent.ts` | `NEXT_PUBLIC_AGENTCORE_URL` （Amplify Hostingで必須。未設定時は `http://localhost:8080` フォールバック） |
+| Backend (Next.js AgentCore Runtime) | Pythonスクリプトをspawnし、SSEストリームを生成 | `backend/app/invocations/route.ts` | `PYTHON_PATH`（デフォルト `python`）、`MAGI_SCRIPT_PATH`（デフォルト `/app/magi_agent.py`） |
+| Backend Docker | Node.js + Python統合実行環境を提供 | `backend/Dockerfile` | `PORT=8080`, `HOSTNAME=0.0.0.0`, `PYTHONPATH=/app` |
+
+Amplify Hosting → AgentCore Runtime → Pythonコンテナの3層すべてが同じポート（8080）とルーティング(`/ping`, `/invocations`)を共有しているため、参考リポジトリ `claude/reorganize-project-structure-01LZvaKNFMtyAbTRMwnfqxgb` の構成要件と一致します。Dockerコンテナに対しては `EXPOSE 8080` と `/ping` ヘルスチェックを宣言しているため、Amplifyが提供する外部ALB/ALBヘルスチェックと同等の挙動を再現できます。
 
 **整合性: フロント/バックエンド間のURL・ポート設定が一致** ✅
 
 ---
 
-### 8. Python MAGIエージェントの入力変換
+### 8. Amplify Gen2 Backendとの接続
+
+`frontend/amplify/backend.ts` では Amplify Gen2 の `auth` / `data` リソースのみを定義し、LLM推論は **すべて AgentCore Runtime (backend)** に委譲しています。これにより、参考構成の「Frontend → Amplify（SSR） → AgentCore Runtime（Next.js→Python）」の責務分離が明確になっています。
+
+- Amplify側: 認証 + 会話データの保存（DynamoDB）
+- AgentCore Runtime側: `/ping` によるヘルス確認と `/invocations` による推論呼び出し
+- Python側: Strands Agents（`magi_agent.py`）でBedrockを呼び出し、JSON LinesでSSEを返却
+
+この責務境界により、Amplifyのランタイム更新とAgentCore Runtimeコンテナ更新を独立して行えるため、参考リポジトリと同じDevOpsフローを維持できます。
+
+**整合性: Amplify Gen2とAgentCore Runtimeの責務分離を確認** ✅
+
+---
+
+### 9. Python MAGIエージェントの入力変換
 
 - ✅ `magi_agent.py` は stdin のJSONをパースし、`agentConfigs` が渡された場合は `custom_prompts` / `model_configs` / `runtime_configs` へ変換する後方互換レイヤーを持つ。
 - ✅ 変換後の設定を `MAGIStrandsAgent` 初期化に使用し、そのままストリーミングイベントを生成。
@@ -217,7 +235,7 @@ for (const line of lines) {
 
 ---
 
-### 9. デバッグ/ヘルスチェックパス
+### 10. デバッグ/ヘルスチェックパス
 
 - ✅ `frontend/app/(admin)/debug/environment/page.tsx` の診断UIから `/ping` と `/invocations` の疎通確認が可能。
 - ✅ `backend/app/ping/route.ts` は単純なJSONを返し、Docker HEALTHCHECK でも使用される。
