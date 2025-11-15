@@ -27,7 +27,22 @@ import type { AgentResponse, JudgeResponse } from '@/lib/amplify/types';
  * ストリーミングイベントの型定義
  */
 interface StreamEvent {
-  type: 'agent_start' | 'agent_thinking' | 'agent_chunk' | 'agent_complete' | 'judge_start' | 'judge_chunk' | 'judge_complete' | 'error' | 'complete';
+  type:
+    | 'start'
+    | 'sages_start'
+    | 'agent_start'
+    | 'agent_thinking'
+    | 'agent_chunk'
+    | 'agent_complete'
+    | 'agent_timeout'
+    | 'judge_start'
+    | 'judge_thinking'
+    | 'judge_chunk'
+    | 'judge_complete'
+    | 'judge_timeout'
+    | 'judge_error'
+    | 'error'
+    | 'complete';
   agentId?: string;
   data?: any;
   error?: string;
@@ -197,6 +212,11 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
   const handleStreamEvent = useCallback((event: StreamEvent) => {
     console.log('Processing stream event:', event.type, event.agentId, event.data);
     switch (event.type) {
+      case 'start':
+      case 'sages_start':
+        console.log('Runtime event:', event.type, event.data);
+        break;
+
       case 'agent_start':
         // エージェント開始
         if (event.agentId) {
@@ -289,6 +309,17 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
         }));
         break;
 
+      case 'judge_thinking':
+        // SOLOMONの思考過程（reasoning）を逐次更新
+        setStreamingState(prev => ({
+          ...prev,
+          judgeResponse: {
+            ...prev.judgeResponse,
+            reasoning: (prev.judgeResponse?.reasoning || '') + event.data.text
+          }
+        }));
+        break;
+
       case 'judge_chunk':
         // SOLOMON Judgeのチャンク
         setStreamingState(prev => ({
@@ -309,6 +340,49 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
             ...event.data
           }
         }));
+        break;
+
+      case 'judge_timeout':
+        setStreamingState(prev => ({
+          ...prev,
+          judgeResponse: {
+            ...(prev.judgeResponse || {}),
+            reasoning:
+              event.data?.partial_response ||
+              prev.judgeResponse?.reasoning ||
+              'SOLOMON evaluation timed out.'
+          }
+        }));
+        break;
+
+      case 'judge_error':
+        setStreamingState(prev => ({
+          ...prev,
+          judgeResponse: {
+            ...(prev.judgeResponse || {}),
+            reasoning: `SOLOMON error: ${event.data?.error ?? 'Unknown error'}`
+          },
+          error: new Error(event.data?.error || 'Judge execution failed')
+        }));
+        break;
+
+      case 'agent_timeout':
+        if (event.agentId) {
+          setStreamingState(prev => ({
+            ...prev,
+            agentResponses: {
+              ...prev.agentResponses,
+              [event.agentId]: {
+                ...prev.agentResponses[event.agentId],
+                reasoning:
+                  (prev.agentResponses[event.agentId]?.reasoning || '') +
+                  (event.data?.partial_response
+                    ? `\n[Timeout after ${event.data.timeout}s] ${event.data.partial_response}`
+                    : `\n[Timeout after ${event.data.timeout}s] No additional context.`)
+              }
+            }
+          }));
+        }
         break;
 
       case 'complete':
@@ -336,6 +410,9 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
           eventSourceRef.current = null;
         }
         break;
+
+      default:
+        console.warn('Unhandled stream event:', event);
     }
   }, []);
 

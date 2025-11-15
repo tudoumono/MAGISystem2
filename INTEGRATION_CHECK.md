@@ -62,24 +62,37 @@ Frontend (useStreamingAgent.ts)
 ### 3. イベントタイプの整合性
 
 #### Python が生成するイベント:
+- ✅ `start` / `sages_start`
 - ✅ `agent_start`
+- ✅ `agent_thinking`
 - ✅ `agent_chunk`
 - ✅ `agent_complete`
+- ✅ `agent_timeout`
 - ✅ `judge_start`
+- ✅ `judge_thinking`
 - ✅ `judge_chunk`
 - ✅ `judge_complete`
+- ✅ `judge_timeout`
+- ✅ `judge_error`
 - ✅ `complete`
 - ✅ `error`
 
 #### Frontend が処理するイベント:
 ```typescript
 switch (event.type) {
+  case 'start':          ✅ (ログのみ)
+  case 'sages_start':    ✅ (ログのみ)
   case 'agent_start':    ✅
+  case 'agent_thinking': ✅
   case 'agent_chunk':    ✅
   case 'agent_complete': ✅
+  case 'agent_timeout':  ✅
   case 'judge_start':    ✅
+  case 'judge_thinking': ✅
   case 'judge_chunk':    ✅
   case 'judge_complete': ✅
+  case 'judge_timeout':  ✅
+  case 'judge_error':    ✅
   case 'complete':       ✅
   case 'error':          ✅
 }
