@@ -53,17 +53,18 @@ export async function POST(req: NextRequest) {
 
         try {
           // Python環境変数から実行パスを取得
-          const pythonPath = process.env.PYTHON_PATH || 'python';
+          const pythonPath = process.env.PYTHON_PATH || 'python3';
 
           // スクリプトパスを環境に応じて決定
-          // 開発環境: backend/magi_agent.py（相対パス）
+          // 開発環境: magi_agent.py（カレントディレクトリからの相対パス）
           // 本番環境: /app/magi_agent.py（Dockerコンテナ内）
           const isDevelopment = process.env.NODE_ENV === 'development';
           const scriptPath = process.env.MAGI_SCRIPT_PATH ||
             (isDevelopment
-              ? '/home/user/MAGISystem2/backend/magi_agent.py'
+              ? 'magi_agent.py'
               : '/app/magi_agent.py');
 
+          console.log(`[AgentCore] Current directory: ${process.cwd()}`);
           console.log(`[AgentCore] Starting Python process: ${pythonPath} ${scriptPath}`);
 
           // Pythonプロセスを起動
