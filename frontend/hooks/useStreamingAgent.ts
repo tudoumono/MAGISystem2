@@ -21,7 +21,76 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import type { AgentResponse, JudgeResponse } from '@/lib/amplify/types';
+import type { AgentResponse, JudgeResponse, AgentType } from '@/lib/amplify/types';
+
+const AGENT_IDS: AgentType[] = ['caspar', 'balthasar', 'melchior', 'solomon'];
+
+const EMPTY_VOTING_RESULT: JudgeResponse['votingResult'] = {
+  approved: 0,
+  rejected: 0,
+  abstained: 0,
+};
+
+function normalizeDecision(value?: string | null): JudgeResponse['finalDecision'] | undefined {
+  if (!value) return undefined;
+  const upper = value.toUpperCase();
+  if (upper === 'APPROVED' || upper === 'REJECTED') {
+    return upper as JudgeResponse['finalDecision'];
+  }
+  return undefined;
+}
+
+function mapVotingResult(source?: Partial<JudgeResponse['votingResult']>): JudgeResponse['votingResult'] {
+  if (!source) {
+    return { ...EMPTY_VOTING_RESULT };
+  }
+
+  return {
+    approved: Number(source.approved ?? 0),
+    rejected: Number(source.rejected ?? 0),
+    abstained: Number(source.abstained ?? 0),
+  };
+}
+
+function mapSageScores(scores?: Record<string, number>): JudgeResponse['scores'] {
+  if (!scores) {
+    return [];
+  }
+
+  return Object.entries(scores)
+    .filter(([agentId]) => AGENT_IDS.includes(agentId as AgentType))
+    .map(([agentId, score]) => ({
+      agentId: agentId as AgentType,
+      score: typeof score === 'number' ? score : Number(score ?? 0),
+      reasoning: '',
+    }));
+}
+
+function mapJudgeEventToState(data?: any): Partial<JudgeResponse> {
+  if (!data) {
+    return {};
+  }
+
+  const solomonData = data.solomon_judgment || data;
+  const finalDecision = normalizeDecision(solomonData.finalDecision ?? solomonData.final_decision);
+  const votingSource = data.voting_result || data.votingResult || solomonData.voting_result;
+  const summary = data.summary ?? solomonData.summary ?? solomonData.reasoning ?? '';
+  const finalRecommendation = data.recommendation ?? data.finalRecommendation ?? '';
+  const reasoning = solomonData.reasoning ?? data.reasoning ?? '';
+  const confidenceValue = solomonData.confidence ?? data.confidence;
+  const confidence = typeof confidenceValue === 'number' ? confidenceValue : 0;
+  const scores = mapSageScores(solomonData.sage_scores || data.sage_scores);
+
+  return {
+    finalDecision,
+    votingResult: mapVotingResult(votingSource),
+    summary,
+    finalRecommendation,
+    reasoning,
+    confidence,
+    scores,
+  };
+}
 
 /**
  * ストリーミングイベントの型定義
@@ -243,14 +312,17 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
         break;
 
       case 'agent_thinking':
+        if (!event.agentId || !event.data?.text) {
+          break;
+        }
         // 思考プロセスの更新
         setStreamingState(prev => ({
           ...prev,
           agentResponses: {
             ...prev.agentResponses,
-            [event.agentId!]: {
-              ...prev.agentResponses[event.agentId!],
-              reasoning: (prev.agentResponses[event.agentId!]?.reasoning || '') + event.data.text
+            [event.agentId]: {
+              ...prev.agentResponses[event.agentId],
+              reasoning: (prev.agentResponses[event.agentId]?.reasoning || '') + event.data.text
             }
           }
         }));
@@ -258,7 +330,7 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
 
       case 'agent_chunk':
         // エージェント応答のチャンク
-        if (event.agentId) {
+        if (event.agentId && event.data?.text) {
           setStreamingState(prev => {
             const newContent = (prev.agentResponses[event.agentId!]?.content || '') + event.data.text;
             const newState = {
@@ -282,19 +354,28 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
 
       case 'agent_complete':
         // エージェント完了
-        setStreamingState(prev => ({
-          ...prev,
-          agentResponses: {
-            ...prev.agentResponses,
-            [event.agentId!]: {
-              ...prev.agentResponses[event.agentId!],
-              ...event.data,
-              decision: event.data.decision,
-              confidence: event.data.confidence,
-              executionTime: event.data.executionTime
+        if (event.agentId && event.data) {
+          const executionTime =
+            typeof event.data.executionTime === 'number'
+              ? event.data.executionTime
+              : typeof event.data.execution_time === 'number'
+                ? event.data.execution_time
+                : undefined;
+
+          setStreamingState(prev => ({
+            ...prev,
+            agentResponses: {
+              ...prev.agentResponses,
+              [event.agentId!]: {
+                ...prev.agentResponses[event.agentId!],
+                ...event.data,
+                decision: event.data.decision,
+                confidence: event.data.confidence,
+                executionTime: executionTime ?? prev.agentResponses[event.agentId!]?.executionTime ?? 0
+              }
             }
-          }
-        }));
+          }));
+        }
         break;
 
       case 'judge_start':
@@ -304,7 +385,10 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
           currentAgent: 'solomon',
           judgeResponse: {
             summary: '',
-            reasoning: ''
+            reasoning: '',
+            votingResult: prev.judgeResponse?.votingResult || { ...EMPTY_VOTING_RESULT },
+            scores: prev.judgeResponse?.scores || [],
+            finalRecommendation: prev.judgeResponse?.finalRecommendation || ''
           }
         }));
         break;
@@ -322,13 +406,15 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
 
       case 'judge_chunk':
         // SOLOMON Judgeのチャンク
-        setStreamingState(prev => ({
-          ...prev,
-          judgeResponse: {
-            ...prev.judgeResponse,
-            summary: (prev.judgeResponse?.summary || '') + event.data.text
-          }
-        }));
+        if (event.data?.text) {
+          setStreamingState(prev => ({
+            ...prev,
+            judgeResponse: {
+              ...prev.judgeResponse,
+              summary: (prev.judgeResponse?.summary || '') + event.data.text
+            }
+          }));
+        }
         break;
 
       case 'judge_complete':
@@ -337,7 +423,7 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
           ...prev,
           judgeResponse: {
             ...prev.judgeResponse,
-            ...event.data
+            ...mapJudgeEventToState(event.data)
           }
         }));
         break;
@@ -390,7 +476,11 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
         setStreamingState(prev => ({
           ...prev,
           isStreaming: false,
-          currentAgent: null
+          currentAgent: null,
+          judgeResponse: {
+            ...prev.judgeResponse,
+            ...mapJudgeEventToState(event.data)
+          }
         }));
         if (eventSourceRef.current) {
           eventSourceRef.current.close();
@@ -403,7 +493,7 @@ export function useStreamingAgent(): UseStreamingAgentReturn {
         setStreamingState(prev => ({
           ...prev,
           isStreaming: false,
-          error: new Error(event.error || 'ストリーミングエラー')
+          error: new Error(event.data?.error || event.error || 'ストリーミングエラー')
         }));
         if (eventSourceRef.current) {
           eventSourceRef.current.close();
