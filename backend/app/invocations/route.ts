@@ -53,7 +53,8 @@ export async function POST(req: NextRequest) {
 
         try {
           // Python環境変数から実行パスを取得
-          const pythonPath = process.env.PYTHON_PATH || 'python3';
+          // WSL環境でWindowsのPythonが呼ばれるのを防ぐため、絶対パスを使用
+          const pythonPath = process.env.PYTHON_PATH || '/usr/local/bin/python3';
 
           // スクリプトパスを環境に応じて決定
           // 開発環境: magi_agent.py（カレントディレクトリからの相対パス）
