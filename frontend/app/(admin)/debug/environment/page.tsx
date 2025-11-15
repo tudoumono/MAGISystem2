@@ -183,57 +183,99 @@ export default function EnvironmentDebugPage() {
           <h2 className="text-xl font-semibold mb-4">重要な環境変数</h2>
 
           <div className="space-y-3">
-            <div className="border-b pb-2">
-              <span className="font-mono text-sm text-gray-600">NEXT_PUBLIC_AGENTCORE_URL:</span>
-              <div className="mt-1">
-                <code className="text-lg font-bold text-blue-600">
-                  {process.env.NEXT_PUBLIC_AGENTCORE_URL || '❌ 未設定'}
-                </code>
+            {/* 開発/デバッグ設定 */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">開発・デバッグ設定</h3>
+              <div className="border-b pb-2 mb-2">
+                <span className="font-mono text-sm text-gray-600">NEXT_PUBLIC_ENABLE_TEST_PAGES:</span>
+                <div className="mt-1">
+                  <code className="text-lg font-bold">
+                    {process.env.NEXT_PUBLIC_ENABLE_TEST_PAGES === 'true' ? (
+                      <span className="text-amber-600">✓ 有効</span>
+                    ) : (
+                      <span className="text-gray-600">無効 (本番推奨)</span>
+                    )}
+                  </code>
+                </div>
+              </div>
+              <div className="border-b pb-2">
+                <span className="font-mono text-sm text-gray-600">NODE_ENV:</span>
+                <div className="mt-1">
+                  <code className="text-lg">
+                    {process.env.NODE_ENV || '❌ 未設定'}
+                  </code>
+                </div>
               </div>
             </div>
 
-            <div className="border-b pb-2">
-              <span className="font-mono text-sm text-gray-600">NEXT_PUBLIC_AWS_REGION:</span>
-              <div className="mt-1">
-                <code className="text-lg">
-                  {process.env.NEXT_PUBLIC_AWS_REGION || '❌ 未設定'}
-                </code>
+            {/* AgentCore Runtime設定 */}
+            <div className="pt-3">
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">AgentCore Runtime</h3>
+              <div className="border-b pb-2 mb-2">
+                <span className="font-mono text-sm text-gray-600">NEXT_PUBLIC_AGENTCORE_URL:</span>
+                <div className="mt-1">
+                  <code className="text-lg font-bold text-blue-600">
+                    {process.env.NEXT_PUBLIC_AGENTCORE_URL || '❌ 未設定'}
+                  </code>
+                </div>
+              </div>
+              <div className="border-b pb-2">
+                <span className="font-mono text-sm text-gray-600">NEXT_PUBLIC_SSE_TIMEOUT_MS:</span>
+                <div className="mt-1">
+                  <code className="text-sm">
+                    {process.env.NEXT_PUBLIC_SSE_TIMEOUT_MS || 'デフォルト値使用 (240000ms = 4分)'}
+                  </code>
+                </div>
               </div>
             </div>
 
-            <div className="border-b pb-2">
-              <span className="font-mono text-sm text-gray-600">NODE_ENV:</span>
-              <div className="mt-1">
-                <code className="text-lg">
-                  {process.env.NODE_ENV || '❌ 未設定'}
-                </code>
+            {/* AWS/Cognito設定 */}
+            <div className="pt-3">
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">AWS・認証設定</h3>
+              <div className="border-b pb-2 mb-2">
+                <span className="font-mono text-sm text-gray-600">NEXT_PUBLIC_AWS_REGION:</span>
+                <div className="mt-1">
+                  <code className="text-sm">
+                    {process.env.NEXT_PUBLIC_AWS_REGION || '❌ 未設定'}
+                  </code>
+                </div>
+              </div>
+              <div className="border-b pb-2 mb-2">
+                <span className="font-mono text-sm text-gray-600">NEXT_PUBLIC_USER_POOL_ID:</span>
+                <div className="mt-1">
+                  <code className="text-sm">
+                    {process.env.NEXT_PUBLIC_USER_POOL_ID || '❌ 未設定'}
+                  </code>
+                </div>
+              </div>
+              <div className="border-b pb-2">
+                <span className="font-mono text-sm text-gray-600">NEXT_PUBLIC_USER_POOL_CLIENT_ID:</span>
+                <div className="mt-1">
+                  <code className="text-sm">
+                    {process.env.NEXT_PUBLIC_USER_POOL_CLIENT_ID || '❌ 未設定'}
+                  </code>
+                </div>
               </div>
             </div>
 
-            <div className="border-b pb-2">
-              <span className="font-mono text-sm text-gray-600">NEXT_PUBLIC_SSE_TIMEOUT_MS:</span>
-              <div className="mt-1">
-                <code className="text-lg">
-                  {process.env.NEXT_PUBLIC_SSE_TIMEOUT_MS || 'デフォルト値使用 (240000ms = 4分)'}
-                </code>
+            {/* GraphQL/AppSync設定 */}
+            <div className="pt-3">
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">GraphQL・AppSync</h3>
+              <div className="border-b pb-2 mb-2">
+                <span className="font-mono text-sm text-gray-600">NEXT_PUBLIC_GRAPHQL_ENDPOINT:</span>
+                <div className="mt-1">
+                  <code className="text-sm break-all">
+                    {process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || '❌ 未設定'}
+                  </code>
+                </div>
               </div>
-            </div>
-
-            <div className="border-b pb-2">
-              <span className="font-mono text-sm text-gray-600">NEXT_PUBLIC_USER_POOL_ID:</span>
-              <div className="mt-1">
-                <code className="text-sm">
-                  {process.env.NEXT_PUBLIC_USER_POOL_ID || '❌ 未設定'}
-                </code>
-              </div>
-            </div>
-
-            <div className="border-b pb-2">
-              <span className="font-mono text-sm text-gray-600">NEXT_PUBLIC_GRAPHQL_ENDPOINT:</span>
-              <div className="mt-1">
-                <code className="text-sm break-all">
-                  {process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || '❌ 未設定'}
-                </code>
+              <div className="border-b pb-2">
+                <span className="font-mono text-sm text-gray-600">NEXT_PUBLIC_API_KEY:</span>
+                <div className="mt-1">
+                  <code className="text-sm break-all">
+                    {process.env.NEXT_PUBLIC_API_KEY || '❌ 未設定'}
+                  </code>
+                </div>
               </div>
             </div>
           </div>
