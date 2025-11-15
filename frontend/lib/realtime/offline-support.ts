@@ -240,7 +240,10 @@ export class OfflineManager {
 
       // 簡易的な接続テスト
       const startTime = Date.now();
-      const response = await fetch('/api/health', {
+      // Backend APIのベースURLを環境変数から取得
+      const backendUrl = process.env.NEXT_PUBLIC_AGENTCORE_URL || 'http://localhost:8080';
+
+      const response = await fetch(`${backendUrl}/api/health`, {
         method: 'HEAD',
         cache: 'no-cache'
       });

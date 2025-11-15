@@ -89,7 +89,11 @@ export async function streamMAGIResponse(options: StreamOptions): Promise<string
       }, sseTimeoutMs);
 
       // Server-Sent Events接続（新エンドポイント）
-      const url = new URL('/api/invocations', window.location.origin);
+      // Backend APIのベースURLを環境変数から取得
+      // 開発環境: http://localhost:8080 (backend Dockerコンテナ)
+      // 本番環境: AgentCore Runtime デプロイURL
+      const backendUrl = process.env.NEXT_PUBLIC_AGENTCORE_URL || 'http://localhost:8080';
+      const url = new URL('/api/invocations', backendUrl);
 
       // POSTリクエストのためにfetchを使用
       fetch(url.toString(), {

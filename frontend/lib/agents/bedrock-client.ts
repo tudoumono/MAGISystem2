@@ -157,8 +157,11 @@ export class BedrockAgentClient {
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
+      // Backend APIのベースURLを環境変数から取得
+      const backendUrl = process.env.NEXT_PUBLIC_AGENTCORE_URL || 'http://localhost:8080';
+
       // API呼び出し
-      const response = await fetch('/api/bedrock-agents/execute', {
+      const response = await fetch(`${backendUrl}/api/bedrock-agents/execute`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

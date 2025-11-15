@@ -212,7 +212,10 @@ export default function MAGIWithTrace({
       await sendMessage({ content: question });
 
       // 実際のMAGIシステムの実行（新エンドポイント）
-      const response = await fetch('/api/invocations', {
+      // Backend APIのベースURLを環境変数から取得
+      const backendUrl = process.env.NEXT_PUBLIC_AGENTCORE_URL || 'http://localhost:8080';
+
+      const response = await fetch(`${backendUrl}/api/invocations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
