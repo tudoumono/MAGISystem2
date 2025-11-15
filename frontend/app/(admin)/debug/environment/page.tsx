@@ -182,11 +182,19 @@ export default function EnvironmentDebugPage() {
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4">重要な環境変数</h2>
 
+          <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
+            <p className="text-sm text-blue-800">
+              <strong>📌 重要:</strong> このページで表示される環境変数は<strong>フロントエンド（Amplify）専用</strong>です。<br/>
+              <strong>AgentCore Runtime（バックエンド）</strong>は別環境（Docker/ECS）で動作し、独自の環境変数を持っています。<br/>
+              例: AgentCore RuntimeのAWS認証情報（Bedrock APIキーなど）はここには表示されません。
+            </p>
+          </div>
+
           <div className="space-y-3">
             {/* 開発/デバッグ設定 */}
             <div>
               <h3 className="text-sm font-semibold text-gray-700 mb-2">開発・デバッグ設定</h3>
-              <div className="border-b pb-2 mb-2">
+              <div className="border-b pb-3 mb-2">
                 <span className="font-mono text-sm text-gray-600">NEXT_PUBLIC_ENABLE_TEST_PAGES:</span>
                 <div className="mt-1">
                   <code className="text-lg font-bold">
@@ -197,85 +205,140 @@ export default function EnvironmentDebugPage() {
                     )}
                   </code>
                 </div>
+                <p className="text-xs text-gray-600 mt-2 bg-gray-50 p-2 rounded">
+                  <strong>用途:</strong> デバッグページ（/debugなど）へのアクセス制御<br/>
+                  <strong>必要な理由:</strong> 本番環境で開発ツールを誤って公開しないため<br/>
+                  <strong>バックエンドとの関係:</strong> なし（フロントエンドのみ）
+                </p>
               </div>
-              <div className="border-b pb-2">
+              <div className="border-b pb-3">
                 <span className="font-mono text-sm text-gray-600">NODE_ENV:</span>
                 <div className="mt-1">
                   <code className="text-lg">
                     {process.env.NODE_ENV || '❌ 未設定'}
                   </code>
                 </div>
+                <p className="text-xs text-gray-600 mt-2 bg-gray-50 p-2 rounded">
+                  <strong>用途:</strong> 実行環境の識別（development/production）<br/>
+                  <strong>必要な理由:</strong> 開発時のみデバッグログを出力、本番では最適化<br/>
+                  <strong>バックエンドとの関係:</strong> なし（Next.js自動設定）
+                </p>
               </div>
             </div>
 
             {/* AgentCore Runtime設定 */}
             <div className="pt-3">
               <h3 className="text-sm font-semibold text-gray-700 mb-2">AgentCore Runtime</h3>
-              <div className="border-b pb-2 mb-2">
+              <div className="border-b pb-3 mb-2">
                 <span className="font-mono text-sm text-gray-600">NEXT_PUBLIC_AGENTCORE_URL:</span>
                 <div className="mt-1">
                   <code className="text-lg font-bold text-blue-600">
                     {process.env.NEXT_PUBLIC_AGENTCORE_URL || '❌ 未設定'}
                   </code>
                 </div>
+                <p className="text-xs text-gray-600 mt-2 bg-blue-50 p-2 rounded">
+                  <strong>用途:</strong> バックエンド（AgentCore Runtime）のURL<br/>
+                  <strong>必要な理由:</strong> フロントエンドからMAGI Agentを実行するため<br/>
+                  <strong>バックエンドとの関係:</strong>
+                  <span className="text-blue-700 font-semibold">フロントエンド → backend/app/invocations → Python MAGI Agent</span><br/>
+                  <strong>例:</strong> 開発環境 http://localhost:8080、本番環境 ALB URL
+                </p>
               </div>
-              <div className="border-b pb-2">
+              <div className="border-b pb-3">
                 <span className="font-mono text-sm text-gray-600">NEXT_PUBLIC_SSE_TIMEOUT_MS:</span>
                 <div className="mt-1">
                   <code className="text-sm">
                     {process.env.NEXT_PUBLIC_SSE_TIMEOUT_MS || 'デフォルト値使用 (240000ms = 4分)'}
                   </code>
                 </div>
+                <p className="text-xs text-gray-600 mt-2 bg-gray-50 p-2 rounded">
+                  <strong>用途:</strong> ストリーミング応答の最大待機時間<br/>
+                  <strong>必要な理由:</strong> 3賢者 + SOLOMON Judge の推論に十分な時間を確保<br/>
+                  <strong>バックエンドとの関係:</strong> backend/のタイムアウト設定と連携<br/>
+                  <strong>デフォルト:</strong> 240000ms (4分) = 賢者90秒 + Judge60秒 + バッファ
+                </p>
               </div>
             </div>
 
             {/* AWS/Cognito設定 */}
             <div className="pt-3">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">AWS・認証設定</h3>
-              <div className="border-b pb-2 mb-2">
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">AWS・認証設定（フロントエンドのみ）</h3>
+              <div className="border-b pb-3 mb-2">
                 <span className="font-mono text-sm text-gray-600">NEXT_PUBLIC_AWS_REGION:</span>
                 <div className="mt-1">
                   <code className="text-sm">
                     {process.env.NEXT_PUBLIC_AWS_REGION || '❌ 未設定'}
                   </code>
                 </div>
+                <p className="text-xs text-gray-600 mt-2 bg-purple-50 p-2 rounded">
+                  <strong>用途:</strong> AWS リソースのリージョン指定（Cognito, AppSyncなど）<br/>
+                  <strong>必要な理由:</strong> フロントエンドからAWSサービスに接続するため<br/>
+                  <strong>バックエンドとの関係:</strong> なし（AgentCore Runtimeは独自のAWS認証情報を使用）<br/>
+                  <strong>例:</strong> ap-northeast-1（東京）、us-east-1（バージニア北部）
+                </p>
               </div>
-              <div className="border-b pb-2 mb-2">
+              <div className="border-b pb-3 mb-2">
                 <span className="font-mono text-sm text-gray-600">NEXT_PUBLIC_USER_POOL_ID:</span>
                 <div className="mt-1">
                   <code className="text-sm">
                     {process.env.NEXT_PUBLIC_USER_POOL_ID || '❌ 未設定'}
                   </code>
                 </div>
+                <p className="text-xs text-gray-600 mt-2 bg-purple-50 p-2 rounded">
+                  <strong>用途:</strong> Cognito User PoolのID<br/>
+                  <strong>必要な理由:</strong> ユーザー認証（サインイン/サインアップ）のため<br/>
+                  <strong>バックエンドとの関係:</strong> なし（フロントエンドで完結する認証）<br/>
+                  <strong>形式:</strong> ap-northeast-1_XXXXXXXXX
+                </p>
               </div>
-              <div className="border-b pb-2">
+              <div className="border-b pb-3">
                 <span className="font-mono text-sm text-gray-600">NEXT_PUBLIC_USER_POOL_CLIENT_ID:</span>
                 <div className="mt-1">
                   <code className="text-sm">
                     {process.env.NEXT_PUBLIC_USER_POOL_CLIENT_ID || '❌ 未設定'}
                   </code>
                 </div>
+                <p className="text-xs text-gray-600 mt-2 bg-purple-50 p-2 rounded">
+                  <strong>用途:</strong> Cognito User PoolアプリケーションクライアントのID<br/>
+                  <strong>必要な理由:</strong> このアプリからCognitoへの認証リクエストを識別するため<br/>
+                  <strong>バックエンドとの関係:</strong> なし（フロントエンドのCognito認証に使用）<br/>
+                  <strong>セキュリティ:</strong> NEXT_PUBLIC_* なので公開されるが、User Poolの設定で保護
+                </p>
               </div>
             </div>
 
             {/* GraphQL/AppSync設定 */}
             <div className="pt-3">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">GraphQL・AppSync</h3>
-              <div className="border-b pb-2 mb-2">
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">GraphQL・AppSync（フロントエンドのみ）</h3>
+              <div className="border-b pb-3 mb-2">
                 <span className="font-mono text-sm text-gray-600">NEXT_PUBLIC_GRAPHQL_ENDPOINT:</span>
                 <div className="mt-1">
                   <code className="text-sm break-all">
                     {process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || '❌ 未設定'}
                   </code>
                 </div>
+                <p className="text-xs text-gray-600 mt-2 bg-green-50 p-2 rounded">
+                  <strong>用途:</strong> AWS AppSync GraphQL APIのエンドポイントURL<br/>
+                  <strong>必要な理由:</strong> データの永続化（会話履歴、ユーザー設定など）のため<br/>
+                  <strong>バックエンドとの関係:</strong> なし（フロントエンドから直接AppSyncへ接続）<br/>
+                  <strong>データフロー:</strong> フロントエンド → AppSync → DynamoDB<br/>
+                  <strong>形式:</strong> https://xxxxx.appsync-api.ap-northeast-1.amazonaws.com/graphql
+                </p>
               </div>
-              <div className="border-b pb-2">
+              <div className="border-b pb-3">
                 <span className="font-mono text-sm text-gray-600">NEXT_PUBLIC_API_KEY:</span>
                 <div className="mt-1">
                   <code className="text-sm break-all">
                     {process.env.NEXT_PUBLIC_API_KEY || '❌ 未設定'}
                   </code>
                 </div>
+                <p className="text-xs text-gray-600 mt-2 bg-green-50 p-2 rounded">
+                  <strong>用途:</strong> AppSync APIへのアクセス認証キー<br/>
+                  <strong>必要な理由:</strong> GraphQLクエリ/ミューテーションの認証のため<br/>
+                  <strong>バックエンドとの関係:</strong> なし（AppSyncのみで使用）<br/>
+                  <strong>セキュリティ:</strong> NEXT_PUBLIC_* で公開されるが、AppSyncのスキーマ権限で保護<br/>
+                  <strong>代替:</strong> Cognito認証も使用可能（より安全）
+                </p>
               </div>
             </div>
           </div>
