@@ -27,16 +27,22 @@ import { MAGISystemInterface } from './MAGISystemInterface';
 import { ReasoningTracePanel } from '@/components/trace';
 import { AskAgentResponse } from '@/types/api';
 import { TraceStep } from '@/types/domain';
-import { generateTraceId } from '@/lib/trace/mock-trace-data';
 import { useMessages } from '@/hooks/useMessages';
 import { Button } from '@/components/ui/Button';
-import { 
-  Eye, 
+import {
+  Eye,
   EyeOff,
   RotateCcw,
   Info,
   History
 } from 'lucide-react';
+
+/**
+ * トレースIDを生成
+ */
+function generateTraceId(): string {
+  return `trace_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+}
 
 /**
  * 表示モードの定義
