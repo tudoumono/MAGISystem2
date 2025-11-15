@@ -49,9 +49,11 @@ export const TracePanel: React.FC<TracePanelProps> = ({
 
   /**
    * 外部ページで開く
+   * TODO: トレース専用ページの実装が必要
    */
   const handleOpenExternal = () => {
-    window.open(`/test/trace?traceId=${traceId}`, '_blank');
+    // window.open(`/debug/trace?traceId=${traceId}`, '_blank');
+    console.warn('Trace page not implemented yet');
   };
 
   return (

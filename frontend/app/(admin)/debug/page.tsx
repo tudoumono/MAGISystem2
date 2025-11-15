@@ -234,7 +234,7 @@ export default function DebugDashboard() {
               <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
                 <li>
                   <code className="bg-muted px-2 py-1 rounded text-xs">
-                    src/app/(admin)/test/your-test/page.tsx
+                    app/(admin)/debug/your-test/page.tsx
                   </code>{' '}
                   を作成
                 </li>

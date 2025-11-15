@@ -89,10 +89,12 @@ export const TraceModal: React.FC<TraceModalProps> = ({
 
   /**
    * 外部ページで開く
+   * TODO: トレース専用ページの実装が必要
    */
   const handleOpenExternal = () => {
     if (traceId) {
-      window.open(`/test/trace?traceId=${traceId}`, '_blank');
+      // window.open(`/debug/trace?traceId=${traceId}`, '_blank');
+      console.warn('Trace page not implemented yet');
     }
   };
 
