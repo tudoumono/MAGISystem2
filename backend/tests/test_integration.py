@@ -1,33 +1,46 @@
 #!/usr/bin/env python3
 """
-MAGI AgentCore Runtime Test (New Event Format)
+MAGI System Integration Test
 
-🎯 AGENTCORE RUNTIME TEST (Next.js + Python統合版) 🎯
-======================================================
+🎯 AGENTCORE RUNTIME INTEGRATION TEST 🎯
+==========================================
 
-✅ デプロイ済みAgentCore Runtime（Next.js + Python）との統合テスト
-✅ 新しいイベント形式の検証（agent_*, agentId）
-✅ ストリーミングレスポンスの完全性検証
-✅ PR #6のイベント形式変更の動作確認
+This test verifies the complete integration between:
+  - Frontend (Amplify)
+  - Backend (Next.js API routes)
+  - Python MAGI Agent (Strands Agents)
+  - Amazon Bedrock
 
-アーキテクチャ:
-    AgentCore Runtime (Docker Container)
-    ├─ Next.jsバックエンド (port 8080)
-    │  └─ spawn('python', ['magi_agent.py'])
-    └─ magi_agent.py → Strands Agents → Bedrock
+✅ Tests streaming response from /invocations endpoint
+✅ Validates new event format (agent_start, agent_chunk, agent_complete)
+✅ Verifies all 3 sages (CASPAR, BALTHASAR, MELCHIOR) responses
+✅ Confirms SOLOMON Judge integration and final decision
 
-実行方法:
-    cd agents/tests
-    python test_magi4.py
+Architecture:
+    Test Client (this file)
+        ↓ HTTP POST /invocations
+    Next.js Backend (port 8080)
+        ↓ spawn('python', ['magi_agent.py'])
+    Python MAGI Agent
+        ↓ Strands Agents
+    Amazon Bedrock
 
-設定方法:
-    1. agents/.env ファイル
-    2. 環境変数 MAGI_AGENT_ARN, APP_AWS_REGION (または AWS_REGION)
-    3. .bedrock_agentcore.yaml ファイル（自動フォールバック）
+Usage:
+    cd backend/tests
+    ./run_test.sh
 
-出力ファイル:
-    - agents/tests/streaming_output_v2/caspar_stream.txt
-    - agents/tests/streaming_output_v2/balthasar_stream.txt
+    # or directly
+    python test_integration.py
+
+Environment Variables:
+    NEXT_PUBLIC_AGENTCORE_URL - Backend URL (default: http://localhost:8080)
+    AWS_REGION - AWS region (default: us-east-1)
+    AWS_ACCESS_KEY_ID - AWS credentials
+    AWS_SECRET_ACCESS_KEY - AWS credentials
+
+Output:
+    - Streaming events printed to console in real-time
+    - Test summary with execution time and event counts
     - agents/tests/streaming_output_v2/melchior_stream.txt
     - agents/tests/streaming_output_v2/solomon_stream.txt
     - agents/tests/streaming_output_v2/full_stream.json
