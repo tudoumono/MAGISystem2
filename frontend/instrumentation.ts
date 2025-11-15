@@ -16,7 +16,7 @@ export async function register() {
   // Node.jsランタイムでのみ実行（Edge Runtimeでは実行しない）
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     // OpenTelemetryを初期化
-    const { initializeObservability } = await import('./src/lib/observability');
+    const { initializeObservability } = await import('./lib/observability');
 
     try {
       await initializeObservability();
@@ -43,7 +43,7 @@ export async function onRequestError(
   }
 ) {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    const { XRayUtils } = await import('./src/lib/observability');
+    const { XRayUtils } = await import('./lib/observability');
 
     // 現在のトレースIDを取得
     const traceId = XRayUtils.getCurrentTraceId();
