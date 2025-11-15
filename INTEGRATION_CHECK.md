@@ -184,6 +184,30 @@ for (const line of lines) {
 
 ---
 
+### 7. 環境変数・ネットワークレイヤーの整合性
+
+| レイヤー | 役割 | 参照ファイル | 必須設定 |
+| --- | --- | --- | --- |
+| Frontend (Amplify Next.js) | AgentCore Runtime のURLを解決し、`/invocations`へPOST | `frontend/hooks/useStreamingAgent.ts` | `NEXT_PUBLIC_AGENTCORE_URL` （Amplify Hostingで必須。未設定時は `http://localhost:8080` フォールバック） |
+| Backend (Next.js AgentCore Runtime) | Pythonスクリプトをspawnし、SSEストリームを生成 | `backend/app/invocations/route.ts` | `PYTHON_PATH`（デフォルト `python`）、`MAGI_SCRIPT_PATH`（デフォルト `/app/magi_agent.py`） |
+| Backend Docker | Node.js + Python統合実行環境を提供 | `backend/Dockerfile` | `PORT=8080`, `HOSTNAME=0.0.0.0`, `PYTHONPATH=/app` |
+
+Amplify Hosting → AgentCore Runtime → Pythonコンテナの3層すべてが同じポート（8080）とルーティング(`/ping`, `/invocations`)を共有しているため、参考リポジトリ `claude/reorganize-project-structure-01LZvaKNFMtyAbTRMwnfqxgb` の構成要件と一致します。Dockerコンテナに対しては `EXPOSE 8080` と `/ping` ヘルスチェックを宣言しているため、Amplifyが提供する外部ALB/ALBヘルスチェックと同等の挙動を再現できます。
+
+---
+
+### 8. Amplify Gen2 Backendとの接続
+
+`frontend/amplify/backend.ts` では Amplify Gen2 の `auth` / `data` リソースのみを定義し、LLM推論は **すべて AgentCore Runtime (backend)** に委譲しています。これにより、参考構成の「Frontend → Amplify（SSR） → AgentCore Runtime（Next.js→Python）」の責務分離が明確になっています。
+
+- Amplify側: 認証 + 会話データの保存（DynamoDB）
+- AgentCore Runtime側: `/ping` によるヘルス確認と `/invocations` による推論呼び出し
+- Python側: Strands Agents（`magi_agent.py`）でBedrockを呼び出し、JSON LinesでSSEを返却
+
+この責務境界により、Amplifyのランタイム更新とAgentCore Runtimeコンテナ更新を独立して行えるため、参考リポジトリと同じDevOpsフローを維持できます。
+
+---
+
 ## 🎯 総合評価
 
 ### ✅ フロントエンド ⇔ バックエンド統合: **完璧**
