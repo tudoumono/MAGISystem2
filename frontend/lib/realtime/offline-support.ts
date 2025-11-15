@@ -243,7 +243,7 @@ export class OfflineManager {
       // Backend APIのベースURLを環境変数から取得
       const backendUrl = process.env.NEXT_PUBLIC_AGENTCORE_URL || 'http://localhost:8080';
 
-      const response = await fetch(`${backendUrl}/api/health`, {
+      const response = await fetch(`${backendUrl}/ping`, {
         method: 'HEAD',
         cache: 'no-cache'
       });

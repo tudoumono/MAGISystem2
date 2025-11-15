@@ -160,8 +160,8 @@ export class BedrockAgentClient {
       // Backend APIのベースURLを環境変数から取得
       const backendUrl = process.env.NEXT_PUBLIC_AGENTCORE_URL || 'http://localhost:8080';
 
-      // API呼び出し
-      const response = await fetch(`${backendUrl}/api/bedrock-agents/execute`, {
+      // API呼び出し（AgentCore Runtime標準エンドポイント）
+      const response = await fetch(`${backendUrl}/invocations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

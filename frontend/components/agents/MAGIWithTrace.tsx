@@ -211,11 +211,11 @@ export default function MAGIWithTrace({
       // 会話履歴にメッセージを保存（useMessagesフックを使用）
       await sendMessage({ content: question });
 
-      // 実際のMAGIシステムの実行（新エンドポイント）
+      // 実際のMAGIシステムの実行（AgentCore Runtime標準エンドポイント）
       // Backend APIのベースURLを環境変数から取得
       const backendUrl = process.env.NEXT_PUBLIC_AGENTCORE_URL || 'http://localhost:8080';
 
-      const response = await fetch(`${backendUrl}/api/invocations`, {
+      const response = await fetch(`${backendUrl}/invocations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
