@@ -185,7 +185,7 @@ export default function EnvironmentDebugPage() {
           <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
             <p className="text-sm text-blue-800">
               <strong>📌 重要:</strong> このページで表示される環境変数は<strong>フロントエンド（Amplify）専用</strong>です。<br/>
-              <strong>AgentCore Runtime（バックエンド）</strong>は別環境（Docker/ECS）で動作し、独自の環境変数を持っています。<br/>
+              <strong>AgentCore Runtime（バックエンド）</strong>は別環境で動作し、独自の環境変数を持っています。<br/>
               例: AgentCore RuntimeのAWS認証情報（Bedrock APIキーなど）はここには表示されません。
             </p>
           </div>
