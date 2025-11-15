@@ -261,17 +261,17 @@ export default function DashboardPage() {
                     variant="ghost"
                     size="sm"
                     className="w-full justify-start"
-                    onClick={() => router.push('/test')}
+                    onClick={() => router.push('/debug')}
                   >
-                    🧪 テストダッシュボード
+                    🧪 デバッグダッシュボード
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
                     className="w-full justify-start"
-                    onClick={() => router.push('/debug/environment-check')}
+                    onClick={() => router.push('/debug/environment')}
                   >
-                    🔧 環境変数デバッグ
+                    🔧 環境変数チェック
                   </Button>
                 </div>
               </div>

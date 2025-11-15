@@ -3,10 +3,16 @@
 import { useState } from 'react';
 
 /**
- * 環境変数デバッグページ
+ * Environment Check - 環境変数チェック
  *
- * 本番環境で環境変数が正しく設定されているか確認するためのページ
- * セキュリティ上の理由から、本番環境では無効化することを推奨
+ * 目的: 本番環境で環境変数が正しく設定されているか確認
+ * アクセス制限: 環境変数 NEXT_PUBLIC_ENABLE_TEST_PAGES=true でのみアクセス可能
+ *
+ * 使用方法:
+ * 1. .env.local に NEXT_PUBLIC_ENABLE_TEST_PAGES=true を追加
+ * 2. /debug/environment にアクセス
+ *
+ * セキュリティ: 本番環境では必ず無効化すること
  */
 
 export default function EnvironmentDebugPage() {

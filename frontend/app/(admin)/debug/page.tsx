@@ -1,7 +1,7 @@
 /**
- * Admin Test Dashboard - 管理者専用テストダッシュボード
+ * Debug Dashboard - デバッグダッシュボード
  *
- * 目的: 開発・デバッグ用の統合テストダッシュボード
+ * 目的: 開発・デバッグ用の統合ダッシュボード
  * アクセス制限: 環境変数 NEXT_PUBLIC_ENABLE_TEST_PAGES=true でのみアクセス可能
  *
  * 主要機能:
@@ -12,7 +12,7 @@
  *
  * 使用方法:
  * 1. .env.local に NEXT_PUBLIC_ENABLE_TEST_PAGES=true を追加
- * 2. /admin/test にアクセス
+ * 2. /debug にアクセス
  */
 
 'use client';
@@ -24,7 +24,7 @@ import { Button } from '@/components/ui/Button';
 import { PageTransition } from '@/components/layout/PageTransition';
 import { AlertCircle, ArrowLeft, CheckCircle, XCircle } from 'lucide-react';
 
-export default function AdminTestDashboard() {
+export default function DebugDashboard() {
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -100,7 +100,7 @@ export default function AdminTestDashboard() {
                 <AlertCircle className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div>
                   <h3 className="text-lg font-semibold text-amber-900 mb-2">
-                    管理者専用テストダッシュボード
+                    デバッグダッシュボード
                   </h3>
                   <p className="text-sm text-amber-800 mb-2">
                     このページは開発・デバッグ用です。本番環境では環境変数を設定して無効化してください。
@@ -116,7 +116,7 @@ export default function AdminTestDashboard() {
           {/* タイトル */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">
-              テストダッシュボード
+              デバッグダッシュボード
             </h1>
             <p className="text-lg text-muted-foreground">
               システム診断・統合テスト・API確認
